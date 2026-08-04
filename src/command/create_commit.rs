@@ -15,6 +15,7 @@ pub struct CreateCommit {
     pub author: UserID,
     pub committer: UserID,
     pub message: String,
+    pub transaction_id: Option<String>,
     pub encoder: Box<dyn Encoder>,
     pub hasher: Box<dyn Hasher>,
     pub signer: Option<Box<dyn Signer>>,
@@ -28,12 +29,17 @@ impl Command for CreateCommit {
         store: &mut dyn ObjectStore,
         refs: &mut dyn RefStore,
     ) -> Result<Hash, VctrlError> {
+        let final_message = match &self.transaction_id {
+            Some(id) if !id.is_empty() => format!("[tx-{}] {}", id, self.message),
+            _ => self.message.clone(),
+        };
+
         let mut commit = Commit::new(
             self.tree_hash,
             self.parents.clone(),
             self.author.clone(),
             self.committer.clone(),
-            self.message.clone(),
+            final_message,
             None,
         );
 

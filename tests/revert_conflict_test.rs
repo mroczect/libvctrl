@@ -31,6 +31,7 @@ fn test_revert_with_conflict_added_modified() {
     let c1 = CreateCommit {
         tree_hash: tree1_hash,
         parents: vec![],
+        transaction_id: None,
         author: alice(),
         committer: alice(),
         message: "first".into(),
@@ -59,6 +60,7 @@ fn test_revert_with_conflict_added_modified() {
         encoder: Box::new(encoder()),
         hasher: Box::new(hasher()),
         signer: None,
+        transaction_id: None,
     }
     .execute(&mut store, &mut refs)
     .unwrap();
@@ -81,6 +83,7 @@ fn test_revert_with_conflict_added_modified() {
         encoder: Box::new(encoder()),
         hasher: Box::new(hasher()),
         signer: None,
+        transaction_id: None,
     }
     .execute(&mut store, &mut refs)
     .unwrap();
