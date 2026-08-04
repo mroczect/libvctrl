@@ -14,10 +14,10 @@ A robust, content-addressed version control engine for arbitrary data, designed
 for embedding into applications.
 
 libvctrl provides the core data model, storage abstractions, hashing, encoding,
-commands, diffing, and three-way merging needed to build version control
-functionality directly into applications -- without shelling out to an external
-VCS or depending on a CLI tool. It is a library only and does not ship a
-binary.
+commands, diffing, three-way merging, and cryptographic signing needed to build
+version control functionality directly into applications -- without shelling out
+to an external VCS or depending on a CLI tool. It is a library only and does
+not ship a binary.
 
 ---
 
@@ -33,7 +33,7 @@ binary.
   - [Hash](#hash)
   - [Tree and TreeEntry](#tree-and-treeentry)
   - [Commit](#commit)
-  - [UserInfo](#userinfo)
+  - [UserID and UserInfo](#userid-and-userinfo)
   - [Object](#object)
 - [Storage](#storage)
   - [ObjectStore Trait](#objectstore-trait)
@@ -63,6 +63,10 @@ binary.
   - [ThreeWayMerge Trait](#threewaymerge-trait)
   - [ConflictResolver Trait](#conflictresolver-trait)
   - [ThreeWayMerger](#threewaymerger)
+- [Cryptographic Signing](#cryptographic-signing)
+  - [Signer Trait](#signer-trait)
+  - [LibrageSigner](#libragesigner)
+  - [Signing and Verification Workflow](#signing-and-verification-workflow)
 - [Error Handling](#error-handling)
   - [VctrlError](#vctrlerror)
   - [HashError](#hasherror)
@@ -72,6 +76,7 @@ binary.
 - [Build and Lint](#build-and-lint)
 - [Security Considerations](#security-considerations)
 - [Limitations](#limitations)
+- [Migration from v0.1.0](#migration-from-v010)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -84,8 +89,15 @@ principle to Git's object model, but with key differences:
 
 - **SHA-512 hashes** instead of SHA-1, providing 256 bits of collision
   resistance.
-- **Trait-based abstractions** for storage, hashing, encoding, diffing, and
-  merging, allowing custom backends and algorithms without modifying the core.
+- **Ed25519 signing** for commit integrity verification, using the
+  `ed25519-dalek` crate.
+- **Validated user identity** through the `UserID` type from the
+
+# age-credentials crate, enforcing name and email format rules.
+
+- **Trait-based abstractions** for storage, hashing, encoding, signing,
+  diffing, and merging, allowing custom backends and algorithms without
+  modifying the core.
 - **Command pattern** for all operations, providing a uniform interface that
   accepts mutable references to an `ObjectStore` and a `RefStore`.
 - **Embedded design** -- no CLI, no subprocess calls, no filesystem
@@ -97,43 +109,44 @@ principle to Git's object model, but with key differences:
 ## Architecture
 
 ```
-
 src/
-lib.rs Crate root, re-exports all modules
-error.rs VctrlError enum
-codec/ Encoding format
-mod.rs Encoder trait and re-exports
-binary.rs BinaryEncoder implementation
-command/ Command pattern operations
-mod.rs Command trait and re-exports
-branch.rs CreateBranch, DeleteBranch, GetBranch, SetHead
-checkout.rs Checkout (recursive tree materialization)
-create_commit.rs CreateCommit
-log.rs Log (commit history traversal)
-merge.rs MergeCommand
-diff/ Tree diffing
-mod.rs TreeDiff trait, DiffKind, DiffEntry
-tree_diff.rs TreeDiffer implementation
-domain/ Core domain types
-mod.rs Re-exports all domain types
-blob.rs Blob (content-addressed data)
-commit.rs Commit (snapshot record)
-hash.rs Hash (64-byte SHA-512), HashError
-object.rs Object enum (Blob, Tree, Commit)
-tree.rs Tree, TreeEntry, EntryKind, TreeError
-user.rs UserInfo (name + email)
-hashing/ Hashing trait and implementation
-mod.rs Hasher trait and re-exports
-sha512.rs Sha512Hasher
-merge/ Three-way merge
-mod.rs ThreeWayMerge trait
-resolver.rs ConflictResolver trait
-three_way.rs ThreeWayMerger implementation
-storage/ Storage backends
-mod.rs Re-exports
-traits.rs ObjectStore, RefStore traits
-memory.rs MemoryStore, MemoryRefStore
-
+  lib.rs              Crate root, re-exports all modules
+  error.rs            VctrlError enum
+  codec/              Encoding format
+    mod.rs              Encoder trait and re-exports
+    binary.rs           BinaryEncoder implementation
+  command/            Command pattern operations
+    mod.rs              Command trait and re-exports
+    branch.rs           CreateBranch, DeleteBranch, GetBranch, SetHead
+    checkout.rs         Checkout (recursive tree materialization)
+    create_commit.rs    CreateCommit
+    log.rs              Log (commit history traversal)
+    merge.rs            MergeCommand
+  crypto/             Cryptographic signing
+    mod.rs              Signer trait and re-exports
+    signer.rs           LibrageSigner (Ed25519)
+  diff/               Tree diffing
+    mod.rs              TreeDiff trait, DiffKind, DiffEntry
+    tree_diff.rs        TreeDiffer implementation
+  domain/             Core domain types
+    mod.rs              Re-exports all domain types
+    blob.rs             Blob (content-addressed data)
+    commit.rs           Commit (snapshot record)
+    hash.rs             Hash (64-byte SHA-512), HashError
+    object.rs           Object enum (Blob, Tree, Commit)
+    tree.rs             Tree, TreeEntry, EntryKind, TreeError
+    user.rs             UserID (from age-credentials), UserInfo
+  hashing/            Hashing trait and implementation
+    mod.rs              Hasher trait and re-exports
+    sha512.rs           Sha512Hasher
+  merge/              Three-way merge
+    mod.rs              ThreeWayMerge trait
+    resolver.rs         ConflictResolver trait
+    three_way.rs        ThreeWayMerger implementation
+  storage/            Storage backends
+    mod.rs              Re-exports
+    traits.rs           ObjectStore, RefStore traits
+    memory.rs           MemoryStore, MemoryRefStore
 ```
 
 ---
@@ -223,13 +236,19 @@ See the `tests/` directory in the repository for complete usage examples.
 
 ## Dependencies
 
-| Crate      | Version | Purpose                                       |
-| ---------- | ------- | --------------------------------------------- |
-| chrono     | 0.4.45  | Timestamps for commits (with serde feature)   |
-| serde      | 1.0.229 | Serialization framework (with derive feature) |
-| serde_json | 1.0.151 | JSON serialization                            |
-| sha2       | 0.11.0  | SHA-512 digest computation                    |
-| thiserror  | 2.0.19  | Error derive macro                            |
+| Crate           | Version | Purpose                                           |
+| --------------- | ------- | ------------------------------------------------- |
+| chrono          | 0.4.45  | Timestamps for commits (with serde feature)       |
+| serde           | 1.0.229 | Serialization framework (with derive feature)     |
+| serde_json      | 1.0.151 | JSON serialization                                |
+| sha2            | 0.11.0  | SHA-512 digest computation                        |
+| thiserror       | 2.0.19  | Error derive macro                                |
+| ed25519-dalek   | 3.0.0   | Ed25519 signing and verification                  |
+| rand            | 0.8.7   | CSPRNG for signing key generation                 |
+| age-credentials | 0.3.0   | Validated UserID type                             |
+| librage         | 1.1.0   | age encryption backend                            |
+| age             | 0.12.1  | age library (transitive, used by age-credentials) |
+| tempfile        | 3.27.0  | Atomic file writes (used by age-credentials)      |
 
 ---
 
@@ -237,9 +256,10 @@ See the `tests/` directory in the repository for complete usage examples.
 
 ```rust
 use libvctrl::{
-    BinaryEncoder, Blob, Commit, CreateBranch, CreateCommit, Hash, Hasher,
-    MemoryRefStore, MemoryStore, Object, ObjectStore, RefStore, SetHead,
-    Sha512Hasher, Tree, TreeEntry, EntryKind, UserInfo, Command,
+    BinaryEncoder, Blob, Command, CreateBranch, CreateCommit, Hash,
+    Hasher, LibrageSigner, MemoryRefStore, MemoryStore, Object,
+    ObjectStore, RefStore, SetHead, Sha512Hasher, Signer, Tree,
+    TreeEntry, EntryKind, UserID,
 };
 
 // Set up storage
@@ -255,7 +275,6 @@ store.put(&blob_hash, &Object::Blob(blob)).unwrap();
 // Create a tree with one entry
 let entry = TreeEntry::new("hello.txt".into(), EntryKind::Blob, blob_hash);
 let tree = Tree::new(vec![entry]).unwrap();
-
 let encoder = BinaryEncoder;
 let mut buf = Vec::new();
 encoder.encode_tree(&tree, &mut buf);
@@ -263,7 +282,7 @@ let tree_hash = hasher.hash_tree_encoded(&buf);
 store.put(&tree_hash, &Object::Tree(tree)).unwrap();
 
 // Create a branch and set HEAD
-let author = UserInfo::new("Alice".into(), "alice@example.com".into());
+let author = UserID::new("Alice Example", "alice@example.com").unwrap();
 CreateBranch { name: "refs/heads/main".into(), hash: tree_hash }
     .execute(&mut store, &mut refs).unwrap();
 SetHead { target: "refs/heads/main".into() }
@@ -280,7 +299,12 @@ let commit_hash = CreateCommit {
     hasher: Box::new(Sha512Hasher),
 }.execute(&mut store, &mut refs).unwrap();
 
-println!("Commit created: {}", commit_hash);
+// Sign the commit
+let signer = LibrageSigner::generate();
+let signature = signer.sign(commit_hash.as_bytes()).unwrap();
+let verifying_key = signer.verifying_key();
+println!("Commit: {}", commit_hash);
+println!("Signature length: {} bytes", signature.len());
 ```
 
 ---
@@ -298,15 +322,13 @@ pub struct Blob {
 A content-addressed data container. The inner `data` field is private to
 enforce encapsulation.
 
-**Methods:**
-
 | Method       | Signature                 | Description                        |
 | ------------ | ------------------------- | ---------------------------------- |
 | `new`        | `(data: Vec<u8>) -> Self` | Construct from raw bytes           |
 | `as_bytes`   | `(&self) -> &[u8]`        | Borrow the inner bytes             |
 | `into_bytes` | `(self) -> Vec<u8>`       | Consume and return the inner bytes |
 
-`Blob` implements `Debug`, `Clone`, `Serialize`, and `Deserialize`.
+Implements `Debug`, `Clone`, `Serialize`, `Deserialize`.
 
 ---
 
@@ -316,43 +338,27 @@ enforce encapsulation.
 pub struct Hash([u8; 64]);
 ```
 
-A 64-byte (512-bit) SHA-512 hash value. The inner array is private. `Hash`
-is `Copy` because 64 bytes is small enough for stack allocation.
-
-**Construction methods:**
+A 64-byte (512-bit) SHA-512 hash value. `Copy` because 64 bytes fits on
+the stack.
 
 | Method       | Signature                            | Description                                       |
 | ------------ | ------------------------------------ | ------------------------------------------------- |
 | `from_bytes` | `(bytes: [u8; 64]) -> Self`          | Construct from a fixed-size array (const)         |
 | `from_slice` | `(&[u8]) -> Result<Self, HashError>` | Construct from a slice; fails if length is not 64 |
 | `from_hex`   | `(&str) -> Result<Self, HashError>`  | Construct from a 128-character hex string         |
+| `as_bytes`   | `(&self) -> &[u8; 64]`               | Borrow the inner byte array                       |
+| `to_hex`     | `(&self) -> String`                  | Produce a 128-character lowercase hex string      |
 
-**Access methods:**
-
-| Method     | Signature              | Description                                  |
-| ---------- | ---------------------- | -------------------------------------------- |
-| `as_bytes` | `(&self) -> &[u8; 64]` | Borrow the inner byte array                  |
-| `to_hex`   | `(&self) -> String`    | Produce a 128-character lowercase hex string |
-
-**Trait implementations:**
-
-| Trait                                      | Behavior                                       |
-| ------------------------------------------ | ---------------------------------------------- |
-| `Debug`                                    | Formats as `Hash(<hex>)`                       |
-| `Display`                                  | Formats as the bare hex string                 |
-| `FromStr`                                  | Parses from hex via `from_hex`                 |
-| `Serialize`                                | Serializes as a hex string                     |
-| `Deserialize`                              | Deserializes from a hex string with validation |
-| `Clone`, `Copy`, `PartialEq`, `Eq`, `Hash` | Standard                                       |
+Implements `Debug`, `Display`, `FromStr`, `Serialize` (as hex),
+`Deserialize` (from hex with validation), `Clone`, `Copy`, `PartialEq`,
+`Eq`, `Hash`.
 
 ---
 
 ### Tree and TreeEntry
 
 ```rust
-pub struct Tree {
-    entries: Vec<TreeEntry>,  // private, sorted by name
-}
+pub struct Tree { entries: Vec<TreeEntry> }  // private, sorted by name
 
 pub struct TreeEntry {
     pub name: String,
@@ -360,43 +366,18 @@ pub struct TreeEntry {
     pub hash: Hash,
 }
 
-pub enum EntryKind {
-    Blob,
-    Tree,
-}
+pub enum EntryKind { Blob, Tree }
 ```
 
-A `Tree` represents a directory listing: an ordered collection of named
-references to child objects (blobs or subtrees). Entries are sorted
-lexicographically by name on construction and duplicate names are rejected.
-
-**Tree methods:**
-
-| Method         | Signature                                              | Description                                |
+| Tree method    | Signature                                              | Description                                |
 | -------------- | ------------------------------------------------------ | ------------------------------------------ |
 | `new`          | `(entries: Vec<TreeEntry>) -> Result<Self, TreeError>` | Construct, sort by name, detect duplicates |
 | `entries`      | `(&self) -> &[TreeEntry]`                              | Borrow the sorted entries                  |
 | `into_entries` | `(self) -> Vec<TreeEntry>`                             | Consume and return the entries             |
 | `is_empty`     | `(&self) -> bool`                                      | Check if there are no entries              |
 
-**TreeEntry::new:**
-
-```rust
-pub fn new(name: String, kind: EntryKind, hash: Hash) -> Self
-```
-
-**TreeError:**
-
-```rust
-pub enum TreeError {
-    DuplicateEntry(String),  // the duplicated name
-}
-```
-
-Because entries are sorted on construction, the hash of a tree is
-deterministic regardless of the input order. This is critical for
-content-addressed storage: two trees with the same entries in different
-orders produce the same hash.
+Entries are sorted on construction, making tree hashes deterministic
+regardless of input order.
 
 ---
 
@@ -406,48 +387,48 @@ orders produce the same hash.
 pub struct Commit {
     pub tree: Hash,
     pub parents: Vec<Hash>,
-    pub author: UserInfo,
-    pub committer: UserInfo,
+    pub author: UserID,
+    pub committer: UserID,
     pub timestamp: DateTime<Utc>,
     pub message: String,
     pub signature: Option<Vec<u8>>,
 }
 ```
 
-A snapshot record linking a tree to metadata.
-
-**Fields:**
-
-| Field       | Type              | Description                                                |
-| ----------- | ----------------- | ---------------------------------------------------------- |
-| `tree`      | `Hash`            | Hash of the root tree this commit captures                 |
-| `parents`   | `Vec<Hash>`       | Zero or more parent commit hashes (empty for root commits) |
-| `author`    | `UserInfo`        | The original author of the change                          |
-| `committer` | `UserInfo`        | The identity that created this commit object               |
-| `timestamp` | `DateTime<Utc>`   | Automatically set to `Utc::now()` on construction          |
-| `message`   | `String`          | Commit message                                             |
-| `signature` | `Option<Vec<u8>>` | Optional cryptographic signature bytes                     |
-
-**Commit::new:**
-
-```rust
-pub fn new(
-    tree: Hash,
-    parents: Vec<Hash>,
-    author: UserInfo,
-    committer: UserInfo,
-    message: String,
-    signature: Option<Vec<u8>>,
-) -> Self
-```
+| Field       | Type              | Description                                       |
+| ----------- | ----------------- | ------------------------------------------------- |
+| `tree`      | `Hash`            | Hash of the root tree this commit captures        |
+| `parents`   | `Vec<Hash>`       | Zero or more parent commit hashes                 |
+| `author`    | `UserID`          | The original author (validated)                   |
+| `committer` | `UserID`          | The identity that created this commit (validated) |
+| `timestamp` | `DateTime<Utc>`   | Automatically set to `Utc::now()` on construction |
+| `message`   | `String`          | Commit message                                    |
+| `signature` | `Option<Vec<u8>>` | Optional cryptographic signature bytes            |
 
 The timestamp is always `Utc::now()` at construction time. There is no way to
-set a custom timestamp through `new`. This ensures that commits created
-through the API always have a valid, recent timestamp.
+set a custom timestamp through `Commit::new`.
 
 ---
 
-### UserInfo
+### UserID and UserInfo
+
+**UserID** is re-exported from the `age-credentials` crate. It is a validated
+user identity with the following rules:
+
+- **Name:** non-empty after trimming, minimum 2 characters, maximum 255
+  characters, only alphabetic, numeric, space, hyphen, apostrophe, or period
+  characters.
+- **Email:** non-empty after trimming, exactly one `@`, non-empty local part
+  and domain, maximum 254 characters, only alphanumeric, period, hyphen,
+  underscore, `@`, or plus characters.
+
+```rust
+let uid = UserID::new("Alice Smith", "alice@example.com")?;
+assert_eq!(uid.to_formatted(), "Alice Smith <alice@example.com>");
+```
+
+**UserInfo** is a plain, unvalidated struct retained for backward
+compatibility:
 
 ```rust
 pub struct UserInfo {
@@ -456,8 +437,9 @@ pub struct UserInfo {
 }
 ```
 
-Author or committer identity. No validation is performed on the `name` or
-`email` fields. The struct is a plain data holder.
+`Commit` and `CreateCommit` use `UserID`. Use `UserInfo` only if you need
+an unvalidated identity (for example, when reading data that has already
+been validated elsewhere).
 
 ---
 
@@ -471,18 +453,8 @@ pub enum Object {
 }
 ```
 
-Tagged union of all storable object types. `Commit` is boxed to avoid
-infinite type recursion (a `Commit` contains `UserInfo` which contains
-`String`, and the overall size is large enough that boxing reduces stack
-pressure).
-
-**Object::obj_type:**
-
-```rust
-pub fn obj_type(&self) -> &str
-```
-
-Returns `"blob"`, `"tree"`, or `"commit"`.
+Tagged union of all storable types. `Commit` is boxed to avoid infinite
+type recursion. `obj_type()` returns `"blob"`, `"tree"`, or `"commit"`.
 
 ---
 
@@ -492,20 +464,13 @@ Returns `"blob"`, `"tree"`, or `"commit"`.
 
 ```rust
 pub trait ObjectStore {
-    fn put(&mut self, hash: &Hash, obj: &Object) -> Result<(), VctrlError>;
+    fn put(&mut self, hash: &Hash, obj: &Object) ->FResult<(), VctrlError>;
     fn get(&self, hash: &Hash) -> Result<Option<Object>, VctrlError>;
     fn exists(&self, hash: &Hash) -> Result<bool, VctrlError>;
 }
 ```
 
-Trait for content-addressed object storage. Implementations store and
-retrieve `Object` values keyed by their `Hash`.
-
-- `put` -- Store an object. If an object with the same hash already exists,
-  the implementation may overwrite it or silently ignore the duplicate (the
-  memory backend overwrites).
-- `get` -- Retrieve an object. Returns `Ok(None)` if the hash is not present.
-- `exists` -- Check whether a hash is present without retrieving the object.
+Trait for content-addressed object storage.
 
 ### RefStore Trait
 
@@ -520,56 +485,19 @@ pub trait RefStore {
 }
 ```
 
-Trait for named reference and HEAD management.
-
-- `set_ref` / `get_ref` / `delete_ref` -- Manage named references (branches,
-  tags, etc.) that map string names to `Hash` values.
-- `set_head` -- Set the HEAD pointer. The `target` is a string that can be
-  either a symbolic reference (starting with `refs/`) or a direct hex hash.
-- `head` -- Resolve HEAD to a `Hash`. If HEAD is a symbolic reference, the
-  implementation resolves it through `get_ref`. If HEAD is a direct hash,
-  it is parsed from hex.
-- `head_ref_name` -- Return the symbolic reference name that HEAD points to,
-  or `None` if HEAD is a direct hash or unset. Used by `CreateCommit` to
-  update the current branch after creating a commit.
+Trait for named reference and HEAD management. `head()` resolves HEAD to a
+`Hash` (through symbolic reference or direct hex). `head_ref_name()` returns
+the symbolic reference name, or `None` if HEAD is a direct hash or unset.
 
 ### MemoryStore
 
-```rust
-pub struct MemoryStore {
-    // private: HashMap<Hash, Object>
-}
-```
-
-In-memory `ObjectStore` backed by `HashMap<Hash, Object>`. Provides `new()`
-and implements `Default`. All objects are kept in memory for the lifetime of
-the store. Suitable for testing, prototyping, and transient computations.
+In-memory `ObjectStore` backed by `HashMap<Hash, Object>`. Implements `Default`.
 
 ### MemoryRefStore
 
-```rust
-pub struct MemoryRefStore {
-    // private: HashMap<String, Hash>, Option<String> for HEAD
-}
-```
-
-In-memory `RefStore` backed by `HashMap<String, Hash>` for references and
-`Option<String>` for HEAD.
-
-**HEAD resolution logic in `head()`:**
-
-1. If `head` is `None`, return `Ok(None)`.
-2. If `head` is `Some(target)` and `target` starts with `"refs/"`, resolve
-   by calling `get_ref(target)`.
-3. If `head` is `Some(target)` and does not start with `"refs/"`, parse it
-   as a 128-character hex hash via `Hash::from_hex`. Returns
-   `Err(VctrlError::Hash)` if the hex is invalid.
-
-**`head_ref_name()` logic:**
-
-1. If `head` is `Some(target)` and `target` starts with `"refs/"`, return
-   `Ok(Some(target.clone()))`.
-2. Otherwise, return `Ok(None)`.
+In-memory `RefStore` backed by `HashMap<String, Hash>` and `Option<String>`
+for HEAD. HEAD can be a symbolic reference (starting with `refs/`) or a
+direct hex hash. Implements `Default`.
 
 ---
 
@@ -585,42 +513,17 @@ pub trait Hasher {
 }
 ```
 
-Trait for content-addressed hashing. Each method takes raw or encoded data
-and produces a `Hash`. The separate methods allow implementations to include
-a type prefix in the hash input, preventing cross-type hash collisions.
-
 ### Sha512Hasher
 
-```rust
-pub struct Sha512Hasher;
-```
+Computes `SHA-512(prefix || length_u64_be || 0x00 || data)`.
 
-SHA-512 implementation of `Hasher`.
+| Method                | Prefix      |
+| --------------------- | ----------- |
+| `hash_blob`           | `"blob "`   |
+| `hash_tree_encoded`   | `"tree "`   |
+| `hash_commit_encoded` | `"commit "` |
 
-**Hash format:** Each method computes `SHA-512(prefix || length_be || 0x00 || data)`:
-
-| Method                | Prefix      | length_be                       |
-| --------------------- | ----------- | ------------------------------- |
-| `hash_blob`           | `"blob "`   | `data.len() as u64`, big-endian |
-| `hash_tree_encoded`   | `"tree "`   | `data.len() as u64`, big-endian |
-| `hash_commit_encoded` | `"commit "` | `data.len() as u64`, big-endian |
-
-The prefix includes a trailing space (for example, `b"blob "`). The null
-byte `0x00` separates the header from the data. This format is modeled after
-Git's object hashing and ensures that two different object types with
-identical content produce different hashes.
-
-**Example:**
-
-```rust
-let hasher = Sha512Hasher;
-let blob_hash = hasher.hash_blob(b"hello world");
-let other_hash = hasher.hash_blob(b"hello world");
-assert_eq!(blob_hash, other_hash);  // deterministic
-
-let different_hash = hasher.hash_blob(b"goodbye");
-assert_ne!(blob_hash, different_hash);
-```
+The type prefix and length header prevent cross-type hash collisions.
 
 ---
 
@@ -635,62 +538,23 @@ pub trait Encoder {
 }
 ```
 
-Trait for serializing domain objects to a byte buffer. The buffer is appended
-to (not cleared), allowing multiple objects to be encoded into the same
-buffer.
-
 ### BinaryEncoder
 
-```rust
-pub struct BinaryEncoder;
-```
-
-Binary format implementation of `Encoder`.
+Binary format implementation. Appends to the provided buffer.
 
 ### Binary Format Specification
 
-**Tree encoding:**
+**Tree:** version byte (0x01), entry count (u32 BE), per-entry: name
+length (u16 BE), name bytes, kind byte (0x00=Blob, 0x01=Tree), hash (64
+bytes).
 
-| Offset | Size | Value                        |
-| ------ | ---- | ---------------------------- |
-| 0      | 1    | Version byte: `0x01`         |
-| 1      | 4    | Entry count (big-endian u32) |
-| 5      | ...  | For each entry:              |
+**Commit:** version byte (0x01), tree hash (64 bytes), parent count (u32
+BE), parent hashes, author, committer, timestamp seconds (i64 BE), timestamp
+nanoseconds (u32 BE), message length (u32 BE"BE), message bytes, signature
+length (u32 BE), signature bytes.
 
-Per entry:
-
-| Offset      | Size     | Value                              |
-| ----------- | -------- | ---------------------------------- |
-| +0          | 2        | Name length (big-endian u16)       |
-| +2          | name_len | Name bytes (UTF-8)                 |
-| +2+name_len | 1        | Kind: `0x00` = Blob, `0x01` = Tree |
-| +3+name_len | 64       | Hash bytes (raw, 64 bytes)         |
-
-**Commit encoding:**
-
-| Offset | Size    | Value                                             |
-| ------ | ------- | ------------------------------------------------- |
-| 0      | 1       | Version byte: `0x01`                              |
-| 1      | 64      | Tree hash                                         |
-| 65     | 4       | Parent count (big-endian u32)                     |
-| 69     | 64 * n  | Parent hashes                                     |
-| ...    | ...     | Author (see below)                                |
-| ...    | ...     | Committer (see below)                             |
-| ...    | 8       | Timestamp seconds (big-endian i64)                |
-| ...    | 4       | Timestamp sub-second nanoseconds (big-endian u32) |
-| ...    | 4       | Message length (big-endian u32)                   |
-| ...    | msg_len | Message bytes (UTF-8)                             |
-| ...    | 4       | Signature length (big-endian u32); 0 if None      |
-| ...    | sig_len | Signature bytes (if present)                      |
-
-**User (author/committer) encoding:**
-
-| Offset      | Size      | Value                         |
-| ----------- | --------- | ----------------------------- |
-| +0          | 2         | Name length (big-endian u16)  |
-| +2          | name_len  | Name bytes (UTF-8)            |
-| +2+name_len | 2         | Email length (big-endian u16) |
-| +4+name_len | email_len | Email bytes (UTF-8)           |
+**User (author/committer):** name length (u16 BE), name bytes, email length
+(u16 BE), email bytes.
 
 ---
 
@@ -701,75 +565,26 @@ Per entry:
 ```rust
 pub trait Command {
     type Output;
-    fn execute(
-        &self,
-        store: &mut dyn ObjectStore,
-        refs: &mut dyn RefStore,
-    ) -> Result<Self::Output, VctrlError>;
+    fn execute(&self, store: &mut dyn ObjectStore, refs: &mut dyn RefStore)
+        -> Result<Self::Output, VctrlError>;
 }
 ```
-
-All operations implement this trait. Each command takes mutable references to
-an object store and a reference store, and returns a typed output or a
-`VctrlError`. The command itself is consumed by reference (`&self`), not by
-value, allowing it to be reused.
 
 ### Branch Operations
 
-#### CreateBranch
-
-```rust
-pub struct CreateBranch {
-    pub name: String,
-    pub hash: Hash,
-}
-```
-
-Creates or updates a named reference. The `name` must start with
-`"refs/heads/"`. Returns `Err(VctrlError::InvalidRef)` otherwise. On
-success, returns `Ok(())`.
-
-#### DeleteBranch
-
-```rust
-pub struct DeleteBranch {
-    pub name: String,
-}
-```
-
-Deletes a named reference. The `name` must start with `"refs/heads/"`.
-Returns `Err(VctrlError::InvalidRef)` otherwise. On success, returns
-`Ok(())`. Deleting a nonexistent reference silently succeeds (the memory
-backend's `HashMap::remove` behavior).
-
-#### GetBranch
-
-```rust
-pub struct GetBranch {
-    pub name: String,
-}
-```
-
-Retrieves the hash associated with a named reference. The `name` must start
-with `"refs/heads/"`. Returns `Ok(Some(hash))` if the reference exists,
-`Ok(None)` if it does not, or `Err(VctrlError::InvalidRef)` if the name is
-invalid.
+| Command                       | Output         | Description                                                   |
+| ----------------------------- | -------------- | ------------------------------------------------------------- |
+| `CreateBranch { name, hash }` | `()`           | Create/update a reference; name must start with `refs/heads/` |
+| `DeleteBranch { name }`       | `()`           | Delete a reference; name must start with `refs/heads/`        |
+| `GetBranch { name }`          | `Option<Hash>` | Look up a reference; name must start with `refs/heads/`       |
 
 ### SetHead
 
 ```rust
-pub struct SetHead {
-    pub target: String,
-}
+pub struct SetHead { pub target: String }
 ```
 
-Sets the HEAD pointer. The `target` must be either:
-
-- A branch reference starting with `"refs/heads/"`, or
-- A valid 128-character hexadecimal hash.
-
-Returns `Err(VctrlError::InvalidRef)` if the target is neither. On success,
-returns `Ok(())`.
+Sets HEAD. Target must start with `refs/` or be a valid 128-char hex hash.
 
 ### CreateCommit
 
@@ -777,28 +592,17 @@ returns `Ok(())`.
 pub struct CreateCommit {
     pub tree_hash: Hash,
     pub parents: Vec<Hash>,
-    pub author: UserInfo,
-    pub committer: UserInfo,
+    pub author: UserID,
+    pub committer: UserID,
     pub message: String,
     pub encoder: Box<dyn Encoder>,
     pub hasher: Box<dyn Hasher>,
 }
 ```
 
-Creates a commit object, stores it, and updates the current branch reference.
-
-**Execution steps:**
-
-1. Construct a `Commit` with `timestamp: Utc::now()` and `signature: None`.
-2. Encode the commit using the provided `encoder`.
-3. Hash the encoded bytes using the provided `hasher`.
-4. Store the commit as `Object::Commit(Box::new(commit))`.
-5. If HEAD points to a symbolic reference (via `refs.head_ref_name()`),
-   update that reference to the new commit hash.
-6. Return the commit hash.
-
-The encoder and hasher are boxed trait objects, allowing the caller to
-inject custom implementations.
+Creates a commit with `timestamp: Utc::now()` and `signature: None`, stores
+it, and updates the current branch reference if HEAD is symbolic. Returns
+the commit hash.
 
 ### Log
 
@@ -806,59 +610,23 @@ inject custom implementations.
 pub struct Log;
 ```
 
-Traverses the commit history starting from HEAD, following the first parent
-of each commit.
-
-**Execution steps:**
-
-1. Resolve HEAD. If HEAD is unset, return an empty vector.
-2. Starting from the HEAD hash, look up the commit object.
-3. Push the commit into the result vector.
-4. Follow `commit.parents[0]` to the next commit.
-5. Repeat until a commit with no parents is reached or an object is not
-   found.
-
-The result is ordered from most recent to oldest (newest commit first).
-
-**Limitation:** Only follows the first parent. Merge commits' second and
-subsequent parents are ignored. This produces a linear history view.
+Traverses commit history from HEAD, following the first parent. Returns
+commits newest-first. Returns empty vector if HEAD is unset.
 
 ### Checkout
 
 ```rust
-pub struct Checkout {
-    pub tree_hash: Hash,
-}
+pub struct Checkout { pub tree_hash: Hash }
 ```
 
-Recursively materializes a tree into a flat list of file paths and their
-contents.
-
-**Output:** `Vec<(String, Vec<u8>)>` where each tuple is `(path, data)`.
-
-**Execution steps:**
-
-1. Look up the tree object by `tree_hash`.
-2. For each entry in the tree:
-   - If `EntryKind::Blob`: look up the blob, prepend the current path
-     prefix, and add `(path, blob.into_bytes())` to the result.
-   - If `EntryKind::Tree`: recurse into the subtree, extending the path
-     prefix with `"{prefix}/{name}"`.
-3. Return the flat list.
-
-**Depth limit:** Recursion is capped at 1000 levels. If exceeded, returns
-`Err(VctrlError::Other("max checkout depth exceeded"))`.
-
-**Error:** Returns `Err(VctrlError::NotFound("tree not found"))` if the
-hash does not resolve to a tree object.
+Recursively materializes a tree into `Vec<(String, Vec<u8>)>` (path, data).
+Depth capped at 1000.
 
 ### MergeCommand
 
 ```rust
 pub struct MergeCommand {
-    pub base: Hash,
-    pub ours: Hash,
-    pub theirs: Hash,
+    pub base: Hash, pub ours: Hash, pub theirs: Hash,
     pub merger: Box<dyn ThreeWayMerge>,
     pub resolver: Box<dyn ConflictResolver>,
     pub encoder: Box<dyn Encoder>,
@@ -866,10 +634,7 @@ pub struct MergeCommand {
 }
 ```
 
-Executes a three-way merge. Delegates to the provided `ThreeWayMerge`
-implementation with the `base`, `ours`, and `theirs` tree hashes. Returns
-the hash of the merged tree on success, or `Err(VctrlError::MergeConflict)`
-on unresolvable conflicts.
+Executes three-way merge, returning the merged tree hash.
 
 ---
 
@@ -892,29 +657,13 @@ pub enum DiffKind {
     Modified { old_hash: Hash, new_hash: Hash },
 }
 
-pub struct DiffEntry {
-    pub name: String,
-    pub kind: DiffKind,
-}
+pub struct DiffEntry { pub name: String, pub kind: DiffKind }
 ```
-
-| Variant    | Meaning                                                                          |
-| ---------- | -------------------------------------------------------------------------------- |
-| `Added`    | Entry exists in `new_tree` but not in `old_tree`                                 |
-| `Removed`  | Entry exists in `old_tree` but not in `new_tree`                                 |
-| `Modified` | Entry exists in both but with different hashes; captures both old and new hashes |
 
 ### TreeDiffer
 
-```rust
-pub struct TreeDiffer;
-```
-
-Implementation of `TreeDiff`. Converts both trees to `BTreeMap<String, TreeEntry>`,
-collects the union of keys, and classifies each entry by comparing presence
-and hash equality. Entries present in both trees with the same hash are
-omitted from the result (no diff). The output is ordered by key name because
-`BTreeSet` iteration is sorted.
+Converts both trees to `BTreeMap`, compares keys, and classifies entries
+as Added, Removed, or Modified. Output is sorted by name.
 
 ---
 
@@ -924,16 +673,11 @@ omitted from the result (no diff). The output is ordered by key name because
 
 ```rust
 pub trait ThreeWayMerge {
-    fn merge(
-        &self,
-        store: &mut dyn ObjectStore,
-        base: &Hash,
-        ours: &Hash,
-        theirs: &Hash,
+    fn merge(&self, store: &mut dyn ObjectStore,
+        base: &Hash, ours: &Hash, theirs: &Hash,
         resolver: &dyn ConflictResolver,
-        encoder: &dyn Encoder,
-        hasher: &dyn Hasher,
-    ) -> Result<Hash, VctrlError>;
+        encoder: &dyn Encoder, hasher: &dyn Hasher)
+    -> Result<Hash, VctrlError>;
 }
 ```
 
@@ -945,51 +689,126 @@ pub trait ConflictResolver {
 }
 ```
 
-Called when both `ours` and `theirs` have modified the same blob relative to
-`base`. Returns `Some(resolved_data)` to resolve the conflict, or `None` to
-fail with `VctrlError::MergeConflict`.
-
-The resolver receives the raw bytes of the base, ours, and theirs blobs. It
-does not receive the entry name or path. Resolvers that need path context
-must capture it through other means (closures, environment variables, etc.).
+Returns `Some(resolved_data)` to resolve a conflict, or `None` to fail.
 
 ### ThreeWayMerger
 
+Handles all nine combinations of (base, ours, theirs) presence/absence.
+Recurses into subtrees when both sides are trees. Calls ConflictResolver
+when both sides modified the same blob. Depth capped at 1000.
+
+---
+
+## Cryptographic Signing
+
+### Signer Trait
+
 ```rust
-pub struct ThreeWayMerger;
+pub trait Signer {
+    fn sign(&self, commit_hash: &[u8]) -> Result<Vec<u8>, VctrlError>;
+}
 ```
 
-Full three-way merge implementation. Handles all nine combinations of entry
-presence in (base, ours, theirs):
+A trait for signing arbitrary byte slices, intended for signing commit
+hashes. The input should be the 64-byte `Hash` of the commit. The output
+is a signature as raw bytes.
 
-| base | ours | theirs         | Result                                      |
-| ---- | ---- | -------------- | ------------------------------------------- |
-| -    | O    | -              | Added by ours: keep O                       |
-| -    | -    | T              | Added by theirs: keep T                     |
-| B    | -    | T              | Removed by ours, modified by theirs: keep T |
-| B    | O    | -              | Modified by ours, removed by theirs: keep O |
-| B    | -    | -              | Removed by both: omit                       |
-| B    | O    | T (O==T)       | Same modification: keep O                   |
-| B    | O    | T (O==B)       | Ours unchanged, theirs modified: keep T     |
-| B    | O    | T (T==B)       | Theirs unchanged, ours modified: keep O     |
-| B    | O    | T (all differ) | Conflict: call resolver                     |
+### LibrageSigner
 
-When all three versions differ and the entries are blobs, the
-`ConflictResolver` is called. If it returns `Some(data)`, a new blob is
-created and stored. If it returns `None`, `VctrlError::MergeConflict` is
-returned.
+```rust
+pub struct LibrageSigner { /* private: SigningKey */ }
+```
 
-When all three versions differ and the entries are trees, the merger
-recurses into the subtrees. When the entry kinds differ (one is Blob, the
-other is Tree), `VctrlError::MergeConflict` is returned with reason
-`"type mismatch"`.
+An Ed25519 signing implementation using `ed25519_dalek::SigningKey`.
 
-**Depth limit:** Recursion is capped at 1000 levels. If exceeded, returns
-`Err(VctrlError::Other("max merge depth exceeded"))`.
+#### LibrageSigner::generate
 
-**After merge:** The merged tree is constructed via `Tree::new` (which sorts
-and validates entries), encoded, hashed, and stored. The hash of the merged
-tree is returned.
+```rust
+pub fn generate() -> Self
+```
+
+Generates a new Ed25519 signing key using the operating system CSPRNG
+(`rand::rngs::OsRng`). The signing key is created from a random 32-byte
+seed. This method cannot fail because `OsRng` is infallible in the
+`rand` 0.8 API.
+
+#### LibrageSigner::from_seed_file
+
+```rust
+pub fn from_seed_file(path: impl AsRef<Path>) -> Result<Self, VctrlError>
+```
+
+Loads a signing key from a 32-byte seed file on disk.
+
+- Reads the file using `std::fs::read`.
+- If the file cannot be read, returns `Err(VctrlError::Io)`.
+- If the file is not exactly 32 bytes, returns `Err(VctrlError::Other)`
+  with message `"seed file must be exactly 32 bytes"`.
+- Constructs the `SigningKey` from the seed and returns `Ok(LrageSigner)`.
+
+#### LibrageSigner::verifying_key
+
+```rust
+pub fn verifying_key(&self) -> VerifyingKey
+```
+
+Returns the `ed25519_dalek::VerifyingKey` (public key) corresponding to
+the signing key. The verifying key can be used to verify signatures
+produced by this signer.
+
+#### Signer trait implementation
+
+```rust
+impl Signer for LibrageSigner {
+    fn sign(&self, commit_hash: &[u8]) -> Result<Vec<u8>, VctrlError>
+}
+```
+
+Signs the provided bytes using the Ed25519 signing key. Returns the
+64-byte signature as a `Vec<u8>`. This method cannot fail because
+Ed25519 signing is inf(ally infallible for any input length.
+
+### Signing and Verification Workflow
+
+libvctrl provides the building blocks for signing and verification but
+does not automatically sign commits during `CreateCommit`. Applications
+must integrate signing explicitly.
+
+**Signing a commit:**
+
+```rust
+use libvctrl::{LibrageSigner, Signer};
+
+let signer = LibrageSigner::generate();
+let commit_hash_bytes = commit_hash.as_bytes();
+let signature = signer.sign(commit_hash_bytes).unwrap();
+// Store signature[;]signature bytes, e.g. in Commit::signature
+```
+
+**Verifying a commit signature:**
+
+```rust
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+let verifying_key = signer.verifying_key();
+let sig = Signature::try_from(signature.as_slice()).expect("valid signature");
+assert!(verifying_key.verify(commit_hash.as_bytes(), &sig).is_ok());
+```
+
+**Persisting and loading a signing key:**
+
+```rust
+// Save the seed (32 bytes) to a file
+use ed25519_dalek::SigningKey;
+// Access the seed through the SigningKey's internal bytes
+// (application-specific; LibrageSigner wraps this)
+
+// Later, load from file
+let signer = LibrageSigner::from_seed_file("/path/to/seed.bin")?;
+```
+
+**Important:** The seed file contains the private signing key. Protect it
+with appropriate filesystem permissions (0600 on POSIX systems).
 
 ---
 
@@ -1011,28 +830,24 @@ pub enum VctrlError {
 }
 ```
 
-| Variant         | Source        | When produced                                                     |
-| --------------- | ------------- | ----------------------------------------------------------------- |
-| `Hash`          | `HashError`   | Invalid hash length or hex string                                 |
-| `Tree`          | `TreeError`   | Duplicate tree entry name                                         |
-| `NotFound`      | String        | Object or tree not found in store                                 |
-| `InvalidRef`    | String        | Branch name lacks `refs/heads/` prefix, or HEAD target is invalid |
-| `MergeConflict` | entry, reason | Unresolvable conflict during three-way merge                      |
-| 5               | `Io`          | `std::io::Error`                                                  | I/O failure (reserved for filesystem backends) |
-| `Serialization` | String        | Serialization failure                                             |
-| `Backend`       | String        | Backend-specific error                                            |
-| `Other`         | String        | Catch-all for uncategorized errors                                |
-
-`VctrlError` implements `std::error::Error` (via thiserror), `Debug`, and
-`Display`. The `Hash`, `Tree`, and `Io` variants implement `From` for
-automatic conversion with the `?` operator.
+| Variant         | When produced                                          |
+| --------------- | ------------------------------------------------------ |
+| `Hash`          | Invalid hash length or hex string                      |
+| `Tree`          | Duplicate tree entry name                              |
+| `NotFound`      | Object or tree not found                               |
+| `InvalidRef`    | Invalid reference name or HEAD target                  |
+| `MergeConflict` | Unresolvable merge conflict                            |
+| `Io`            | I/O failure                                            |
+| `Serialization` | Serialization failure                                  |
+| `Backend`       | Backend-specific error                                 |
+| `Other`         | Catch-all (e.g., seed file wrong size, depth exceeded) |
 
 ### HashError
 
 ```rust
 pub enum HashError {
-    InvalidLength(usize),   // actual length (expected 64)
-    InvalidHex,             // non-hex characters
+    InvalidLength(usize),
+    InvalidHex,
 }
 ```
 
@@ -1040,7 +855,7 @@ pub enum HashError {
 
 ```rust
 pub enum TreeError {
-    DuplicateEntry(String),  // the duplicated entry name
+    DuplicateEntry(String),
 }
 ```
 
@@ -1048,79 +863,34 @@ pub enum TreeError {
 
 ## Module Reference
 
-| Module    | Status      | Description                                                  |
-| --------- | ----------- | ------------------------------------------------------------ |
-| `codec`   | Implemented | Encoder trait and BinaryEncoder                              |
-| `command` | Implemented | Command trait and all command implementations                |
-| `diff`    | Implemented | TreeDiff trait, DiffKind, DiffEntry, TreeDiffer              |
-| `domain`  | Implemented | Blob, Hash, Tree, TreeEntry, Commit, UserInfo, Object        |
-| `error`   | Implemented | VctrlError, HashError, TreeError                             |
-| `hashing` | Implemented | Hasher trait and Sha512Hasher                                |
-| `merge`   | Implemented | ThreeWayMerge trait, ConflictResolver trait, ThreeWayMerger  |
-| `storage` | Implemented | ObjectStore and RefStore traits, MemoryStore, MemoryRefStore |
+| Module    | Status      | Description                                                   |
+| --------- | ----------- | ------------------------------------------------------------- |
+| `codec`   | Implemented | Encoder trait and BinaryEncoder                               |
+| `command` | Implemented | Command trait and all command implementations                 |
+| `crypto`  | Implemented | Signer trait and LibrageSigner                                |
+| `diff`    | Implemented | TreeDiff trait, DiffKind, DiffEntry, TreeDiffer               |
+| `domain`  | Implemented | Blob, Hash, Tree, TreeEntry, Commit, UserID, UserInfo, Object |
+| `error`   | Implemented | VctrlError, HashError, TreeError                              |
+| `hashing` | Implemented | Hasher trait and Sha512Hasher                                 |
+| `merge`   | Implemented | ThreeWayMerge trait, ConflictResolver trait, ThreeWayMerger   |
+| `storage` | Implemented | ObjectStore and RefStore traits, MemoryStore, MemoryRefStore  |
 
 ---
 
 ## Testing
 
-22 tests across 7 test files:
+29 tests across 8 test files:
 
-### blob_test (2 tests)
-
-| Test                  | Verifies                                |
-| --------------------- | --------------------------------------- |
-| `blob_new_and_access` | `Blob::new` and `as_bytes()` round-trip |
-| `blob_into_bytes`     | `into_bytes()` returns original data    |
-
-### branch_test (3 tests)
-
-| Test                       | Verifies                                               |
-| -------------------------- | ------------------------------------------------------ |
-| `branch_create_get_delete` | Create, get, and delete branch round-trip              |
-| `branch_invalid_name`      | Name without `refs/heads/` prefix returns `InvalidRef` |
-| `set_head_works`           | `SetHead` resolves HEAD to the branch's hash           |
-
-### checkout_test (4 tests)
-
-| Test                              | Verifies                                       |
-| --------------------------------- | ---------------------------------------------- |
-| `checkout_flat_tree`              | Flat tree materializes to expected file paths  |
-| `checkout_recursive`              | Nested tree produces paths with `/` separators |
-| `checkout_empty_tree`             | Empty tree produces empty file list            |
-| `checkout_nonexistent_tree_error` | Non-existent tree returns `NotFound`           |
-
-### commit_test (3 tests)
-
-| Test                    | Verifies                                         |
-| ----------------------- | ------------------------------------------------ |
-| `create_commit_and_log` | Create a commit and retrieve it via Log          |
-| `commit_chain_log`      | Two-commit chain produces correct history order  |
-| `commit_getters`        | Commit struct field access and default timestamp |
-
-### diff_test (2 tests)
-
-| Test                          | Verifies                                      |
-| ----------------------------- | --------------------------------------------- |
-| `diff_added_removed_modified` | Added, removed, and modified entries detected |
-| `diff_no_changes`             | Identical trees produce empty diff            |
-
-### merge_test (3 tests)
-
-| Test                  | Verifies                                                         |
-| --------------------- | ---------------------------------------------------------------- |
-| `merge_no_conflict`   | Non-conflicting changes merge correctly                          |
-| `merge_conflict_blob` | Blob conflict returns `MergeConflict`                            |
-| `merge_resolved`      | `KeepOursResolver` resolves conflict and produces correct result |
-
-### tree_test (5 tests)
-
-| Test                           | Verifies                                           |
-| ------------------------------ | -------------------------------------------------- |
-| `tree_new_sorts_entries`       | Entries are sorted by name on construction         |
-| `tree_duplicate_entries_error` | Duplicate names return `TreeError::DuplicateEntry` |
-| `tree_hash_deterministic`      | Different input order produces same hash           |
-| `tree_empty`                   | Empty tree is valid and reports `is_empty()`       |
-| `tree_into_entries`            | `into_entries()` returns the entries               |
+| Test file     | Count | Verifies                                                                                             |
+| ------------- | ----- | ---------------------------------------------------------------------------------------------------- |
+| blob_test     | 2     | Blob construction and access                                                                         |
+| branch_test   | 3     | Branch create/get/delete, invalid name, SetHead                                                      |
+| checkout_test | 4     | Flat tree, recursive, empty tree, nonexistent tree                                                   |
+| commit_test   | 3     | Create+log, commit chain, field access                                                               |
+| diff_test     | 2     | Added/removed/modified, no changes                                                                   |
+| merge_test    | 3     | No conflict, blob conflict, resolved conflict                                                        |
+| sign_tests    | 7     | Generate+sign, deterministic, different hashes, wrong hash, empty hash, seed file, invalid seed file |
+| tree_test     | 5     | Sort, duplicate error, hash determinism, empty, into_entries                                         |
 
 Run the test suite:
 
@@ -1133,62 +903,84 @@ cargo test
 ## Build and Lint
 
 The project includes a Makefile. Run `make ci` for the full CI pipeline
-(format check, clippy, and tests).
+(format check, clippy with all targets and features, and tests<stests).
 
 ---
 
 ## Security Considerations
 
-- **SHA-512 collision resistance.** The hashing scheme uses SHA-512, which
-  provides 256 bits of collision resistance. This is sufficient for all
-  practical purposes and is stronger than Git's SHA-1.
-- **Type-prefixed hashing.** Each hash includes the object type (`blob`,
-  `tree`, `commit`) as a prefix. This prevents cross-type hash collisions
-  where a blob and a tree with the same content would produce the same hash.
-- **Content-addressed integrity.** Objects are stored and retrieved by their
-  content hash. Any corruption of the stored data will result in a hash
-  mismatch when the object is re-read and verified by the caller.
-- **No cryptographic signing.** The `Commit::signature` field is an opaque
-  `Option<Vec<u8>>`. libvctrl does not create, verify, or interpret
-  signatures. Applications must implement signing and verification
-  themselves.
-- **No encryption.** libvctrl does not encrypt objects. If confidentiality
-  is required, the application must encrypt data before storing it as a blob.
-- **Depth limits.** `Checkout` and `ThreeWayMerger` enforce a maximum
-  recursion depth of 1000. This prevents stack overflow from maliciously
-  crafted deeply nested trees.
-- **Memory store has no persistence.** `MemoryStore` and `MemoryRefStore`
-  exist only in RAM. Data is lost when the process exits. Applications
-  requiring persistence must implement a filesystem or database backend.
+- **SHA-512 collision resistance.** 256 bits of collision resistance, stronger
+  than Git's SHA-1.
+- **Type-prefixed hashing.** Prevents cross-type hash collisions.
+- **Content-addressed integrity.** Objects are stored and retrieved by hash.
+- **Ed25519 signing.** Provides 128-bit security level. Signatures are
+  deterministic for the same key and message.
+- **Seed file protection.** The 32-byte seed file contains the private
+  signing key. Applications must protect it with filesystem permissions.
+- **CSPRNG.** `LibrageSigner::generate` uses `OsRng`, which draws from the
+  operating system's secure random number generator.
+- **No encryption.** libvctrl does not encrypt objects. Applications must
+  encrypt data before storing as blobs if confidentiality is required.
+- **Depth limits.** Checkout and ThreeWayMerger cap recursion at 1000 levels.
+- **Memory store has no persistence.** Data is lost on process exit.
 
 ---
 
 ## Limitations
 
-- Only an in-memory storage backend is provided.
-- `Log` only follows the first parent, producing linear history.
+- Only in-memory storage backend.
+- `Log` only follows first parent (linear history).
 - `Checkout` produces in-memory file lists, not filesystem writes.
-- Branch names must start with `refs/heads/`. Tags and remote references
-  are not supported.
-- `MergeCommand` produces a merged tree but does not create a merge commit.
-- `ConflictResolver` receives blob data only, without path context.
-- `Commit::new` always sets `timestamp` to `Utc::now()`. Custom timestamps
-  are not supported.
-- The binary encoding does not include a CRC or integrity checksum beyond
-  the SHA-512 content hash.
+- Branch names must start with `refs/heads/`. Tags and remotes not
+  supported.
+- `MergeCommand` produces merged tree but not merge commit.
+- `ConflictResolver` has no path context.
+- `Commit::new` always sets `timestamp` to `Utc::now()`.
+- `CreateCommit` does not automatically sign commits.
+- `LibrageSigner` does not persist the signing key.
+
+---
+
+## Migration from v0.1.0
+
+### Commit and CreateCommit use UserID instead of UserInfo
+
+The `author` and `committer` fields of `Commit` and `CreateCommit` now use
+`UserID` (validated, from age-credentials) instead of `UserInfo`
+(unvalidated). Update all construction sites:
+
+```rust
+// Before (v0.1.0):
+let author = UserInfo::new("Alice".into(), "alice@example.com".into());
+
+// After (v0.2.0):
+let author = UserID::new("Alice Example", "alice@example.com")?;
+```
+
+`UserID::new` can return an error if the name or email fails validation.
+Ensure your code handles the `Result`.
+
+### SetHead accepts any refs/ prefix
+
+In v0.1.0, `SetHead` required the target to start with `"refs/heads/"`.
+In v0.2.0, it accepts any target starting with `"refs/"`. Code that relied
+on `"refs/heads/"` being the only accepted prefix still works but can now
+also use `"refs/tags/"` and other namespaces.
 
 ---
 
 ## Roadmap
 
 - Filesystem storage backend.
-- Tag support (`refs/tags/`).
-- Remote reference namespace (`refs/remotes/`).
-- Full ancestry traversal (all parents, not just first).
-- Merge commit creation as part of `MergeCommand`.
+- Tag support.
+- Remote reference namespace.
+- Full ancestry traversal (all parents).
+- Merge commit creation as part of MergeCommand.
 - Path-aware conflict resolver.
 - Custom commit timestamps.
-- Streaming encoding and decoding for large objects.
+- Automatic commit signing in CreateCommit.
+- Signing key persistence helpers.
+- Streaming encoding and decoding.
 - Pack format for efficient storage.
 - crates.io publication.
 
