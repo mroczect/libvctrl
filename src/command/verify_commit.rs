@@ -1,18 +1,17 @@
-use crate::codec::BinaryEncoder;
 use crate::codec::Encoder;
 use crate::command::Command;
-use crate::domain::commit::Commit;
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
 use crate::error::VctrlError;
 use crate::hashing::Hasher;
-use crate::hashing::Sha512Hasher;
 use crate::storage::traits::{ObjectStore, RefStore};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
 pub struct VerifyCommit {
     pub commit_hash: Hash,
     pub verifying_key: VerifyingKey,
+    pub encoder: Box<dyn Encoder>,
+    pub hasher: Box<dyn Hasher>,
 }
 
 impl Command for VerifyCommit {
@@ -33,7 +32,7 @@ impl Command for VerifyCommit {
             None => return Ok(false),
         };
 
-        let pre_sig_commit = Commit {
+        let pre_sig_commit = crate::domain::commit::Commit {
             tree: commit.tree,
             parents: commit.parents.clone(),
             author: commit.author.clone(),
@@ -43,11 +42,9 @@ impl Command for VerifyCommit {
             signature: None,
         };
 
-        let encoder = BinaryEncoder;
-        let hasher = Sha512Hasher;
         let mut buf = Vec::new();
-        encoder.encode_commit(&pre_sig_commit, &mut buf);
-        let pre_sig_hash = hasher.hash_commit_encoded(&buf);
+        self.encoder.encode_commit(&pre_sig_commit, &mut buf);
+        let pre_sig_hash = self.hasher.hash_commit_encoded(&buf);
 
         let signature = Signature::try_from(sig_bytes.as_slice())
             .map_err(|_| VctrlError::Other("invalid signature format".into()))?;
