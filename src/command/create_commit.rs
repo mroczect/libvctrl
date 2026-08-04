@@ -3,7 +3,7 @@ use crate::command::Command;
 use crate::domain::commit::Commit;
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
-use crate::domain::user::UserInfo;
+use crate::domain::user::UserID;
 use crate::error::VctrlError;
 use crate::hashing::Hasher;
 use crate::storage::traits::{ObjectStore, RefStore};
@@ -11,8 +11,8 @@ use crate::storage::traits::{ObjectStore, RefStore};
 pub struct CreateCommit {
     pub tree_hash: Hash,
     pub parents: Vec<Hash>,
-    pub author: UserInfo,
-    pub committer: UserInfo,
+    pub author: UserID,
+    pub committer: UserID,
     pub message: String,
     pub encoder: Box<dyn Encoder>,
     pub hasher: Box<dyn Hasher>,
