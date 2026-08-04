@@ -23,7 +23,12 @@ impl Hash {
         &self.0
     }
     pub fn to_hex(&self) -> String {
-        self.0.iter().map(|b| format!("{:02x}", b)).collect()
+        use std::fmt::Write;
+        let mut s = String::with_capacity(128);
+        for b in &self.0 {
+            write!(s, "{:02x}", b).expect("write to String cannot fail");
+        }
+        s
     }
 }
 
