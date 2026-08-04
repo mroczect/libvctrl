@@ -1,44 +1,69 @@
 mod common;
-use common::setup_refs;
+use common::{blob_hash, setup_refs, setup_store};
 
-use libvctrl::{
-    Blob, RefStore, VctrlError, create_branch, delete_branch, get_branch, set_head_branch,
-};
+use libvctrl::{Command, CreateBranch, DeleteBranch, GetBranch, RefStore, SetHead};
 
 #[test]
 fn branch_create_get_delete() {
+    let mut store = setup_store();
     let mut refs = setup_refs();
-    let hash = Blob::new(b"data".to_vec()).hash().unwrap();
+    let hash = blob_hash(b"data");
 
-    create_branch(&mut refs, "refs/heads/feature", &hash).unwrap();
-    let got = get_branch(&refs, "refs/heads/feature").unwrap();
-    assert_eq!(got, Some(hash));
+    let create = CreateBranch {
+        name: "refs/heads/feature".into(),
+        hash,
+    };
+    create.execute(&mut store, &mut refs).unwrap();
 
-    delete_branch(&mut refs, "refs/heads/feature").unwrap();
-    let got = get_branch(&refs, "refs/heads/feature").unwrap();
-    assert!(got.is_none());
+    let get = GetBranch {
+        name: "refs/heads/feature".into(),
+    };
+    assert_eq!(get.execute(&mut store, &mut refs).unwrap(), Some(hash));
+
+    let delete = DeleteBranch {
+        name: "refs/heads/feature".into(),
+    };
+    delete.execute(&mut store, &mut refs).unwrap();
+
+    let get = GetBranch {
+        name: "refs/heads/feature".into(),
+    };
+    assert!(get.execute(&mut store, &mut refs).unwrap().is_none());
 }
 
 #[test]
 fn branch_invalid_name() {
+    let mut store = setup_store();
     let mut refs = setup_refs();
-    let hash = Blob::new(b"data".to_vec()).hash().unwrap();
+    let hash = blob_hash(b"data");
 
-    let err = create_branch(&mut refs, "invalid_name", &hash).unwrap_err();
+    let create = CreateBranch {
+        name: "invalid_name".into(),
+        hash,
+    };
+    let err = create.execute(&mut store, &mut refs).unwrap_err();
     match err {
-        VctrlError::InvalidRef(_) => {}
-        _ => panic!("expected InvalidRef error"),
+        libvctrl::VctrlError::InvalidRef(_) => {}
+        _ => panic!("expected InvalidRef"),
     }
 }
 
 #[test]
-fn set_head_branch_works() {
+fn set_head_works() {
+    let mut store = setup_store();
     let mut refs = setup_refs();
-    let hash = Blob::new(b"data".to_vec()).hash().unwrap();
+    let hash = blob_hash(b"data");
 
-    create_branch(&mut refs, "refs/heads/main", &hash).unwrap();
-    set_head_branch(&mut refs, "refs/heads/main").unwrap();
+    let create = CreateBranch {
+        name: "refs/heads/main".into(),
+        hash,
+    };
+    create.execute(&mut store, &mut refs).unwrap();
 
-    let head = refs.head().unwrap().unwrap();
-    assert_eq!(head, hash);
+    let set_head = SetHead {
+        target: "refs/heads/main".into(),
+    };
+    set_head.execute(&mut store, &mut refs).unwrap();
+
+    assert_eq!(refs.head().unwrap(), Some(hash));
 }
