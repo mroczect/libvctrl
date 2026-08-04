@@ -82,7 +82,7 @@ impl ThreeWayMerger {
                         match resolver.resolve(&base_data, &ours_data, &theirs_data) {
                             Some(resolved) => {
                                 let blob = Blob::new(resolved);
-                                let blob_hash = hasher.hash_blob(&blob.data);
+                                let blob_hash = hasher.hash_blob(blob.as_bytes());
                                 store.put(&blob_hash, &Object::Blob(blob))?;
                                 TreeEntry::new(key, EntryKind::Blob, blob_hash)
                             }
