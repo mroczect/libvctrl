@@ -130,13 +130,84 @@ memory.rs MemoryStore, MemoryRefStore
 
 ## Installation
 
+There are several ways to add `libvctrl` to your Rust project:
+
+### 1. Using `cargo add`
+
+```sh
+cargo add libvctrl
+```
+
+This command will automatically add the dependency line to `Cargo.toml`.
+
+### 2. Adding Manually in `Cargo.toml`
+
+Add the following line to the `[dependencies]` section:
+
 ```toml
 [dependencies]
 libvctrl = { git = "https://github.com/mroczect/libvcrtl.git" }
 ```
 
-The crate edition is 2024 and requires a Rust toolchain that supports that
-edition.
+### 3. Clone the repository and use it as a local dependency (path)
+
+If you want to develop or modify the library alongside your project, clone the repository first:
+
+```sh
+git clone https://github.com/mroczect/libvcrtl.git
+```
+
+Then, in your project's `Cargo.toml`, navigate to the cloned path:
+
+```toml
+[dependencies]
+libvctrl = { path = "../libvcrtl" } # adjust the directory location
+```
+
+With this method, changes you make to the library will be immediately reflected in the main project upon compilation.
+
+### 4. Fork and use it as a Git dependency from your fork
+
+You can fork the repository to your own GitHub account, then use it the same way as method 1 or 2, just replace the URL to your fork repository:
+
+```toml
+[dependencies]
+libvctrl = { git = "https://github.com/your-username/libvcrtl.git" }
+```
+
+### Toolchain Requirements
+
+This library uses **Rust edition 2024**. Make sure your toolchain supports that edition (Rust **1.85.0** or later). To check the installed Rust version:
+
+```sh
+rustc --version
+```
+
+If your toolchain is older, update it with:
+
+```sh
+rustup update stable
+```
+
+If for some reason you need to use an older edition (e.g., 2021), you can change the `edition` line in `libvctrl`'s `Cargo.toml` from `"2024"` to `"2021"`. However, keep in mind that some syntactic features may not be available.
+
+### Dependencies
+
+`libvctrl` depends on the following crates (handled automatically by Cargo):
+
+- `chrono` 0.4.45 (`serde` feature)
+- `serde` 1.0.229 (`derive` feature)
+- `serde_json` 1.0.151
+- `sha2` 0.11.0
+- `thiserror` 2.0.19
+
+All public types and traits are exported directly in the crate root, so you can import them easily:
+
+```rust
+use libvctrl::{Blob, MemoryStore, Command, ...};
+```
+
+See the `tests/` directory in the repository for complete usage examples.
 
 ---
 
