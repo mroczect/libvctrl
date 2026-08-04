@@ -1,10 +1,13 @@
-use libvctrl::{Blob, DiffKind, EntryKind, Tree, TreeEntry, diff_trees};
+mod common;
+use common::blob_hash;
+
+use libvctrl::{DiffKind, EntryKind, Tree, TreeDiff, TreeDiffer, TreeEntry};
 
 #[test]
 fn diff_added_removed_modified() {
-    let h1 = Blob::new(b"one".to_vec()).hash().unwrap();
-    let h2 = Blob::new(b"two".to_vec()).hash().unwrap();
-    let h3 = Blob::new(b"three".to_vec()).hash().unwrap();
+    let h1 = blob_hash(b"one");
+    let h2 = blob_hash(b"two");
+    let h3 = blob_hash(b"three");
 
     let old = Tree::new(vec![
         TreeEntry::new("a".into(), EntryKind::Blob, h1),
@@ -18,7 +21,8 @@ fn diff_added_removed_modified() {
     ])
     .unwrap();
 
-    let diffs = diff_trees(&old, &new).unwrap();
+    let differ = TreeDiffer;
+    let diffs = differ.diff(&old, &new).unwrap();
     assert_eq!(diffs.len(), 3);
 
     let added = diffs
@@ -48,8 +52,9 @@ fn diff_added_removed_modified() {
 
 #[test]
 fn diff_no_changes() {
-    let h = Blob::new(b"same".to_vec()).hash().unwrap();
+    let h = blob_hash(b"same");
     let tree = Tree::new(vec![TreeEntry::new("f".into(), EntryKind::Blob, h)]).unwrap();
-    let diffs = diff_trees(&tree, &tree).unwrap();
+    let differ = TreeDiffer;
+    let diffs = differ.diff(&tree, &tree).unwrap();
     assert!(diffs.is_empty());
 }
