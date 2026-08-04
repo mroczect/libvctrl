@@ -69,6 +69,11 @@ impl Command for SetHead {
         _store: &mut dyn ObjectStore,
         refs: &mut dyn RefStore,
     ) -> Result<(), VctrlError> {
+        if !(self.target.starts_with("refs/") || Hash::from_hex(&self.target).is_ok()) {
+            return Err(VctrlError::InvalidRef(
+                "HEAD target must be a symbolic ref (refs/...) or a 128-char hex hash".into(),
+            ));
+        }
         refs.set_head(&self.target)
     }
 }
