@@ -5,7 +5,7 @@ use crate::domain::object::Object;
 use crate::error::VctrlError;
 use crate::hashing::Hasher;
 use crate::storage::traits::{ObjectStore, RefStore};
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 
 pub struct VerifyCommit {
     pub commit_hash: Hash,
@@ -50,7 +50,7 @@ impl Command for VerifyCommit {
             .map_err(|_| VctrlError::Other("invalid signature format".into()))?;
 
         self.verifying_key
-            .verify(pre_sig_hash.as_bytes(), &signature)
+            .verify_strict(pre_sig_hash.as_bytes(), &signature)
             .map_err(|_| VctrlError::Other("signature verification failed".into()))?;
 
         Ok(true)

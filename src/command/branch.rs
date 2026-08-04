@@ -66,14 +66,22 @@ impl Command for SetHead {
     type Output = ();
     fn execute(
         &self,
-        _store: &mut dyn ObjectStore,
+        store: &mut dyn ObjectStore,
         refs: &mut dyn RefStore,
     ) -> Result<(), VctrlError> {
-        if !(self.target.starts_with("refs/heads/") || Hash::from_hex(&self.target).is_ok()) {
-            return Err(VctrlError::InvalidRef(
-                "HEAD target must be a branch name (refs/heads/...) or a 128-char hex hash".into(),
-            ));
+        if self.target.starts_with("refs/heads/") {
+            refs.set_head(&self.target)
+        } else {
+            let hash = Hash::from_hex(&self.target).map_err(|_| {
+                VctrlError::InvalidRef("HEAD target must be a branch name or valid hash".into())
+            })?;
+            if !store.exists(&hash)? {
+                return Err(VctrlError::NotFound(format!(
+                    "commit '{}' does not exist",
+                    self.target
+                )));
+            }
+            refs.set_head(&self.target)
         }
-        refs.set_head(&self.target)
     }
 }

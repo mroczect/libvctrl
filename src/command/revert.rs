@@ -110,7 +110,7 @@ fn apply_reverse_diff(head: &Tree, parent: &Tree, diffs: &[DiffEntry]) -> Result
                 {
                     return Err(VctrlError::Other(format!(
                         "revert conflict: '{}' has been modified since the commit being reverted",
-                        diff.name
+                        diff.names
                     )));
                 }
                 map.remove(&diff.name);
