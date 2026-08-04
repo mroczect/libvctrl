@@ -4,11 +4,11 @@
 [![Downloads](https://img.shields.io/crates/d/libvctrl?label=downloads)](https://crates.io/crates/libvctrl)
 [![License: MIT](https://img.shields.io/crates/l/libvctrl)](#license)
 [![Docs](https://docs.rs/libvctrl/badge.svg)](https://docs.rs/libvctrl)
-[![CI](https://img.shields.io/github/actions/workflow/status/mroczect/libvcrtl/rust.yml?branch=master)](https://github.com/mroczect/libvcrtl/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/mroczect/libvctrl/rust.yml?branch=master)](https://github.com/mroczect/libvctrl/actions)
 [![MSRV](https://img.shields.io/badge/MSRV-1.85.0-blue)](#installation)
-[![LoC](https://img.shields.io/tokei/lines/github/mroczect/libvcrtl)](https://github.com/mroczect/libvcrtl)
-[![Last Commit](https://img.shields.io/github/last-commit/mroczect/libvcrtl)](https://github.com/mroczect/libvcrtl/commits/master)
-[![Repo Size](https://img.shields.io/github/repo-size/mroczect/libvcrtl)](https://github.com/mroczect/libvcrtl)
+[![LoC](https://img.shields.io/tokei/lines/github/mroczect/libvctrl)](https://github.com/mroczect/libvctrl)
+[![Last Commit](https://img.shields.io/github/last-commit/mroczect/libvctrl)](https://github.com/mroczect/libvctrl/commits/master)
+[![Repo Size](https://img.shields.io/github/repo-size/mroczect/libvctrl)](https://github.com/mroczect/libvctrl)
 
 A robust, content-addressed version control engine for arbitrary data, designed
 for embedding into applications.
@@ -156,7 +156,7 @@ Add the following line to the `[dependencies]` section:
 
 ```toml
 [dependencies]
-libvctrl = { git = "https://github.com/mroczect/libvcrtl.git" }
+libvctrl = { git = "https://github.com/mroczect/libvctrl.git" }
 ```
 
 ### 3. Clone the repository and use it as a local dependency (path)
@@ -164,14 +164,14 @@ libvctrl = { git = "https://github.com/mroczect/libvcrtl.git" }
 If you want to develop or modify the library alongside your project, clone the repository first:
 
 ```sh
-git clone https://github.com/mroczect/libvcrtl.git
+git clone https://github.com/mroczect/libvctrl.git
 ```
 
 Then, in your project's `Cargo.toml`, navigate to the cloned path:
 
 ```toml
 [dependencies]
-libvctrl = { path = "../libvcrtl" } # adjust the directory location
+libvctrl = { path = "../libvctrl" } # adjust the directory location
 ```
 
 With this method, changes you make to the library will be immediately reflected in the main project upon compilation.
@@ -182,7 +182,7 @@ You can fork the repository to your own GitHub account, then use it the same way
 
 ```toml
 [dependencies]
-libvctrl = { git = "https://github.com/your-username/libvcrtl.git" }
+libvctrl = { git = "https://github.com/your-username/libvctrl.git" }
 ```
 
 ### Toolchain Requirements
