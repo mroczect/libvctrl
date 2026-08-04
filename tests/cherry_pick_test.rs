@@ -44,6 +44,7 @@ fn test_cherry_pick_simple() {
         encoder: Box::new(encoder()),
         hasher: Box::new(hasher()),
         signer: None,
+        transaction_id: None,
     }
     .execute(&mut store, &mut refs)
     .unwrap();
@@ -66,6 +67,7 @@ fn test_cherry_pick_simple() {
         encoder: Box::new(encoder()),
         hasher: Box::new(hasher()),
         signer: None,
+        transaction_id: None,
     }
     .execute(&mut store, &mut refs)
     .unwrap();
@@ -140,6 +142,7 @@ fn test_revert() {
         encoder: Box::new(encoder()),
         hasher: Box::new(hasher()),
         signer: None,
+        transaction_id: None,
     }
     .execute(&mut store, &mut refs)
     .unwrap();
@@ -162,6 +165,7 @@ fn test_revert() {
         encoder: Box::new(encoder()),
         hasher: Box::new(hasher()),
         signer: None,
+        transaction_id: None,
     }
     .execute(&mut store, &mut refs)
     .unwrap();
