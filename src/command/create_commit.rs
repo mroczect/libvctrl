@@ -38,7 +38,7 @@ impl Command for CreateCommit {
         );
 
         let mut buf = Vec::new();
-        self.encoder.encode_commit(&commit, &mut buf);
+        self.encoder.encode_commit(&commit, &mut buf)?;
         let pre_sig_hash = self.hasher.hash_commit_encoded(&buf);
 
         if let Some(signer) = &self.signer {
@@ -46,7 +46,7 @@ impl Command for CreateCommit {
             commit.signature = Some(sig);
 
             buf.clear();
-            self.encoder.encode_commit(&commit, &mut buf);
+            self.encoder.encode_commit(&commit, &mut buf)?;
         }
 
         let final_hash = self.hasher.hash_commit_encoded(&buf);
