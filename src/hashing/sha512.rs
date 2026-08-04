@@ -31,4 +31,12 @@ impl Hasher for Sha512Hasher {
         h.update(data);
         Hash::from_bytes(h.finalize().into())
     }
+    fn hash_tag_encoded(&self, data: &[u8]) -> Hash {
+        let mut h = Sha512::new();
+        h.update(b"tag ");
+        h.update((data.len() as u64).to_be_bytes());
+        h.update(b"\0");
+        h.update(data);
+        Hash::from_bytes(h.finalize().into())
+    }
 }
