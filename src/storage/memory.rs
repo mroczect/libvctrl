@@ -72,4 +72,10 @@ impl RefStore for MemoryRefStore {
             None => Ok(None),
         }
     }
+    fn head_ref_name(&self) -> Result<Option<String>, VctrlError> {
+        match &self.head {
+            Some(target) if target.starts_with("refs/") => Ok(Some(target.clone())),
+            _ => Ok(None),
+        }
+    }
 }
