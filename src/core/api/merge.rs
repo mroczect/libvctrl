@@ -2,15 +2,16 @@ use crate::handler::error::VctrlError;
 use crate::handler::types::{Blob, EntryKind, Hash, Object, ObjectStore, Tree, TreeEntry};
 use std::collections::BTreeMap;
 
-pub type MergeResolver = dyn Fn(&[u8], &[u8], &[u8]) -> Option<Vec<u8>>;
-
-pub fn merge_trees(
+pub fn merge_trees<F>(
     store: &mut dyn ObjectStore,
     base_hash: &Hash,
     ours_hash: &Hash,
     theirs_hash: &Hash,
-    resolver: &MergeResolver,
-) -> Result<Hash, VctrlError> {
+    resolver: &F,
+) -> Result<Hash, VctrlError>
+where
+    F: Fn(&[u8], &[u8], &[u8]) -> Option<Vec<u8>>,
+{
     let base_tree = get_tree(store, base_hash)?;
     let ours_tree = get_tree(store, ours_hash)?;
     let theirs_tree = get_tree(store, theirs_hash)?;
@@ -19,15 +20,14 @@ pub fn merge_trees(
     let ours_map = tree_to_map(&ours_tree);
     let theirs_map = tree_to_map(&theirs_tree);
 
-    let mut all_keys: Vec<String> = base_map
+    let all_keys: Vec<String> = base_map
         .keys()
         .chain(ours_map.keys())
         .chain(theirs_map.keys())
         .cloned()
-        .collect::<std::collections::HashSet<_>>()
+        .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect();
-    all_keys.sort();
 
     let mut new_entries = Vec::new();
 
@@ -50,15 +50,18 @@ pub fn merge_trees(
                     let base_data = get_blob_bytes(store, &b.hash)?;
                     let ours_data = get_blob_bytes(store, &o.hash)?;
                     let theirs_data = get_blob_bytes(store, &t.hash)?;
-                    if let Some(resolved) = resolver(&base_data, &ours_data, &theirs_data) {
-                        let blob = Blob::new(resolved);
-                        let blob_hash = store.put(&Object::Blob(blob))?;
-                        TreeEntry::new(key, EntryKind::Blob, blob_hash)
-                    } else {
-                        return Err(VctrlError::MergeConflict {
-                            entry: key,
-                            reason: "resolver returned None".into(),
-                        });
+                    match resolver(&base_data, &ours_data, &theirs_data) {
+                        Some(resolved) => {
+                            let blob = Blob::new(resolved);
+                            let blob_hash = store.put(&Object::Blob(blob))?;
+                            TreeEntry::new(key, EntryKind::Blob, blob_hash)
+                        }
+                        None => {
+                            return Err(VctrlError::MergeConflict {
+                                entry: key,
+                                reason: "resolver returned None".into(),
+                            });
+                        }
                     }
                 }
                 (EntryKind::Tree, EntryKind::Tree) => {
@@ -72,7 +75,7 @@ pub fn merge_trees(
                     });
                 }
             },
-            _ => unreachable!(),
+            _ => return Err(VctrlError::Other("unexpected merge state".into())),
         };
         new_entries.push(entry);
     }
