@@ -119,7 +119,7 @@ impl ThreeWayMerger {
         }
         let new_tree = Tree::new(entries).map_err(VctrlError::Tree)?;
         let mut buf = Vec::new();
-        encoder.encode_tree(&new_tree, &mut buf);
+        encoder.encode_tree(&new_tree, &mut buf)?;
         let tree_hash = hasher.hash_tree_encoded(&buf);
         store.put(&tree_hash, &Object::Tree(new_tree))?;
         Ok(tree_hash)

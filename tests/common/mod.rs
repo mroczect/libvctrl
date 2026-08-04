@@ -26,11 +26,11 @@ pub fn user(name: &str, email: &str) -> UserID {
 }
 
 pub fn alice() -> UserID {
-    UserID::new("Alice Example", "alice@example.com").unwrap()
+    UserID::new("Alice Example".to_string(), "alice@example.com".to_string()).unwrap()
 }
 
 pub fn bob() -> UserID {
-    UserID::new("Bob Example", "bob@example.com").unwrap()
+    UserID::new("Bob Example".to_string(), "bob@example.com".to_string()).unwrap()
 }
 
 pub fn blob_hash(data: &[u8]) -> Hash {
@@ -41,7 +41,7 @@ pub fn tree_hash(tree: &libvctrl::Tree) -> Hash {
     let encoder = encoder();
     let hasher = hasher();
     let mut buf = Vec::new();
-    encoder.encode_tree(tree, &mut buf);
+    encoder.encode_tree(tree, &mut buf).unwrap();
     hasher.hash_tree_encoded(&buf)
 }
 
@@ -49,7 +49,7 @@ pub fn commit_hash(commit: &libvctrl::Commit) -> Hash {
     let encoder = encoder();
     let hasher = hasher();
     let mut buf = Vec::new();
-    encoder.encode_commit(commit, &mut buf);
+    encoder.encode_commit(commit, &mut buf).unwrap();
     hasher.hash_commit_encoded(&buf)
 }
 

@@ -1,20 +1,28 @@
 mod common;
 use common::{alice, bob, put_blob, put_tree, setup_refs, setup_store};
 
-use libvctrl::{Command, CreateCommit, EntryKind, Log, SetHead, Tree, TreeEntry};
+use libvctrl::{Command, CreateBranch, CreateCommit, EntryKind, Log, SetHead, Tree, TreeEntry};
 
 #[test]
 fn create_commit_and_log() {
     let mut store = setup_store();
     let mut refs = setup_refs();
 
-    let set_head = SetHead {
+    let init_hash = common::blob_hash(b"init");
+    CreateBranch {
+        name: "refs/heads/main".into(),
+        hash: init_hash,
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+    SetHead {
         target: "refs/heads/main".into(),
-    };
-    set_head.execute(&mut store, &mut refs).unwrap();
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
 
     let blob_hash = put_blob(&mut store, b"data");
-    let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash);
+    let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash).unwrap();
     let tree = Tree::new(vec![entry]).unwrap();
     let tree_hash = put_tree(&mut store, &tree);
 
@@ -44,13 +52,21 @@ fn commit_chain_log() {
     let mut store = setup_store();
     let mut refs = setup_refs();
 
-    let set_head = SetHead {
+    let init_hash = common::blob_hash(b"init");
+    CreateBranch {
+        name: "refs/heads/main".into(),
+        hash: init_hash,
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+    SetHead {
         target: "refs/heads/main".into(),
-    };
-    set_head.execute(&mut store, &mut refs).unwrap();
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
 
     let blob_hash = put_blob(&mut store, b"data");
-    let entry = TreeEntry::new("f".into(), EntryKind::Blob, blob_hash);
+    let entry = TreeEntry::new("f".into(), EntryKind::Blob, blob_hash).unwrap();
     let tree = Tree::new(vec![entry]).unwrap();
     let tree_hash = put_tree(&mut store, &tree);
 

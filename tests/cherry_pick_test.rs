@@ -1,8 +1,8 @@
 mod common;
 use common::{alice, bob, encoder, hasher, put_blob, put_tree, setup_refs, setup_store};
 use libvctrl::{
-    CherryPick, Command, ConflictResolver, CreateCommit, EntryKind, Log, Object, ObjectStore,
-    SetHead, ThreeWayMerger, Tree, TreeEntry,
+    CherryPick, Command, ConflictResolver, CreateBranch, CreateCommit, EntryKind, Log, Object,
+    ObjectStore, SetHead, ThreeWayMerger, Tree, TreeEntry,
 };
 
 struct NoConflictResolver;
@@ -17,13 +17,21 @@ fn test_cherry_pick_simple() {
     let mut store = setup_store();
     let mut refs = setup_refs();
 
-    let set_head = SetHead {
+    let init_hash = common::blob_hash(b"init");
+    CreateBranch {
+        name: "refs/heads/main".into(),
+        hash: init_hash,
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+    SetHead {
         target: "refs/heads/main".into(),
-    };
-    set_head.execute(&mut store, &mut refs).unwrap();
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
 
     let blob1 = put_blob(&mut store, b"data1");
-    let entry1 = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1);
+    let entry1 = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1).unwrap();
     let tree1 = Tree::new(vec![entry1]).unwrap();
     let tree1_hash = put_tree(&mut store, &tree1);
 
@@ -41,9 +49,9 @@ fn test_cherry_pick_simple() {
     .unwrap();
 
     let blob2 = put_blob(&mut store, b"data2");
-    let entry2 = TreeEntry::new("file2.txt".into(), EntryKind::Blob, blob2);
+    let entry2 = TreeEntry::new("file2.txt".into(), EntryKind::Blob, blob2).unwrap();
     let tree2 = Tree::new(vec![
-        TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1),
+        TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1).unwrap(),
         entry2,
     ])
     .unwrap();
@@ -62,13 +70,12 @@ fn test_cherry_pick_simple() {
     .execute(&mut store, &mut refs)
     .unwrap();
 
-    libvctrl::CreateBranch {
+    CreateBranch {
         name: "refs/heads/other".into(),
         hash: c1,
     }
     .execute(&mut store, &mut refs)
     .unwrap();
-
     SetHead {
         target: "refs/heads/other".into(),
     }
@@ -106,13 +113,21 @@ fn test_revert() {
     let mut store = setup_store();
     let mut refs = setup_refs();
 
-    let set_head = SetHead {
+    let init_hash = common::blob_hash(b"init");
+    CreateBranch {
+        name: "refs/heads/main".into(),
+        hash: init_hash,
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+    SetHead {
         target: "refs/heads/main".into(),
-    };
-    set_head.execute(&mut store, &mut refs).unwrap();
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
 
     let blob1 = put_blob(&mut store, b"data1");
-    let entry1 = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1);
+    let entry1 = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1).unwrap();
     let tree1 = Tree::new(vec![entry1]).unwrap();
     let tree1_hash = put_tree(&mut store, &tree1);
 
@@ -130,9 +145,9 @@ fn test_revert() {
     .unwrap();
 
     let blob2 = put_blob(&mut store, b"data2");
-    let entry2 = TreeEntry::new("file2.txt".into(), EntryKind::Blob, blob2);
+    let entry2 = TreeEntry::new("file2.txt".into(), EntryKind::Blob, blob2).unwrap();
     let tree2 = Tree::new(vec![
-        TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1),
+        TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1).unwrap(),
         entry2,
     ])
     .unwrap();

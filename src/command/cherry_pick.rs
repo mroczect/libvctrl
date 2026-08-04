@@ -78,7 +78,7 @@ impl Command for CherryPick {
             None,
         );
         let mut buf = Vec::new();
-        self.encoder.encode_tree(&empty_tree, &mut buf)?;
+        self.encoder.encode_commit(&new_commit, &mut buf)?;
         let new_hash = self.hasher.hash_commit_encoded(&buf);
         store.put(&new_hash, &Object::Commit(Box::new(new_commit)))?;
 

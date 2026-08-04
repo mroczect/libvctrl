@@ -1,7 +1,8 @@
 mod common;
 use common::{alice, encoder, hasher, put_blob, put_tree, setup_refs, setup_store};
 use libvctrl::{
-    Command, CreateCommit, CreateLightweightTag, EntryKind, Log, RefStore, SetHead, Tree, TreeEntry,
+    Command, CreateCommit, CreateLightweightTag, EntryKind, Log, ObjectStore, RefStore, SetHead,
+    Tree, TreeEntry,
 };
 
 #[test]
@@ -10,7 +11,7 @@ fn test_commit_on_tag_detached_head() {
     let mut refs = setup_refs();
 
     let blob_hash = put_blob(&mut store, b"data");
-    let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash);
+    let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash).unwrap();
     let tree = Tree::new(vec![entry]).unwrap();
     let tree_hash = put_tree(&mut store, &tree);
 
@@ -53,9 +54,7 @@ fn test_commit_on_tag_detached_head() {
     .execute(&mut store, &mut refs)
     .unwrap();
 
-    let c2_commit = libvctrl::ObjectStore::get(&store, &c2)
-        .unwrap()
-        .expect("c2 harus tersimpan");
+    let c2_commit = store.get(&c2).unwrap().expect("c2 harus tersimpan");
     assert!(matches!(c2_commit, libvctrl::Object::Commit(_)));
 
     let tag_ref = refs.get_ref("refs/tags/v1.0").unwrap().unwrap();

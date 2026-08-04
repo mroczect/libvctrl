@@ -43,7 +43,7 @@ impl Command for CreateAnnotatedTag {
     ) -> Result<Hash, VctrlError> {
         let tag = Tag::new(self.target, self.tagger.clone(), self.message.clone());
         let mut buf = Vec::new();
-        self.encoder.encode_tag(&tag, &mut buf);
+        self.encoder.encode_tag(&tag, &mut buf)?;
         let hash = self.hasher.hash_tag_encoded(&buf);
         store.put(&hash, &Object::Tag(Box::new(tag)))?;
 

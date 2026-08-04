@@ -50,7 +50,7 @@ impl Command for Revert {
         let new_tree = apply_reverse_diff(&head_tree, &parent_tree, &diffs)?;
 
         let mut buf = Vec::new();
-        self.encoder.encode_tree(&new_tree, &mut buf);
+        self.encoder.encode_tree(&new_tree, &mut buf)?;
         let new_tree_hash = self.hasher.hash_tree_encoded(&buf);
         store.put(&new_tree_hash, &Object::Tree(new_tree))?;
 
@@ -63,7 +63,7 @@ impl Command for Revert {
             None,
         );
         let mut buf = Vec::new();
-        self.encoder.encode_commit(&new_commit, &mut buf);
+        self.encoder.encode_commit(&new_commit, &mut buf)?;
         let new_hash = self.hasher.hash_commit_encoded(&buf);
         store.put(&new_hash, &Object::Commit(Box::new(new_commit)))?;
 
@@ -110,7 +110,7 @@ fn apply_reverse_diff(head: &Tree, parent: &Tree, diffs: &[DiffEntry]) -> Result
                 {
                     return Err(VctrlError::Other(format!(
                         "revert conflict: '{}' has been modified since the commit being reverted",
-                        diff.names
+                        diff.name
                     )));
                 }
                 map.remove(&diff.name);

@@ -1,7 +1,8 @@
 mod common;
 use common::{alice, bob, encoder, hasher, put_blob, put_tree, setup_refs, setup_store};
 use libvctrl::{
-    Command, CreateCommit, EntryKind, Log, Object, ObjectStore, Revert, SetHead, Tree, TreeEntry,
+    Command, CreateBranch, CreateCommit, EntryKind, Log, Object, ObjectStore, Revert, SetHead,
+    Tree, TreeEntry,
 };
 
 #[test]
@@ -9,13 +10,21 @@ fn test_revert_with_conflict_added_modified() {
     let mut store = setup_store();
     let mut refs = setup_refs();
 
-    let set_head = SetHead {
+    let init_hash = common::blob_hash(b"init");
+    CreateBranch {
+        name: "refs/heads/main".into(),
+        hash: init_hash,
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+    SetHead {
         target: "refs/heads/main".into(),
-    };
-    set_head.execute(&mut store, &mut refs).unwrap();
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
 
     let blob1 = put_blob(&mut store, b"data1");
-    let entry1 = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1);
+    let entry1 = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1).unwrap();
     let tree1 = Tree::new(vec![entry1]).unwrap();
     let tree1_hash = put_tree(&mut store, &tree1);
 
@@ -33,9 +42,9 @@ fn test_revert_with_conflict_added_modified() {
     .unwrap();
 
     let blob2 = put_blob(&mut store, b"data2");
-    let entry2 = TreeEntry::new("file2.txt".into(), EntryKind::Blob, blob2);
+    let entry2 = TreeEntry::new("file2.txt".into(), EntryKind::Blob, blob2).unwrap();
     let tree2 = Tree::new(vec![
-        TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1),
+        TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1).unwrap(),
         entry2,
     ])
     .unwrap();
@@ -55,9 +64,9 @@ fn test_revert_with_conflict_added_modified() {
     .unwrap();
 
     let blob3 = put_blob(&mut store, b"data3");
-    let entry2_modified = TreeEntry::new("file2.txt".into(), EntryKind::Blob, blob3);
+    let entry2_modified = TreeEntry::new("file2.txt".into(), EntryKind::Blob, blob3).unwrap();
     let tree3 = Tree::new(vec![
-        TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1),
+        TreeEntry::new("file.txt".into(), EntryKind::Blob, blob1).unwrap(),
         entry2_modified,
     ])
     .unwrap();

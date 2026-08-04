@@ -43,7 +43,7 @@ impl Command for VerifyCommit {
         };
 
         let mut buf = Vec::new();
-        self.encoder.encode_commit(&pre_sig_commit, &mut buf);
+        self.encoder.encode_commit(&pre_sig_commit, &mut buf)?;
         let pre_sig_hash = self.hasher.hash_commit_encoded(&buf);
 
         let signature = Signature::try_from(sig_bytes.as_slice())

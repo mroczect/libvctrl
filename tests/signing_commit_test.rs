@@ -2,7 +2,8 @@ mod common;
 use common::{alice, encoder, hasher, put_blob, put_tree, setup_refs, setup_store};
 use ed25519_dalek::VerifyingKey;
 use libvctrl::{
-    Command, CreateCommit, EntryKind, LibrageSigner, SetHead, Tree, TreeEntry, VerifyCommit,
+    Command, CreateBranch, CreateCommit, EntryKind, LibrageSigner, SetHead, Tree, TreeEntry,
+    VerifyCommit,
 };
 
 #[test]
@@ -10,13 +11,21 @@ fn test_signed_commit_and_verify() {
     let mut store = setup_store();
     let mut refs = setup_refs();
 
-    let set_head = SetHead {
+    let init_hash = common::blob_hash(b"init");
+    CreateBranch {
+        name: "refs/heads/main".into(),
+        hash: init_hash,
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+    SetHead {
         target: "refs/heads/main".into(),
-    };
-    set_head.execute(&mut store, &mut refs).unwrap();
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
 
     let blob_hash = put_blob(&mut store, b"data");
-    let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash);
+    let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash).unwrap();
     let tree = Tree::new(vec![entry]).unwrap();
     let tree_hash = put_tree(&mut store, &tree);
 
@@ -59,13 +68,21 @@ fn test_unsigned_commit() {
     let mut store = setup_store();
     let mut refs = setup_refs();
 
-    let set_head = SetHead {
+    let init_hash = common::blob_hash(b"init");
+    CreateBranch {
+        name: "refs/heads/main".into(),
+        hash: init_hash,
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+    SetHead {
         target: "refs/heads/main".into(),
-    };
-    set_head.execute(&mut store, &mut refs).unwrap();
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
 
     let blob_hash = put_blob(&mut store, b"data");
-    let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash);
+    let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash).unwrap();
     let tree = Tree::new(vec![entry]).unwrap();
     let tree_hash = put_tree(&mut store, &tree);
 

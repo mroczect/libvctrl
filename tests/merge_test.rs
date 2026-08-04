@@ -28,25 +28,25 @@ fn merge_no_conflict() {
     let b2 = put_blob(&mut store, b"2");
 
     let base_tree = Tree::new(vec![
-        TreeEntry::new("a".into(), EntryKind::Blob, a1),
-        TreeEntry::new("b".into(), EntryKind::Blob, b2),
+        TreeEntry::new("a".into(), EntryKind::Blob, a1).unwrap(),
+        TreeEntry::new("b".into(), EntryKind::Blob, b2).unwrap(),
     ])
     .unwrap();
     let base_hash = put_tree(&mut store, &base_tree);
 
     let b3 = put_blob(&mut store, b"3");
     let ours_tree = Tree::new(vec![
-        TreeEntry::new("a".into(), EntryKind::Blob, a1),
-        TreeEntry::new("b".into(), EntryKind::Blob, b3),
+        TreeEntry::new("a".into(), EntryKind::Blob, a1).unwrap(),
+        TreeEntry::new("b".into(), EntryKind::Blob, b3).unwrap(),
     ])
     .unwrap();
     let ours_hash = put_tree(&mut store, &ours_tree);
 
     let c4 = put_blob(&mut store, b"4");
     let theirs_tree = Tree::new(vec![
-        TreeEntry::new("a".into(), EntryKind::Blob, a1),
-        TreeEntry::new("b".into(), EntryKind::Blob, b2),
-        TreeEntry::new("c".into(), EntryKind::Blob, c4),
+        TreeEntry::new("a".into(), EntryKind::Blob, a1).unwrap(),
+        TreeEntry::new("b".into(), EntryKind::Blob, b2).unwrap(),
+        TreeEntry::new("c".into(), EntryKind::Blob, c4).unwrap(),
     ])
     .unwrap();
     let theirs_hash = put_tree(&mut store, &theirs_tree);
@@ -83,17 +83,19 @@ fn merge_conflict_blob() {
     let ours_blob = put_blob(&mut store, b"ours");
     let theirs_blob = put_blob(&mut store, b"theirs");
 
-    let base_tree =
-        Tree::new(vec![TreeEntry::new("f".into(), EntryKind::Blob, base_blob)]).unwrap();
+    let base_tree = Tree::new(vec![
+        TreeEntry::new("f".into(), EntryKind::Blob, base_blob).unwrap(),
+    ])
+    .unwrap();
     let base_hash = put_tree(&mut store, &base_tree);
-    let ours_tree =
-        Tree::new(vec![TreeEntry::new("f".into(), EntryKind::Blob, ours_blob)]).unwrap();
+    let ours_tree = Tree::new(vec![
+        TreeEntry::new("f".into(), EntryKind::Blob, ours_blob).unwrap(),
+    ])
+    .unwrap();
     let ours_hash = put_tree(&mut store, &ours_tree);
-    let theirs_tree = Tree::new(vec![TreeEntry::new(
-        "f".into(),
-        EntryKind::Blob,
-        theirs_blob,
-    )])
+    let theirs_tree = Tree::new(vec![
+        TreeEntry::new("f".into(), EntryKind::Blob, theirs_blob).unwrap(),
+    ])
     .unwrap();
     let theirs_hash = put_tree(&mut store, &theirs_tree);
 
@@ -121,17 +123,19 @@ fn merge_resolved() {
     let ours_blob = put_blob(&mut store, b"ours");
     let theirs_blob = put_blob(&mut store, b"theirs");
 
-    let base_tree =
-        Tree::new(vec![TreeEntry::new("f".into(), EntryKind::Blob, base_blob)]).unwrap();
+    let base_tree = Tree::new(vec![
+        TreeEntry::new("f".into(), EntryKind::Blob, base_blob).unwrap(),
+    ])
+    .unwrap();
     let base_hash = put_tree(&mut store, &base_tree);
-    let ours_tree =
-        Tree::new(vec![TreeEntry::new("f".into(), EntryKind::Blob, ours_blob)]).unwrap();
+    let ours_tree = Tree::new(vec![
+        TreeEntry::new("f".into(), EntryKind::Blob, ours_blob).unwrap(),
+    ])
+    .unwrap();
     let ours_hash = put_tree(&mut store, &ours_tree);
-    let theirs_tree = Tree::new(vec![TreeEntry::new(
-        "f".into(),
-        EntryKind::Blob,
-        theirs_blob,
-    )])
+    let theirs_tree = Tree::new(vec![
+        TreeEntry::new("f".into(), EntryKind::Blob, theirs_blob).unwrap(),
+    ])
     .unwrap();
     let theirs_hash = put_tree(&mut store, &theirs_tree);
 

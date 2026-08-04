@@ -10,14 +10,14 @@ fn diff_added_removed_modified() {
     let h3 = blob_hash(b"three");
 
     let old = Tree::new(vec![
-        TreeEntry::new("a".into(), EntryKind::Blob, h1),
-        TreeEntry::new("b".into(), EntryKind::Blob, h2),
+        TreeEntry::new("a".into(), EntryKind::Blob, h1).unwrap(),
+        TreeEntry::new("b".into(), EntryKind::Blob, h2).unwrap(),
     ])
     .unwrap();
 
     let new = Tree::new(vec![
-        TreeEntry::new("a".into(), EntryKind::Blob, h3),
-        TreeEntry::new("c".into(), EntryKind::Blob, h1),
+        TreeEntry::new("a".into(), EntryKind::Blob, h3).unwrap(),
+        TreeEntry::new("c".into(), EntryKind::Blob, h1).unwrap(),
     ])
     .unwrap();
 
@@ -53,7 +53,10 @@ fn diff_added_removed_modified() {
 #[test]
 fn diff_no_changes() {
     let h = blob_hash(b"same");
-    let tree = Tree::new(vec![TreeEntry::new("f".into(), EntryKind::Blob, h)]).unwrap();
+    let tree = Tree::new(vec![
+        TreeEntry::new("f".into(), EntryKind::Blob, h).unwrap(),
+    ])
+    .unwrap();
     let differ = TreeDiffer;
     let diffs = differ.diff(&tree, &tree).unwrap();
     assert!(diffs.is_empty());
