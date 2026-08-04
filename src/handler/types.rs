@@ -93,7 +93,7 @@ impl Blob {
     }
 
     pub fn hash(&self) -> Result<Hash, VctrlError> {
-        crate::handler::types::hash_blob(&self.data)
+        hash_blob(&self.data)
     }
 }
 
@@ -136,6 +136,10 @@ impl Tree {
         &self.entries
     }
 
+    pub fn into_entries(self) -> Vec<TreeEntry> {
+        self.entries
+    }
+
     pub fn hash(&self) -> Result<Hash, VctrlError> {
         let serialized = serde_json::to_vec(&self.entries).map_err(VctrlError::from)?;
         hash_tree(&serialized)
@@ -166,13 +170,13 @@ impl UserInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Commit {
-    pub tree: Hash,
-    pub parents: Vec<Hash>,
-    pub author: UserInfo,
-    pub committer: UserInfo,
-    pub timestamp: DateTime<Utc>,
-    pub message: String,
-    pub signature: Option<Vec<u8>>,
+    tree: Hash,
+    parents: Vec<Hash>,
+    author: UserInfo,
+    committer: UserInfo,
+    timestamp: DateTime<Utc>,
+    message: String,
+    signature: Option<Vec<u8>>,
 }
 
 impl Commit {
@@ -195,6 +199,28 @@ impl Commit {
         };
         let _ = commit.hash()?;
         Ok(commit)
+    }
+
+    pub fn tree(&self) -> &Hash {
+        &self.tree
+    }
+    pub fn parents(&self) -> &[Hash] {
+        &self.parents
+    }
+    pub fn author(&self) -> &UserInfo {
+        &self.author
+    }
+    pub fn committer(&self) -> &UserInfo {
+        &self.committer
+    }
+    pub fn timestamp(&self) -> &DateTime<Utc> {
+        &self.timestamp
+    }
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+    pub fn signature(&self) -> Option<&[u8]> {
+        self.signature.as_deref()
     }
 
     pub fn hash(&self) -> Result<Hash, VctrlError> {

@@ -1,6 +1,5 @@
 use crate::handler::error::VctrlError;
 use crate::handler::types::{Commit, Hash, Object, ObjectStore, RefStore, UserInfo};
-use chrono::Utc;
 
 pub fn create_commit(
     store: &mut dyn ObjectStore,
@@ -10,17 +9,8 @@ pub fn create_commit(
     committer: UserInfo,
     message: String,
 ) -> Result<Hash, VctrlError> {
-    let commit = Commit {
-        tree: tree_hash,
-        parents,
-        author,
-        committer,
-        timestamp: Utc::now(),
-        message,
-        signature: None,
-    };
-    let obj = Object::Commit(Box::new(commit));
-    store.put(&obj)
+    let commit = Commit::new(tree_hash, parents, author, committer, message, None)?;
+    store.put(&Object::Commit(Box::new(commit)))
 }
 
 pub fn get_commit(store: &dyn ObjectStore, hash: &Hash) -> Result<Option<Commit>, VctrlError> {
@@ -36,11 +26,11 @@ pub fn log(store: &dyn ObjectStore, ref_store: &dyn RefStore) -> Result<Vec<Comm
         None => return Ok(Vec::new()),
     };
 
-    let mut commits = Vec::new();
+    let mut commits = Vec::with_capacity(16);
     let mut current = Some(head_hash);
     while let Some(hash) = current {
         if let Some(commit) = get_commit(store, &hash)? {
-            current = commit.parents.first().copied();
+            current = commit.parents().first().copied();
             commits.push(commit);
         } else {
             break;
