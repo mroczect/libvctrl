@@ -1,6 +1,6 @@
 [package]
 name = "libvctrl"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 description = "A robust, content-addressed version control engine for arbitrary data, designed for embedding into applications."
 license = "MIT"
@@ -21,6 +21,7 @@ serde_json = "1.0.151"
 sha2 = "0.11.0"
 thiserror = "2.0.19"
 rand = "0.8"
+byteorder = "1.5.0"
 
 [dev-dependencies]
 tempfile = "3.27.0"
