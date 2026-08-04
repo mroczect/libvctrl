@@ -1,0 +1,20 @@
+[package]
+name = "libvcrtl"
+version = "0.1.0"
+edition = "2024"
+description = "A robust, content-addressed version control engine for arbitrary data, designed for embedding into applications."
+license = "MIT"
+authors = ["mroczect <mroczect@proton.me>"]
+repository = "https://github.com/mroczect/libvcrtl"
+homepage = "https://github.com/mroczect/libvcrtl"
+documentation = "https://docs.rs/libvcrtl"
+readme = "README.md"
+keywords = ["version-control", "content-addressed", "merkle-tree", "cryptography", "sha512"]
+categories = ["algorithms", "data-structures", "development-tools", "cryptography"]
+
+[dependencies]
+chrono = { version = "0.4.45", features = ["serde"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+thiserror = "2.0.19"
