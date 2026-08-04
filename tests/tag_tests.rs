@@ -35,7 +35,6 @@ fn test_annotated_tag() {
         hasher: Box::new(hasher()),
     };
     let tag_hash = cmd.execute(&mut store, &mut refs).unwrap();
-
     assert!(store.exists(&tag_hash).unwrap());
 
     let ref_name = "refs/tags/v2.0";
