@@ -38,6 +38,8 @@ fn test_signed_commit_and_verify() {
     let verify = VerifyCommit {
         commit_hash,
         verifying_key: vk,
+        encoder: Box::new(encoder()),
+        hasher: Box::new(hasher()),
     };
     assert!(verify.execute(&mut store, &mut refs).unwrap());
 
@@ -46,6 +48,8 @@ fn test_signed_commit_and_verify() {
     let verify_wrong = VerifyCommit {
         commit_hash,
         verifying_key: wrong_vk,
+        encoder: Box::new(encoder()),
+        hasher: Box::new(hasher()),
     };
     assert!(verify_wrong.execute(&mut store, &mut refs).is_err());
 }
@@ -81,6 +85,8 @@ fn test_unsigned_commit() {
     let verify = VerifyCommit {
         commit_hash,
         verifying_key: vk,
+        encoder: Box::new(encoder()),
+        hasher: Box::new(hasher()),
     };
     assert!(!verify.execute(&mut store, &mut refs).unwrap());
 }

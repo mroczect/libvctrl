@@ -28,6 +28,13 @@ impl Command for CherryPick {
         refs: &mut dyn RefStore,
     ) -> Result<Hash, VctrlError> {
         let src_commit = get_commit(store, &self.commit_hash)?;
+
+        if src_commit.parents.len() > 1 {
+            return Err(VctrlError::Other(
+                "cherry-pick: merge commits are not supported".into(),
+            ));
+        }
+
         let theirs_tree_hash = src_commit.tree;
 
         let base_tree_hash = match src_commit.parents.first() {
@@ -36,7 +43,8 @@ impl Command for CherryPick {
                 parent_commit.tree
             }
             None => {
-                let empty_tree = crate::domain::tree::Tree::new(vec![]).unwrap();
+                let empty_tree =
+                    crate::domain::tree::Tree::new(vec![]).map_err(VctrlError::Tree)?;
                 let mut buf = Vec::new();
                 self.encoder.encode_tree(&empty_tree, &mut buf);
                 let hash = self.hasher.hash_tree_encoded(&buf);
