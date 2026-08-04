@@ -1,5 +1,6 @@
 use crate::codec::Encoder;
 use crate::command::Command;
+use crate::crypto::Signer;
 use crate::domain::commit::Commit;
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
@@ -16,6 +17,7 @@ pub struct CreateCommit {
     pub message: String,
     pub encoder: Box<dyn Encoder>,
     pub hasher: Box<dyn Hasher>,
+    pub signer: Option<Box<dyn Signer>>,
 }
 
 impl Command for CreateCommit {
@@ -26,7 +28,7 @@ impl Command for CreateCommit {
         store: &mut dyn ObjectStore,
         refs: &mut dyn RefStore,
     ) -> Result<Hash, VctrlError> {
-        let commit = Commit::new(
+        let mut commit = Commit::new(
             self.tree_hash,
             self.parents.clone(),
             self.author.clone(),
@@ -34,15 +36,26 @@ impl Command for CreateCommit {
             self.message.clone(),
             None,
         );
+
         let mut buf = Vec::new();
         self.encoder.encode_commit(&commit, &mut buf);
-        let hash = self.hasher.hash_commit_encoded(&buf);
-        store.put(&hash, &Object::Commit(Box::new(commit)))?;
+        let pre_sig_hash = self.hasher.hash_commit_encoded(&buf);
 
-        if let Some(branch_name) = refs.head_ref_name()? {
-            refs.set_ref(&branch_name, &hash)?;
+        if let Some(signer) = &self.signer {
+            let sig = signer.sign(pre_sig_hash.as_bytes())?;
+            commit.signature = Some(sig);
+
+            buf.clear();
+            self.encoder.encode_commit(&commit, &mut buf);
         }
 
-        Ok(hash)
+        let final_hash = self.hasher.hash_commit_encoded(&buf);
+        store.put(&final_hash, &Object::Commit(Box::new(commit)))?;
+
+        if let Some(branch_name) = refs.head_ref_name()? {
+            refs.set_ref(&branch_name, &final_hash)?;
+        }
+
+        Ok(final_hash)
     }
 }
