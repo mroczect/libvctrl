@@ -11,8 +11,8 @@ fn checkout_flat_tree() {
     let h2 = put_blob(&mut store, b"data2");
 
     let tree = Tree::new(vec![
-        TreeEntry::new("a.txt".into(), EntryKind::Blob, h1),
-        TreeEntry::new("b.txt".into(), EntryKind::Blob, h2),
+        TreeEntry::new("a.txt".into(), EntryKind::Blob, h1).unwrap(),
+        TreeEntry::new("b.txt".into(), EntryKind::Blob, h2).unwrap(),
     ])
     .unwrap();
     let tree_hash = put_tree(&mut store, &tree);
@@ -31,19 +31,15 @@ fn checkout_recursive() {
     let mut refs = setup_refs();
     let inner_hash = put_blob(&mut store, b"inner");
 
-    let sub_tree = Tree::new(vec![TreeEntry::new(
-        "inner.txt".into(),
-        EntryKind::Blob,
-        inner_hash,
-    )])
+    let sub_tree = Tree::new(vec![
+        TreeEntry::new("inner.txt".into(), EntryKind::Blob, inner_hash).unwrap(),
+    ])
     .unwrap();
     let sub_hash = put_tree(&mut store, &sub_tree);
 
-    let root_tree = Tree::new(vec![TreeEntry::new(
-        "sub".into(),
-        EntryKind::Tree,
-        sub_hash,
-    )])
+    let root_tree = Tree::new(vec![
+        TreeEntry::new("sub".into(), EntryKind::Tree, sub_hash).unwrap(),
+    ])
     .unwrap();
     let root_hash = put_tree(&mut store, &root_tree);
 
