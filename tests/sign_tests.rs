@@ -2,6 +2,9 @@ use ed25519_dalek::{Verifier, VerifyingKey};
 use libvctrl::crypto::{LibrageSigner, Signer};
 use tempfile::tempdir;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 #[test]
 fn test_generate_and_sign() {
     let signer = LibrageSigner::generate();
@@ -59,6 +62,8 @@ fn test_from_seed_file() {
     let dir = tempdir().unwrap();
     let seed_path = dir.path().join("seed.bin");
     std::fs::write(&seed_path, seed).unwrap();
+    #[cfg(unix)]
+    std::fs::set_permissions(&seed_path, std::fs::Permissions::from_mode(0o600)).unwrap();
 
     let loaded = LibrageSigner::from_seed_file(&seed_path).unwrap();
     let hash = [0xab; 64];
@@ -73,6 +78,9 @@ fn test_seed_file_invalid_length() {
     let dir = tempdir().unwrap();
     let seed_path = dir.path().join("short.bin");
     std::fs::write(&seed_path, [0u8; 31]).unwrap();
+    #[cfg(unix)]
+    std::fs::set_permissions(&seed_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+
     let err = LibrageSigner::from_seed_file(&seed_path).unwrap_err();
     match err {
         libvctrl::VctrlError::Other(msg) => assert!(msg.contains("32 bytes")),
