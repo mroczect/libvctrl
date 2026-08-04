@@ -4,7 +4,7 @@ use common::blob_hash;
 use libvctrl::{EntryKind, Tree, TreeEntry, TreeError};
 
 fn make_entry(name: &str, hash: libvctrl::Hash) -> TreeEntry {
-    TreeEntry::new(name.to_string(), EntryKind::Blob, hash)
+    TreeEntry::new(name.to_string(), EntryKind::Blob, hash).unwrap()
 }
 
 #[test]
@@ -23,6 +23,7 @@ fn tree_duplicate_entries_error() {
     let err = Tree::new(entries).unwrap_err();
     match err {
         TreeError::DuplicateEntry(name) => assert_eq!(name, "a"),
+        _ => panic!("expected DuplicateEntry"),
     }
 }
 
