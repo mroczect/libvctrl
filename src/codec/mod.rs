@@ -11,3 +11,9 @@ pub trait Encoder {
     fn encode_commit(&self, commit: &Commit, buf: &mut Vec<u8>) -> Result<(), VctrlError>;
     fn encode_tag(&self, tag: &Tag, buf: &mut Vec<u8>) -> Result<(), VctrlError>;
 }
+
+pub trait Decoder {
+    fn decode_tree(&self, data: &[u8]) -> Result<Tree, VctrlError>;
+    fn decode_commit(&self, data: &[u8]) -> Result<Commit, VctrlError>;
+    fn decode_tag(&self, data: &[u8]) -> Result<Tag, VctrlError>;
+}
