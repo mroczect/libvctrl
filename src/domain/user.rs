@@ -1,3 +1,4 @@
+pub use age_credentials::UserID;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

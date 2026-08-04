@@ -1,6 +1,6 @@
 [package]
 name = "libvctrl"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "A robust, content-addressed version control engine for arbitrary data, designed for embedding into applications."
 license = "MIT"
@@ -13,8 +13,16 @@ keywords = ["version-control", "content-addressed", "merkle-tree", "cryptography
 categories = ["algorithms", "data-structures", "development-tools", "cryptography"]
 
 [dependencies]
+age = { version = "0.12.1", features = ["ssh"] }
+age-credentials = "0.3.0"
 chrono = { version = "0.4.45", features = ["serde"] }
+ed25519-dalek = "3.0.0"
+librage = "1.1.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.11.0"
 thiserror = "2.0.19"
+rand = "0.8"
+
+[dev-dependencies]
+tempfile = "3.27.0"
