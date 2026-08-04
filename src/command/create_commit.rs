@@ -17,8 +17,10 @@ pub struct CreateCommit {
     pub encoder: Box<dyn Encoder>,
     pub hasher: Box<dyn Hasher>,
 }
+
 impl Command for CreateCommit {
     type Output = Hash;
+
     fn execute(
         &self,
         store: &mut dyn ObjectStore,
@@ -36,19 +38,11 @@ impl Command for CreateCommit {
         self.encoder.encode_commit(&commit, &mut buf);
         let hash = self.hasher.hash_commit_encoded(&buf);
         store.put(&hash, &Object::Commit(Box::new(commit)))?;
-        if let Some(head_name) = get_head_branch_name(refs)? {
-            refs.set_ref(&head_name, &hash)?;
-        } else {
-            refs.set_ref("refs/heads/main", &hash)?;
-            refs.set_head("refs/heads/main")?;
+
+        if let Some(branch_name) = refs.head_ref_name()? {
+            refs.set_ref(&branch_name, &hash)?;
         }
+
         Ok(hash)
-    }
-}
-fn get_head_branch_name(refs: &dyn RefStore) -> Result<Option<String>, VctrlError> {
-    if refs.head()?.is_some() {
-        Ok(Some("refs/heads/main".to_string()))
-    } else {
-        Ok(None)
     }
 }
