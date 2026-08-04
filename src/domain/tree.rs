@@ -1,6 +1,8 @@
 use super::hash::Hash;
 use serde::{Deserialize, Serialize};
 
+pub const MAX_TREE_DEPTH: usize = 1000;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryKind {
     Blob,
@@ -15,8 +17,16 @@ pub struct TreeEntry {
 }
 
 impl TreeEntry {
-    pub fn new(name: String, kind: EntryKind, hash: Hash) -> Self {
-        Self { name, kind, hash }
+    pub fn new(name: String, kind: EntryKind, hash: Hash) -> Result<Self, TreeError> {
+        if name.is_empty()
+            || name.contains('/')
+            || name.contains('\\')
+            || name == ".."
+            || name == "."
+        {
+            return Err(TreeError::InvalidEntryName(name));
+        }
+        Ok(Self { name, kind, hash })
     }
 }
 
@@ -50,4 +60,6 @@ impl Tree {
 pub enum TreeError {
     #[error("duplicate entry name: {0}")]
     DuplicateEntry(String),
+    #[error("invalid entry name: {0}")]
+    InvalidEntryName(String),
 }
