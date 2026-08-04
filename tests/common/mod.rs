@@ -2,7 +2,7 @@
 
 use libvctrl::{
     BinaryEncoder, Encoder, Hash, Hasher, MemoryRefStore, MemoryStore, ObjectStore, Sha512Hasher,
-    UserInfo,
+    UserID,
 };
 
 pub fn setup_store() -> MemoryStore {
@@ -21,16 +21,16 @@ pub fn hasher() -> Sha512Hasher {
     Sha512Hasher
 }
 
-pub fn user(name: &str, email: &str) -> UserInfo {
-    UserInfo::new(name.to_string(), email.to_string())
+pub fn user(name: &str, email: &str) -> UserID {
+    UserID::new(name.to_string(), email.to_string()).unwrap()
 }
 
-pub fn alice() -> UserInfo {
-    user("Alice", "alice@example.com")
+pub fn alice() -> UserID {
+    UserID::new("Alice Example", "alice@example.com").unwrap()
 }
 
-pub fn bob() -> UserInfo {
-    user("Bob", "bob@example.com")
+pub fn bob() -> UserID {
+    UserID::new("Bob Example", "bob@example.com").unwrap()
 }
 
 pub fn blob_hash(data: &[u8]) -> Hash {
