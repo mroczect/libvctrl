@@ -1,7 +1,7 @@
 use crate::codec::Encoder;
 use crate::domain::commit::Commit;
 use crate::domain::tree::{EntryKind, Tree};
-use crate::domain::user::UserInfo;
+use crate::domain::user::UserID;
 
 pub struct BinaryEncoder;
 
@@ -51,11 +51,12 @@ impl Encoder for BinaryEncoder {
     }
 }
 
-fn write_user(user: &UserInfo, buf: &mut Vec<u8>) {
+fn write_user(user: &UserID, buf: &mut Vec<u8>) {
     let name = user.name.as_bytes();
     let name_len = name.len() as u16;
     buf.extend_from_slice(&name_len.to_be_bytes());
     buf.extend_from_slice(name);
+
     let email = user.email.as_bytes();
     let email_len = email.len() as u16;
     buf.extend_from_slice(&email_len.to_be_bytes());
