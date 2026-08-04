@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Blob {
-    pub data: Vec<u8>,
+    data: Vec<u8>,
 }
 
 impl Blob {
