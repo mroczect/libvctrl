@@ -1,8 +1,6 @@
 use crate::handler::error::VctrlError;
 use crate::handler::types::{EntryKind, Hash, Object, ObjectStore};
 
-/// Rekursif mengekstrak semua blob dari tree menjadi daftar (path, konten).
-/// Path adalah gabungan nama entry dengan separator `/`.
 pub fn checkout_tree(
     store: &dyn ObjectStore,
     tree_hash: &Hash,
