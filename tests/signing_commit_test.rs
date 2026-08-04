@@ -35,6 +35,7 @@ fn test_signed_commit_and_verify() {
     let cmd = CreateCommit {
         tree_hash,
         parents: vec![],
+        transaction_id: None,
         author: alice(),
         committer: alice(),
         message: "signed".into(),
@@ -89,6 +90,7 @@ fn test_unsigned_commit() {
     let cmd = CreateCommit {
         tree_hash,
         parents: vec![],
+        transaction_id: None,
         author: alice(),
         committer: alice(),
         message: "unsigned".into(),
