@@ -15,4 +15,5 @@ pub trait RefStore {
     fn set_head(&mut self, target: &str) -> Result<(), VctrlError>;
     fn head(&self) -> Result<Option<Hash>, VctrlError>;
     fn head_ref_name(&self) -> Result<Option<String>, VctrlError>;
+    fn list_refs(&self, prefix: &str) -> Result<Vec<String>, VctrlError>;
 }

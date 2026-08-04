@@ -78,4 +78,12 @@ impl RefStore for MemoryRefStore {
             _ => Ok(None),
         }
     }
+    fn list_refs(&self, prefix: &str) -> Result<Vec<String>, VctrlError> {
+        Ok(self
+            .refs
+            .keys()
+            .filter(|k| k.starts_with(prefix))
+            .cloned()
+            .collect())
+    }
 }

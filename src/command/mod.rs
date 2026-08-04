@@ -3,12 +3,14 @@ pub mod checkout;
 pub mod create_commit;
 pub mod log;
 pub mod merge;
+pub mod tag_cmd;
 
 pub use branch::*;
 pub use checkout::*;
 pub use create_commit::*;
 pub use log::*;
 pub use merge::*;
+pub use tag_cmd::*;
 
 use crate::error::VctrlError;
 use crate::storage::traits::{ObjectStore, RefStore};

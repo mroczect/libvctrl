@@ -1,5 +1,6 @@
 use crate::codec::Encoder;
 use crate::domain::commit::Commit;
+use crate::domain::tag::Tag;
 use crate::domain::tree::{EntryKind, Tree};
 use crate::domain::user::UserID;
 
@@ -7,7 +8,7 @@ pub struct BinaryEncoder;
 
 impl Encoder for BinaryEncoder {
     fn encode_tree(&self, tree: &Tree, buf: &mut Vec<u8>) {
-        buf.push(1u8); // version
+        buf.push(1u8);
         let n = tree.entries().len() as u32;
         buf.extend_from_slice(&n.to_be_bytes());
         for entry in tree.entries() {
@@ -48,6 +49,20 @@ impl Encoder for BinaryEncoder {
         } else {
             buf.extend_from_slice(&0u32.to_be_bytes());
         }
+    }
+
+    fn encode_tag(&self, tag: &Tag, buf: &mut Vec<u8>) {
+        buf.push(1u8);
+        buf.extend_from_slice(tag.target.as_bytes());
+        write_user(&tag.tagger, buf);
+        let ts = tag.timestamp.timestamp();
+        let ts_ns = tag.timestamp.timestamp_subsec_nanos();
+        buf.extend_from_slice(&ts.to_be_bytes());
+        buf.extend_from_slice(&ts_ns.to_be_bytes());
+        let msg = tag.message.as_bytes();
+        let msg_len = msg.len() as u32;
+        buf.extend_from_slice(&msg_len.to_be_bytes());
+        buf.extend_from_slice(msg);
     }
 }
 

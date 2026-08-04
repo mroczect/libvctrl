@@ -7,13 +7,13 @@ pub mod error;
 pub mod hashing;
 pub mod merge;
 pub mod storage;
+
 pub use codec::*;
 pub use command::*;
 pub use crypto::*;
 pub use diff::*;
-pub use domain::user::UserID;
 pub use domain::*;
-pub use error::VctrlError;
+pub use error::*;
 pub use hashing::*;
 pub use merge::*;
 pub use storage::*;

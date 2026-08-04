@@ -1,6 +1,6 @@
 [package]
 name = "libvctrl"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "A robust, content-addressed version control engine for arbitrary data, designed for embedding into applications."
 license = "MIT"
