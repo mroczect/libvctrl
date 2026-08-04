@@ -6,6 +6,7 @@ pub mod domain;
 pub mod error;
 pub mod hashing;
 pub mod merge;
+pub mod pos;
 pub mod storage;
 
 pub use codec::*;
