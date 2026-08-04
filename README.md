@@ -1,5 +1,15 @@
 # libvctrl
 
+[![Crates.io](https://img.shields.io/crates/v/libvctrl)](https://crates.io/crates/libvctrl)
+[![Downloads](https://img.shields.io/crates/d/libvctrl?label=downloads)](https://crates.io/crates/libvctrl)
+[![License: MIT](https://img.shields.io/crates/l/libvctrl)](#license)
+[![Docs](https://docs.rs/libvctrl/badge.svg)](https://docs.rs/libvctrl)
+[![CI](https://img.shields.io/github/actions/workflow/status/mroczect/libvcrtl/rust.yml?branch=master)](https://github.com/mroczect/libvcrtl/actions)
+[![MSRV](https://img.shields.io/badge/MSRV-1.85.0-blue)](#installation)
+[![LoC](https://img.shields.io/tokei/lines/github/mroczect/libvcrtl)](https://github.com/mroczect/libvcrtl)
+[![Last Commit](https://img.shields.io/github/last-commit/mroczect/libvcrtl)](https://github.com/mroczect/libvcrtl/commits/master)
+[![Repo Size](https://img.shields.io/github/repo-size/mroczect/libvcrtl)](https://github.com/mroczect/libvcrtl)
+
 A robust, content-addressed version control engine for arbitrary data, designed
 for embedding into applications.
 
