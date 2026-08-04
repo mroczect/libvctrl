@@ -47,14 +47,7 @@ impl Command for Revert {
         let head_commit = get_commit(store, &head_commit_hash)?;
         let head_tree = get_tree(store, &head_commit.tree)?;
 
-        let new_tree = apply_reverse_diff(
-            &head_tree,
-            &parent_tree,
-            &diffs,
-            store,
-            &*self.encoder,
-            &*self.hasher,
-        )?;
+        let new_tree = apply_reverse_diff(&head_tree, &parent_tree, &diffs)?;
 
         let mut buf = Vec::new();
         self.encoder.encode_tree(&new_tree, &mut buf);
@@ -96,14 +89,7 @@ fn get_tree(store: &dyn ObjectStore, hash: &Hash) -> Result<Tree, VctrlError> {
     }
 }
 
-fn apply_reverse_diff(
-    head: &Tree,
-    parent: &Tree,
-    diffs: &[DiffEntry],
-    _store: &mut dyn ObjectStore,
-    _encoder: &dyn Encoder,
-    _hasher: &dyn Hasher,
-) -> Result<Tree, VctrlError> {
+fn apply_reverse_diff(head: &Tree, parent: &Tree, diffs: &[DiffEntry]) -> Result<Tree, VctrlError> {
     let mut map: BTreeMap<String, TreeEntry> = head
         .entries()
         .iter()
@@ -122,11 +108,25 @@ fn apply_reverse_diff(
                 map.remove(&diff.name);
             }
             DiffKind::Removed => {
+                if map.contains_key(&diff.name) {
+                    return Err(VctrlError::Other(format!(
+                        "revert conflict: '{}' already exists in HEAD",
+                        diff.name
+                    )));
+                }
                 if let Some(entry) = parent_map.get(&diff.name) {
                     map.insert(diff.name.clone(), entry.clone());
                 }
             }
             DiffKind::Modified { old_hash, .. } => {
+                if let Some(current) = map.get(&diff.name)
+                    && current.hash != *old_hash
+                {
+                    return Err(VctrlError::Other(format!(
+                        "revert conflict: '{}' has been modified",
+                        diff.name
+                    )));
+                }
                 if let Some(entry) = map.get_mut(&diff.name) {
                     entry.hash = *old_hash;
                 }
