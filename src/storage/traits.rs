@@ -14,4 +14,5 @@ pub trait RefStore {
     fn delete_ref(&mut self, name: &str) -> Result<(), VctrlError>;
     fn set_head(&mut self, target: &str) -> Result<(), VctrlError>;
     fn head(&self) -> Result<Option<Hash>, VctrlError>;
+    fn head_ref_name(&self) -> Result<Option<String>, VctrlError>;
 }

@@ -10,8 +10,10 @@ const MAX_DEPTH: usize = 1000;
 pub struct Checkout {
     pub tree_hash: Hash,
 }
+
 impl Command for Checkout {
     type Output = Vec<(String, Vec<u8>)>;
+
     fn execute(
         &self,
         store: &mut dyn ObjectStore,
@@ -22,6 +24,7 @@ impl Command for Checkout {
         Ok(files)
     }
 }
+
 fn checkout_recursive(
     store: &dyn ObjectStore,
     hash: &Hash,
@@ -30,7 +33,7 @@ fn checkout_recursive(
     depth: usize,
 ) -> Result<(), VctrlError> {
     if depth > MAX_DEPTH {
-        return Err(VctrlError::Other("max depth".into()));
+        return Err(VctrlError::Other("max checkout depth exceeded".into()));
     }
     match store.get(hash)? {
         Some(Object::Tree(tree)) => {
@@ -38,7 +41,11 @@ fn checkout_recursive(
                 let path = if prefix.is_empty() {
                     entry.name.clone()
                 } else {
-                    format!("{}/{}", prefix, entry.name)
+                    let mut path = String::with_capacity(prefix.len() + 1 + entry.name.len());
+                    path.push_str(prefix);
+                    path.push('/');
+                    path.push_str(&entry.name);
+                    path
                 };
                 match entry.kind {
                     EntryKind::Blob => {
@@ -47,12 +54,12 @@ fn checkout_recursive(
                         }
                     }
                     EntryKind::Tree => {
-                        checkout_recursive(store, &entry.hash, &path, files, depth + 1)?
+                        checkout_recursive(store, &entry.hash, &path, files, depth + 1)?;
                     }
                 }
             }
         }
-        _ => return Err(VctrlError::NotFound("tree".into())),
+        _ => return Err(VctrlError::NotFound("tree not found".into())),
     }
     Ok(())
 }

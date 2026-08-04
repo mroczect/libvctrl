@@ -1,12 +1,17 @@
 mod common;
 use common::{alice, bob, put_blob, put_tree, setup_refs, setup_store};
 
-use libvctrl::{Command, CreateCommit, EntryKind, Log, Tree, TreeEntry};
+use libvctrl::{Command, CreateCommit, EntryKind, Log, SetHead, Tree, TreeEntry};
 
 #[test]
 fn create_commit_and_log() {
     let mut store = setup_store();
     let mut refs = setup_refs();
+
+    let set_head = SetHead {
+        target: "refs/heads/main".into(),
+    };
+    set_head.execute(&mut store, &mut refs).unwrap();
 
     let blob_hash = put_blob(&mut store, b"data");
     let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash);
@@ -37,6 +42,11 @@ fn create_commit_and_log() {
 fn commit_chain_log() {
     let mut store = setup_store();
     let mut refs = setup_refs();
+
+    let set_head = SetHead {
+        target: "refs/heads/main".into(),
+    };
+    set_head.execute(&mut store, &mut refs).unwrap();
 
     let blob_hash = put_blob(&mut store, b"data");
     let entry = TreeEntry::new("f".into(), EntryKind::Blob, blob_hash);
