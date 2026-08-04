@@ -1,9 +1,13 @@
-use crate::codec::Encoder;
+use crate::codec::{Decoder, Encoder};
 use crate::domain::commit::Commit;
+use crate::domain::hash::Hash;
 use crate::domain::tag::Tag;
-use crate::domain::tree::{EntryKind, Tree};
+use crate::domain::tree::{EntryKind, Tree, TreeEntry};
 use crate::domain::user::UserID;
 use crate::error::VctrlError;
+use byteorder::{BigEndian, ReadBytesExt};
+use chrono::{TimeZone, Utc};
+use std::io::{Cursor, Read};
 
 pub struct BinaryEncoder;
 
@@ -90,4 +94,175 @@ fn write_user(user: &UserID, buf: &mut Vec<u8>) -> Result<(), VctrlError> {
     buf.extend_from_slice(&email_len.to_be_bytes());
     buf.extend_from_slice(email);
     Ok(())
+}
+
+pub struct BinaryDecoder;
+
+impl Decoder for BinaryDecoder {
+    fn decode_tree(&self, data: &[u8]) -> Result<Tree, VctrlError> {
+        let mut cursor = Cursor::new(data);
+        let version = cursor
+            .read_u8()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        if version != 1 {
+            return Err(VctrlError::Other("unsupported tree version".into()));
+        }
+        let n = cursor
+            .read_u32::<BigEndian>()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let mut entries = Vec::with_capacity(n as usize);
+        for _ in 0..n {
+            let name_len = cursor
+                .read_u16::<BigEndian>()
+                .map_err(|e| VctrlError::Other(e.to_string()))?;
+            let mut name_bytes = vec![0u8; name_len as usize];
+            cursor
+                .read_exact(&mut name_bytes)
+                .map_err(|e| VctrlError::Other(e.to_string()))?;
+            let name =
+                String::from_utf8(name_bytes).map_err(|e| VctrlError::Other(e.to_string()))?;
+            let kind_byte = cursor
+                .read_u8()
+                .map_err(|e| VctrlError::Other(e.to_string()))?;
+            let kind = match kind_byte {
+                0 => EntryKind::Blob,
+                1 => EntryKind::Tree,
+                _ => return Err(VctrlError::Other("invalid entry kind".into())),
+            };
+            let mut hash_bytes = [0u8; 64];
+            cursor
+                .read_exact(&mut hash_bytes)
+                .map_err(|e| VctrlError::Other(e.to_string()))?;
+            let hash = Hash::from_bytes(hash_bytes);
+            entries.push(TreeEntry { name, kind, hash });
+        }
+        Tree::new(entries).map_err(VctrlError::Tree)
+    }
+
+    fn decode_commit(&self, data: &[u8]) -> Result<Commit, VctrlError> {
+        let mut cursor = Cursor::new(data);
+        let version = cursor
+            .read_u8()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        if version != 1 {
+            return Err(VctrlError::Other("unsupported commit version".into()));
+        }
+        let mut tree_hash = [0u8; 64];
+        cursor
+            .read_exact(&mut tree_hash)
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let tree = Hash::from_bytes(tree_hash);
+        let np = cursor
+            .read_u32::<BigEndian>()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let mut parents = Vec::with_capacity(np as usize);
+        for _ in 0..np {
+            let mut h = [0u8; 64];
+            cursor
+                .read_exact(&mut h)
+                .map_err(|e| VctrlError::Other(e.to_string()))?;
+            parents.push(Hash::from_bytes(h));
+        }
+        let author = read_user(&mut cursor)?;
+        let committer = read_user(&mut cursor)?;
+        let ts = cursor
+            .read_i64::<BigEndian>()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let ts_ns = cursor
+            .read_u32::<BigEndian>()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let timestamp = Utc
+            .timestamp_opt(ts, ts_ns)
+            .single()
+            .ok_or_else(|| VctrlError::Other("invalid timestamp".into()))?;
+        let msg_len = cursor
+            .read_u32::<BigEndian>()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let mut msg_bytes = vec![0u8; msg_len as usize];
+        cursor
+            .read_exact(&mut msg_bytes)
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let message = String::from_utf8(msg_bytes).map_err(|e| VctrlError::Other(e.to_string()))?;
+        let sig_len = cursor
+            .read_u32::<BigEndian>()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let signature = if sig_len == 0 {
+            None
+        } else {
+            let mut sig = vec![0u8; sig_len as usize];
+            cursor
+                .read_exact(&mut sig)
+                .map_err(|e| VctrlError::Other(e.to_string()))?;
+            Some(sig)
+        };
+        Ok(Commit {
+            tree,
+            parents,
+            author,
+            committer,
+            timestamp,
+            message,
+            signature,
+        })
+    }
+
+    fn decode_tag(&self, data: &[u8]) -> Result<Tag, VctrlError> {
+        let mut cursor = Cursor::new(data);
+        let version = cursor
+            .read_u8()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        if version != 1 {
+            return Err(VctrlError::Other("unsupported tag version".into()));
+        }
+        let mut target_hash = [0u8; 64];
+        cursor
+            .read_exact(&mut target_hash)
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let target = Hash::from_bytes(target_hash);
+        let tagger = read_user(&mut cursor)?;
+        let ts = cursor
+            .read_i64::<BigEndian>()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let ts_ns = cursor
+            .read_u32::<BigEndian>()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let timestamp = Utc
+            .timestamp_opt(ts, ts_ns)
+            .single()
+            .ok_or_else(|| VctrlError::Other("invalid timestamp".into()))?;
+        let msg_len = cursor
+            .read_u32::<BigEndian>()
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let mut msg_bytes = vec![0u8; msg_len as usize];
+        cursor
+            .read_exact(&mut msg_bytes)
+            .map_err(|e| VctrlError::Other(e.to_string()))?;
+        let message = String::from_utf8(msg_bytes).map_err(|e| VctrlError::Other(e.to_string()))?;
+        Ok(Tag {
+            target,
+            tagger,
+            timestamp,
+            message,
+        })
+    }
+}
+
+fn read_user(cursor: &mut Cursor<&[u8]>) -> Result<UserID, VctrlError> {
+    let name_len = cursor
+        .read_u16::<BigEndian>()
+        .map_err(|e| VctrlError::Other(e.to_string()))?;
+    let mut name_bytes = vec![0u8; name_len as usize];
+    cursor
+        .read_exact(&mut name_bytes)
+        .map_err(|e| VctrlError::Other(e.to_string()))?;
+    let name = String::from_utf8(name_bytes).map_err(|e| VctrlError::Other(e.to_string()))?;
+    let email_len = cursor
+        .read_u16::<BigEndian>()
+        .map_err(|e| VctrlError::Other(e.to_string()))?;
+    let mut email_bytes = vec![0u8; email_len as usize];
+    cursor
+        .read_exact(&mut email_bytes)
+        .map_err(|e| VctrlError::Other(e.to_string()))?;
+    let email = String::from_utf8(email_bytes).map_err(|e| VctrlError::Other(e.to_string()))?;
+    Ok(UserID { name, email })
 }
