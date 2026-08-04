@@ -49,6 +49,7 @@ impl Default for MemoryRefStore {
         Self::new()
     }
 }
+
 impl RefStore for MemoryRefStore {
     fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError> {
         self.refs.insert(name.to_string(), *hash);

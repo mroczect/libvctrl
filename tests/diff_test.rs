@@ -27,7 +27,7 @@ fn diff_added_removed_modified() {
 
     let added = diffs
         .iter()
-        .find(|d| matches!(d.kind, DiffKind::Added))
+        .find(|d| matches!(d.kind, DiffKind::Added { .. }))
         .unwrap();
     assert_eq!(added.name, "c");
 

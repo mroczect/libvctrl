@@ -104,7 +104,15 @@ fn apply_reverse_diff(head: &Tree, parent: &Tree, diffs: &[DiffEntry]) -> Result
 
     for diff in diffs {
         match &diff.kind {
-            DiffKind::Added => {
+            DiffKind::Added { new_hash } => {
+                if let Some(current) = map.get(&diff.name)
+                    && current.hash != *new_hash
+                {
+                    return Err(VctrlError::Other(format!(
+                        "revert conflict: '{}' has been modified since the commit being reverted",
+                        diff.name
+                    )));
+                }
                 map.remove(&diff.name);
             }
             DiffKind::Removed => {

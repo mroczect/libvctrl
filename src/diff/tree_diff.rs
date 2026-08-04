@@ -15,9 +15,9 @@ impl TreeDiff for TreeDiffer {
             let old = old_map.get(&key);
             let new = new_map.get(&key);
             match (old, new) {
-                (None, Some(_)) => diffs.push(DiffEntry {
+                (None, Some(n)) => diffs.push(DiffEntry {
                     name: key,
-                    kind: DiffKind::Added,
+                    kind: DiffKind::Added { new_hash: n.hash },
                 }),
                 (Some(_), None) => diffs.push(DiffEntry {
                     name: key,

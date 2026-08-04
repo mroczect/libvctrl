@@ -7,7 +7,7 @@ use crate::error::VctrlError;
 
 #[derive(Debug, Clone)]
 pub enum DiffKind {
-    Added,
+    Added { new_hash: Hash },
     Removed,
     Modified { old_hash: Hash, new_hash: Hash },
 }
