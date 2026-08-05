@@ -73,10 +73,13 @@ impl Command for Rebase {
                 hash
             };
 
+            let current_commit = store.get_commit(&current_head)?;
+            let ours_tree = current_commit.tree;
+
             let merged_tree_hash = self.merger.merge(
                 store,
                 &base_tree_hash,
-                &current_head,
+                &ours_tree,
                 &src_commit.tree,
                 self.resolver.as_ref(),
                 self.encoder.as_ref(),
