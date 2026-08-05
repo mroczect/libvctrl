@@ -38,9 +38,10 @@ impl Command for StashPush {
         let hash = self.hasher.hash_commit_encoded(&buf);
         store.put(&hash, &Object::Commit(Box::new(commit)))?;
 
-        let existing = refs.list_refs("refs/stash/")?;
-        let next_index = existing.len();
-        let ref_name = format!("refs/stash/{}", next_index);
+        let nanos = chrono::Utc::now()
+            .timestamp_nanos_opt()
+            .ok_or_else(|| VctrlError::Other("invalid system clock".into()))?;
+        let ref_name = format!("refs/stash/{}", nanos);
         refs.set_ref(&ref_name, &hash)?;
         Ok(hash)
     }
@@ -56,20 +57,15 @@ impl Command for StashPop {
         store: &mut dyn ObjectStore,
         refs: &mut dyn RefStore,
     ) -> Result<Option<Hash>, VctrlError> {
-        let stash_refs = refs.list_refs("refs/stash/")?;
+        let mut stash_refs = refs.list_refs("refs/stash/")?;
         if stash_refs.is_empty() {
             return Ok(None);
         }
-        let mut indices: Vec<usize> = stash_refs
-            .iter()
-            .filter_map(|r| r.trim_start_matches("refs/stash/").parse::<usize>().ok())
-            .collect();
-        indices.sort();
-        let last = indices.last().unwrap();
-        let ref_name = format!("refs/stash/{}", last);
-        let commit_hash = refs.get_ref(&ref_name)?.unwrap();
+        stash_refs.sort();
+        let last = stash_refs.last().unwrap().clone();
+        let commit_hash = refs.get_ref(&last)?.unwrap();
         let commit = store.get_commit(&commit_hash)?;
-        refs.delete_ref(&ref_name)?;
+        refs.delete_ref(&last)?;
         Ok(Some(commit.tree))
     }
 }
