@@ -94,7 +94,7 @@ impl Encoder for BinaryEncoder {
     }
 
     fn encode_tag(&self, tag: &Tag, buf: &mut Vec<u8>) -> Result<(), VctrlError> {
-        buf.push(1u8);
+        buf.push(2u8);
         buf.extend_from_slice(tag.target.as_bytes());
         write_user(&tag.tagger, buf)?;
         let ts = tag.timestamp.timestamp();
@@ -106,6 +106,14 @@ impl Encoder for BinaryEncoder {
             .map_err(|_| VctrlError::Other("tag message too long".into()))?;
         buf.extend_from_slice(&msg_len.to_be_bytes());
         buf.extend_from_slice(msg);
+        if let Some(sig) = &tag.signature {
+            let sig_len = u32::try_from(sig.len())
+                .map_err(|_| VctrlError::Other("signature too long".into()))?;
+            buf.extend_from_slice(&sig_len.to_be_bytes());
+            buf.extend_from_slice(sig);
+        } else {
+            buf.extend_from_slice(&0u32.to_be_bytes());
+        }
         Ok(())
     }
 }
@@ -298,7 +306,7 @@ impl Decoder for BinaryDecoder {
         let version = cursor
             .read_u8()
             .map_err(|e| VctrlError::Other(e.to_string()))?;
-        if version != 1 {
+        if version != 1 && version != 2 {
             return Err(VctrlError::Other("unsupported tag version".into()));
         }
         let mut target_hash = [0u8; 64];
@@ -328,11 +336,33 @@ impl Decoder for BinaryDecoder {
             .read_exact(&mut msg_bytes)
             .map_err(|e| VctrlError::Other(e.to_string()))?;
         let message = String::from_utf8(msg_bytes).map_err(|e| VctrlError::Other(e.to_string()))?;
+
+        let signature = if version >= 2 {
+            let sig_len = cursor
+                .read_u32::<BigEndian>()
+                .map_err(|e| VctrlError::Other(e.to_string()))?;
+            if sig_len > MAX_SIG_LEN {
+                return Err(VctrlError::Corrupted("signature too long".into()));
+            }
+            if sig_len == 0 {
+                None
+            } else {
+                let mut sig = vec![0u8; sig_len as usize];
+                cursor
+                    .read_exact(&mut sig)
+                    .map_err(|e| VctrlError::Other(e.to_string()))?;
+                Some(sig)
+            }
+        } else {
+            None
+        };
+
         Ok(Tag {
             target,
             tagger,
             timestamp,
             message,
+            signature,
         })
     }
 }
