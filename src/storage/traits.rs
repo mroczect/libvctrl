@@ -1,8 +1,10 @@
+use crate::codec::Encoder;
 use crate::domain::commit::Commit;
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
 use crate::domain::tree::Tree;
 use crate::error::VctrlError;
+use crate::hashing::HashVerifier;
 
 pub trait ObjectStore {
     fn put(&mut self, hash: &Hash, obj: &Object) -> Result<(), VctrlError>;
@@ -24,6 +26,12 @@ pub trait ObjectStoreExt {
     fn get_commit(&self, hash: &Hash) -> Result<Commit, VctrlError>;
     fn get_tree(&self, hash: &Hash) -> Result<Tree, VctrlError>;
     fn get_blob(&self, hash: &Hash) -> Result<Vec<u8>, VctrlError>;
+
+    fn get_verified(
+        &self,
+        hash: &Hash,
+        hasher: &dyn crate::hashing::Hasher,
+    ) -> Result<Object, VctrlError>;
 }
 
 impl<T: ObjectStore + ?Sized> ObjectStoreExt for T {
@@ -44,5 +52,56 @@ impl<T: ObjectStore + ?Sized> ObjectStoreExt for T {
             Some(Object::Blob(b)) => Ok(b.into_bytes()),
             _ => Err(VctrlError::NotFound(format!("blob '{}' not found", hash))),
         }
+    }
+
+    fn get_verified(
+        &self,
+        hash: &Hash,
+        hasher: &dyn crate::hashing::Hasher,
+    ) -> Result<Object, VctrlError> {
+        let obj = self
+            .get(hash)?
+            .ok_or_else(|| VctrlError::NotFound(format!("object '{}' not found", hash)))?;
+        match &obj {
+            Object::Blob(b) => {
+                if !hasher.verify_blob(hash, b.as_bytes()) {
+                    return Err(VctrlError::Corrupted(format!(
+                        "blob hash mismatch: {}",
+                        hash
+                    )));
+                }
+            }
+            Object::Tree(t) => {
+                let mut buf = Vec::new();
+                crate::codec::BinaryEncoder.encode_tree(t, &mut buf)?;
+                if !hasher.verify_tree_encoded(hash, &buf) {
+                    return Err(VctrlError::Corrupted(format!(
+                        "tree hash mismatch: {}",
+                        hash
+                    )));
+                }
+            }
+            Object::Commit(c) => {
+                let mut buf = Vec::new();
+                crate::codec::BinaryEncoder.encode_commit(c, &mut buf)?;
+                if !hasher.verify_commit_encoded(hash, &buf) {
+                    return Err(VctrlError::Corrupted(format!(
+                        "commit hash mismatch: {}",
+                        hash
+                    )));
+                }
+            }
+            Object::Tag(t) => {
+                let mut buf = Vec::new();
+                crate::codec::BinaryEncoder.encode_tag(t, &mut buf)?;
+                if !hasher.verify_tag_encoded(hash, &buf) {
+                    return Err(VctrlError::Corrupted(format!(
+                        "tag hash mismatch: {}",
+                        hash
+                    )));
+                }
+            }
+        }
+        Ok(obj)
     }
 }
