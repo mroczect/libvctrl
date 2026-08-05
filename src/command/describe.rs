@@ -52,15 +52,18 @@ impl Command for Describe {
         queue.push_back((self.commit_hash, 0usize));
         visited.insert(self.commit_hash);
 
-        let mut found: Option<(String, usize)> = None;
+        let mut best_dist = usize::MAX;
+        let mut found_tag: Option<String> = None;
 
         while let Some((hash, dist)) = queue.pop_front() {
             for (commit_hash, tag_name) in &tag_map {
-                if *commit_hash == hash && (found.is_none() || dist < found.as_ref().unwrap().1) {
-                    found = Some((tag_name.clone(), dist));
+                if *commit_hash == hash && dist < best_dist {
+                    best_dist = dist;
+                    found_tag = Some(tag_name.clone());
                 }
             }
-            if found.is_some() {
+
+            if found_tag.is_some() {
                 break;
             }
 
@@ -77,10 +80,10 @@ impl Command for Describe {
             }
         }
 
-        if let Some((tag_name, dist)) = found {
+        if let Some(tag_name) = found_tag {
             let mut desc = tag_name;
-            if dist > 0 {
-                desc.push_str(&format!("-{}", dist));
+            if best_dist > 0 {
+                desc.push_str(&format!("-{}", best_dist));
             }
             let short_hash = self.commit_hash.to_hex();
             let short = if short_hash.len() >= 8 {
