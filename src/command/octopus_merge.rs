@@ -56,8 +56,13 @@ impl Command for OctopusMerge {
         let mut parents = vec![head_hash];
 
         for theirs_hash in &theirs_hashes {
-            let base = find_merge_base(store, head_hash, *theirs_hash)?
+            let theirs_commit = store.get_commit(theirs_hash)?;
+            let theirs_tree_hash = theirs_commit.tree;
+
+            let base_commit_hash = find_merge_base(store, head_hash, *theirs_hash)?
                 .ok_or_else(|| VctrlError::Other("no common ancestor".into()))?;
+            let base_commit = store.get_commit(&base_commit_hash)?;
+            let base_tree_hash = base_commit.tree;
 
             let mut buf = Vec::new();
             self.encoder.encode_tree(&current_tree, &mut buf)?;
@@ -68,9 +73,9 @@ impl Command for OctopusMerge {
 
             let merged_tree_hash = self.merger.merge(
                 store,
-                &base,
+                &base_tree_hash,
                 &our_tree_hash,
-                theirs_hash,
+                &theirs_tree_hash,
                 self.resolver.as_ref(),
                 self.encoder.as_ref(),
                 self.hasher.as_ref(),
