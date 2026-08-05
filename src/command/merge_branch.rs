@@ -6,7 +6,7 @@ use crate::domain::user::UserID;
 use crate::error::VctrlError;
 use crate::hashing::Hasher;
 use crate::merge::{ConflictResolver, ThreeWayMerge, find_merge_base, is_ancestor};
-use crate::storage::traits::{ObjectStore, RefStore};
+use crate::storage::traits::{ObjectStore, ObjectStoreExt, RefStore};
 
 pub struct MergeBranch {
     pub branch_name: String,
@@ -40,14 +40,22 @@ impl Command for MergeBranch {
             return Ok(theirs_hash);
         }
 
-        let base = find_merge_base(store, head_hash, theirs_hash)?
+        let head_commit = store.get_commit(&head_hash)?;
+        let head_tree_hash = head_commit.tree;
+
+        let theirs_commit = store.get_commit(&theirs_hash)?;
+        let theirs_tree_hash = theirs_commit.tree;
+
+        let base_commit_hash = find_merge_base(store, head_hash, theirs_hash)?
             .ok_or_else(|| VctrlError::Other("no common ancestor".into()))?;
+        let base_commit = store.get_commit(&base_commit_hash)?;
+        let base_tree_hash = base_commit.tree;
 
         let merged_tree = self.merger.merge(
             store,
-            &base,
-            &head_hash,
-            &theirs_hash,
+            &base_tree_hash,
+            &head_tree_hash,
+            &theirs_tree_hash,
             self.resolver.as_ref(),
             self.encoder.as_ref(),
             self.hasher.as_ref(),
