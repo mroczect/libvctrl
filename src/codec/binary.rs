@@ -11,6 +11,18 @@ use std::io::{Cursor, Read};
 
 pub struct BinaryEncoder;
 
+const MAX_TREE_ENTRIES: u32 = 100_000;
+const MAX_NAME_LEN: u16 = 255;
+const MAX_PARENTS: u32 = 255;
+const MAX_MSG_LEN: u32 = 1_048_576;
+const MAX_HEADERS: u16 = 100;
+const MAX_HEADER_KEY_LEN: u16 = 255;
+const MAX_HEADER_VAL_LEN: u32 = 8192;
+const MAX_SIG_LEN: u32 = 2048;
+const MAX_USER_NAME_LEN: u16 = 255;
+const MAX_USER_EMAIL_LEN: u16 = 255;
+const MAX_TAG_MSG_LEN: u32 = 1_048_576;
+
 impl Encoder for BinaryEncoder {
     fn encode_tree(&self, tree: &Tree, buf: &mut Vec<u8>) -> Result<(), VctrlError> {
         buf.push(1u8);
@@ -127,11 +139,17 @@ impl Decoder for BinaryDecoder {
         let n = cursor
             .read_u32::<BigEndian>()
             .map_err(|e| VctrlError::Other(e.to_string()))?;
+        if n > MAX_TREE_ENTRIES {
+            return Err(VctrlError::Corrupted("tree entry count too large".into()));
+        }
         let mut entries = Vec::with_capacity(n as usize);
         for _ in 0..n {
             let name_len = cursor
                 .read_u16::<BigEndian>()
                 .map_err(|e| VctrlError::Other(e.to_string()))?;
+            if name_len > MAX_NAME_LEN {
+                return Err(VctrlError::Corrupted("entry name too long".into()));
+            }
             let mut name_bytes = vec![0u8; name_len as usize];
             cursor
                 .read_exact(&mut name_bytes)
@@ -172,6 +190,9 @@ impl Decoder for BinaryDecoder {
         let np = cursor
             .read_u32::<BigEndian>()
             .map_err(|e| VctrlError::Other(e.to_string()))?;
+        if np > MAX_PARENTS {
+            return Err(VctrlError::Corrupted("too many parents".into()));
+        }
         let mut parents = Vec::with_capacity(np as usize);
         for _ in 0..np {
             let mut h = [0u8; 64];
@@ -195,6 +216,9 @@ impl Decoder for BinaryDecoder {
         let msg_len = cursor
             .read_u32::<BigEndian>()
             .map_err(|e| VctrlError::Other(e.to_string()))?;
+        if msg_len > MAX_MSG_LEN {
+            return Err(VctrlError::Corrupted("commit message too long".into()));
+        }
         let mut msg_bytes = vec![0u8; msg_len as usize];
         cursor
             .read_exact(&mut msg_bytes)
@@ -205,11 +229,17 @@ impl Decoder for BinaryDecoder {
             let hdr_count = cursor
                 .read_u16::<BigEndian>()
                 .map_err(|e| VctrlError::Other(e.to_string()))?;
+            if hdr_count > MAX_HEADERS {
+                return Err(VctrlError::Corrupted("too many headers".into()));
+            }
             let mut hdrs = Vec::with_capacity(hdr_count as usize);
             for _ in 0..hdr_count {
                 let key_len = cursor
                     .read_u16::<BigEndian>()
                     .map_err(|e| VctrlError::Other(e.to_string()))?;
+                if key_len > MAX_HEADER_KEY_LEN {
+                    return Err(VctrlError::Corrupted("header key too long".into()));
+                }
                 let mut key_bytes = vec![0u8; key_len as usize];
                 cursor
                     .read_exact(&mut key_bytes)
@@ -219,6 +249,9 @@ impl Decoder for BinaryDecoder {
                 let val_len = cursor
                     .read_u32::<BigEndian>()
                     .map_err(|e| VctrlError::Other(e.to_string()))?;
+                if val_len > MAX_HEADER_VAL_LEN {
+                    return Err(VctrlError::Corrupted("header value too long".into()));
+                }
                 let mut val_bytes = vec![0u8; val_len as usize];
                 cursor
                     .read_exact(&mut val_bytes)
@@ -235,6 +268,9 @@ impl Decoder for BinaryDecoder {
         let sig_len = cursor
             .read_u32::<BigEndian>()
             .map_err(|e| VctrlError::Other(e.to_string()))?;
+        if sig_len > MAX_SIG_LEN {
+            return Err(VctrlError::Corrupted("signature too long".into()));
+        }
         let signature = if sig_len == 0 {
             None
         } else {
@@ -284,6 +320,9 @@ impl Decoder for BinaryDecoder {
         let msg_len = cursor
             .read_u32::<BigEndian>()
             .map_err(|e| VctrlError::Other(e.to_string()))?;
+        if msg_len > MAX_TAG_MSG_LEN {
+            return Err(VctrlError::Corrupted("tag message too long".into()));
+        }
         let mut msg_bytes = vec![0u8; msg_len as usize];
         cursor
             .read_exact(&mut msg_bytes)
@@ -302,6 +341,9 @@ fn read_user(cursor: &mut Cursor<&[u8]>) -> Result<UserID, VctrlError> {
     let name_len = cursor
         .read_u16::<BigEndian>()
         .map_err(|e| VctrlError::Other(e.to_string()))?;
+    if name_len > MAX_USER_NAME_LEN {
+        return Err(VctrlError::Corrupted("user name too long".into()));
+    }
     let mut name_bytes = vec![0u8; name_len as usize];
     cursor
         .read_exact(&mut name_bytes)
@@ -310,6 +352,9 @@ fn read_user(cursor: &mut Cursor<&[u8]>) -> Result<UserID, VctrlError> {
     let email_len = cursor
         .read_u16::<BigEndian>()
         .map_err(|e| VctrlError::Other(e.to_string()))?;
+    if email_len > MAX_USER_EMAIL_LEN {
+        return Err(VctrlError::Corrupted("user email too long".into()));
+    }
     let mut email_bytes = vec![0u8; email_len as usize];
     cursor
         .read_exact(&mut email_bytes)

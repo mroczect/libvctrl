@@ -47,7 +47,10 @@ pub fn mark_reachable(
     Ok(reachable)
 }
 
-pub fn gc(store: &mut dyn ObjectStore, refs: &dyn RefStore) -> Result<usize, VctrlError> {
+pub fn count_reachable(
+    store: &mut dyn ObjectStore,
+    refs: &dyn RefStore,
+) -> Result<usize, VctrlError> {
     let reachable = mark_reachable(store, refs)?;
     Ok(reachable.len())
 }
