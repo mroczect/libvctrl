@@ -1,15 +1,15 @@
 use crate::codec::Encoder;
 use crate::command::Command;
+use crate::crypto::Verifier;
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
 use crate::error::VctrlError;
 use crate::hashing::Hasher;
 use crate::storage::traits::{ObjectStore, RefStore};
-use ed25519_dalek::{Signature, VerifyingKey};
 
 pub struct VerifyCommit {
     pub commit_hash: Hash,
-    pub verifying_key: VerifyingKey,
+    pub verifier: Box<dyn Verifier>,
     pub encoder: Box<dyn Encoder>,
     pub hasher: Box<dyn Hasher>,
 }
@@ -47,13 +47,6 @@ impl Command for VerifyCommit {
         self.encoder.encode_commit(&pre_sig_commit, &mut buf)?;
         let pre_sig_hash = self.hasher.hash_commit_encoded(&buf);
 
-        let signature = Signature::try_from(sig_bytes.as_slice())
-            .map_err(|_| VctrlError::Other("invalid signature format".into()))?;
-
-        self.verifying_key
-            .verify_strict(pre_sig_hash.as_bytes(), &signature)
-            .map_err(|_| VctrlError::Other("signature verification failed".into()))?;
-
-        Ok(true)
+        self.verifier.verify(pre_sig_hash.as_bytes(), &sig_bytes)
     }
 }

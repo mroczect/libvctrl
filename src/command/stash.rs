@@ -62,8 +62,12 @@ impl Command for StashPop {
             return Ok(None);
         }
         stash_refs.sort();
-        let last = stash_refs.last().unwrap().clone();
-        let commit_hash = refs.get_ref(&last)?.unwrap();
+        let last = stash_refs
+            .pop()
+            .ok_or_else(|| VctrlError::Other("no stash entries".into()))?;
+        let commit_hash = refs
+            .get_ref(&last)?
+            .ok_or_else(|| VctrlError::NotFound(format!("stash ref '{}' missing", last)))?;
         let commit = store.get_commit(&commit_hash)?;
         refs.delete_ref(&last)?;
         Ok(Some(commit.tree))
