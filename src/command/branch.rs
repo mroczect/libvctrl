@@ -70,6 +70,12 @@ impl Command for SetHead {
         refs: &mut dyn RefStore,
     ) -> Result<(), VctrlError> {
         if self.target.starts_with("refs/heads/") {
+            if refs.get_ref(&self.target)?.is_none() {
+                return Err(VctrlError::InvalidRef(format!(
+                    "branch '{}' does not exist",
+                    self.target
+                )));
+            }
             refs.set_head(&self.target)
         } else {
             let hash = Hash::from_hex(&self.target).map_err(|_| {
