@@ -13,7 +13,9 @@ struct RevWalkItem {
 
 impl Ord for RevWalkItem {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.timestamp.cmp(&other.timestamp)
+        self.timestamp
+            .cmp(&other.timestamp)
+            .then_with(|| self.hash.as_bytes().cmp(other.hash.as_bytes()))
     }
 }
 impl PartialOrd for RevWalkItem {
