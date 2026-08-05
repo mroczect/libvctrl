@@ -9,6 +9,8 @@ pub trait ObjectStore {
     fn put(&mut self, hash: &Hash, obj: &Object) -> Result<(), VctrlError>;
     fn get(&self, hash: &Hash) -> Result<Option<Object>, VctrlError>;
     fn exists(&self, hash: &Hash) -> Result<bool, VctrlError>;
+    fn all_hashes(&self) -> Result<Vec<Hash>, VctrlError>;
+    fn remove(&mut self, hash: &Hash) -> Result<(), VctrlError>;
 }
 
 pub trait RefStore {
