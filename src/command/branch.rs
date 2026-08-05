@@ -91,3 +91,27 @@ impl Command for SetHead {
         }
     }
 }
+
+pub struct ListBranches;
+
+impl Command for ListBranches {
+    type Output = Vec<(String, Hash, bool)>;
+
+    fn execute(
+        &self,
+        _store: &mut dyn ObjectStore,
+        refs: &mut dyn RefStore,
+    ) -> Result<Vec<(String, Hash, bool)>, VctrlError> {
+        let active_branch = refs.head_ref_name()?;
+        let branch_refs = refs.list_refs("refs/heads/")?;
+        let mut result = Vec::new();
+        for ref_name in branch_refs {
+            if let Some(hash) = refs.get_ref(&ref_name)? {
+                let short_name = ref_name.trim_start_matches("refs/heads/").to_string();
+                let is_active = Some(ref_name.clone()) == active_branch;
+                result.push((short_name, hash, is_active));
+            }
+        }
+        Ok(result)
+    }
+}
