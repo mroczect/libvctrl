@@ -1,4 +1,3 @@
-use crate::codec::Encoder;
 use crate::domain::commit::Commit;
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
@@ -30,6 +29,7 @@ pub trait ObjectStoreExt {
     fn get_verified(
         &self,
         hash: &Hash,
+        encoder: &dyn crate::codec::Encoder,
         hasher: &dyn crate::hashing::Hasher,
     ) -> Result<Object, VctrlError>;
 }
@@ -57,6 +57,7 @@ impl<T: ObjectStore + ?Sized> ObjectStoreExt for T {
     fn get_verified(
         &self,
         hash: &Hash,
+        encoder: &dyn crate::codec::Encoder,
         hasher: &dyn crate::hashing::Hasher,
     ) -> Result<Object, VctrlError> {
         let obj = self
@@ -73,7 +74,7 @@ impl<T: ObjectStore + ?Sized> ObjectStoreExt for T {
             }
             Object::Tree(t) => {
                 let mut buf = Vec::new();
-                crate::codec::BinaryEncoder.encode_tree(t, &mut buf)?;
+                encoder.encode_tree(t, &mut buf)?;
                 if !hasher.verify_tree_encoded(hash, &buf) {
                     return Err(VctrlError::Corrupted(format!(
                         "tree hash mismatch: {}",
@@ -83,7 +84,7 @@ impl<T: ObjectStore + ?Sized> ObjectStoreExt for T {
             }
             Object::Commit(c) => {
                 let mut buf = Vec::new();
-                crate::codec::BinaryEncoder.encode_commit(c, &mut buf)?;
+                encoder.encode_commit(c, &mut buf)?;
                 if !hasher.verify_commit_encoded(hash, &buf) {
                     return Err(VctrlError::Corrupted(format!(
                         "commit hash mismatch: {}",
@@ -93,7 +94,7 @@ impl<T: ObjectStore + ?Sized> ObjectStoreExt for T {
             }
             Object::Tag(t) => {
                 let mut buf = Vec::new();
-                crate::codec::BinaryEncoder.encode_tag(t, &mut buf)?;
+                encoder.encode_tag(t, &mut buf)?;
                 if !hasher.verify_tag_encoded(hash, &buf) {
                     return Err(VctrlError::Corrupted(format!(
                         "tag hash mismatch: {}",
