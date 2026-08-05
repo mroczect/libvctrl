@@ -18,13 +18,11 @@ fn test_commit_on_tag_detached_head() {
     let c1 = CreateCommit {
         tree_hash,
         parents: vec![],
-        transaction_id: None,
         author: alice(),
         committer: alice(),
         message: "first".into(),
         encoder: Box::new(encoder()),
         hasher: Box::new(hasher()),
-        signer: None,
     }
     .execute(&mut store, &mut refs)
     .unwrap();
@@ -45,13 +43,11 @@ fn test_commit_on_tag_detached_head() {
     let c2 = CreateCommit {
         tree_hash,
         parents: vec![c1],
-        transaction_id: None,
         author: alice(),
         committer: alice(),
         message: "second".into(),
         encoder: Box::new(encoder()),
         hasher: Box::new(hasher()),
-        signer: None,
     }
     .execute(&mut store, &mut refs)
     .unwrap();

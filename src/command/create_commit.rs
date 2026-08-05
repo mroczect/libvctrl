@@ -1,6 +1,5 @@
 use crate::codec::Encoder;
 use crate::command::Command;
-use crate::crypto::Signer;
 use crate::domain::commit::Commit;
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
@@ -15,10 +14,8 @@ pub struct CreateCommit {
     pub author: UserID,
     pub committer: UserID,
     pub message: String,
-    pub transaction_id: Option<String>,
     pub encoder: Box<dyn Encoder>,
     pub hasher: Box<dyn Hasher>,
-    pub signer: Option<Box<dyn Signer>>,
 }
 
 impl Command for CreateCommit {
@@ -29,39 +26,25 @@ impl Command for CreateCommit {
         store: &mut dyn ObjectStore,
         refs: &mut dyn RefStore,
     ) -> Result<Hash, VctrlError> {
-        let final_message = match &self.transaction_id {
-            Some(id) if !id.is_empty() => format!("[tx-{}] {}", id, self.message),
-            _ => self.message.clone(),
-        };
-
-        let mut commit = Commit::new(
+        let commit = Commit::new(
             self.tree_hash,
             self.parents.clone(),
             self.author.clone(),
             self.committer.clone(),
-            final_message,
+            self.message.clone(),
             None,
         );
 
         let mut buf = Vec::new();
         self.encoder.encode_commit(&commit, &mut buf)?;
-        let pre_sig_hash = self.hasher.hash_commit_encoded(&buf);
+        let commit_hash = self.hasher.hash_commit_encoded(&buf);
 
-        if let Some(signer) = &self.signer {
-            let sig = signer.sign(pre_sig_hash.as_bytes())?;
-            commit.signature = Some(sig);
-
-            buf.clear();
-            self.encoder.encode_commit(&commit, &mut buf)?;
-        }
-
-        let final_hash = self.hasher.hash_commit_encoded(&buf);
-        store.put(&final_hash, &Object::Commit(Box::new(commit)))?;
+        store.put(&commit_hash, &Object::Commit(Box::new(commit)))?;
 
         if let Some(branch_name) = refs.head_ref_name()? {
-            refs.set_ref(&branch_name, &final_hash)?;
+            refs.set_ref(&branch_name, &commit_hash)?;
         }
 
-        Ok(final_hash)
+        Ok(commit_hash)
     }
 }
