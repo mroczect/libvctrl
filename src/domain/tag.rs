@@ -9,6 +9,7 @@ pub struct Tag {
     pub tagger: UserID,
     pub timestamp: DateTime<Utc>,
     pub message: String,
+    pub signature: Option<Vec<u8>>,
 }
 
 impl Tag {
@@ -18,6 +19,7 @@ impl Tag {
             tagger,
             timestamp: Utc::now(),
             message,
+            signature: None,
         }
     }
 }
