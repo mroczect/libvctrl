@@ -12,6 +12,7 @@ pub struct Commit {
     pub timestamp: DateTime<Utc>,
     pub message: String,
     pub signature: Option<Vec<u8>>,
+    pub headers: Vec<(String, String)>,
 }
 
 impl Commit {
@@ -31,6 +32,7 @@ impl Commit {
             timestamp: Utc::now(),
             message,
             signature,
+            headers: Vec::new(),
         }
     }
 }
