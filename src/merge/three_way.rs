@@ -72,6 +72,58 @@ impl ThreeWayMerger {
                 (Some(_), Some(o), Some(t)) if o.hash == t.hash => o.clone(),
                 (Some(b), Some(o), Some(t)) if o.hash == b.hash => t.clone(),
                 (Some(b), Some(o), Some(t)) if t.hash == b.hash => o.clone(),
+                (None, Some(o), Some(t)) => {
+                    if o.hash == t.hash {
+                        o.clone()
+                    } else {
+                        match (&o.kind, &t.kind) {
+                            (EntryKind::Blob, EntryKind::Blob) => {
+                                let ours_data = store.get_blob(&o.hash)?;
+                                let theirs_data = store.get_blob(&t.hash)?;
+                                match resolver.resolve(&[], &ours_data, &theirs_data) {
+                                    Some(resolved) => {
+                                        let blob = Blob::new(resolved);
+                                        let blob_hash = hasher.hash_blob(blob.as_bytes());
+                                        store.put(&blob_hash, &Object::Blob(blob))?;
+                                        TreeEntry::new(key, EntryKind::Blob, blob_hash)
+                                            .map_err(VctrlError::Tree)?
+                                    }
+                                    None => {
+                                        return Err(VctrlError::MergeConflict {
+                                            entry: key,
+                                            reason: "conflict".into(),
+                                        });
+                                    }
+                                }
+                            }
+                            (EntryKind::Tree, EntryKind::Tree) => {
+                                let empty_tree = Tree::new(vec![]).map_err(VctrlError::Tree)?;
+                                let mut buf = Vec::new();
+                                encoder.encode_tree(&empty_tree, &mut buf)?;
+                                let empty_hash = hasher.hash_tree_encoded(&buf);
+                                store.put(&empty_hash, &Object::Tree(empty_tree))?;
+                                let merged = self.merge_inner(
+                                    store,
+                                    &empty_hash,
+                                    &o.hash,
+                                    &t.hash,
+                                    resolver,
+                                    encoder,
+                                    hasher,
+                                    depth + 1,
+                                )?;
+                                TreeEntry::new(key, EntryKind::Tree, merged)
+                                    .map_err(VctrlError::Tree)?
+                            }
+                            _ => {
+                                return Err(VctrlError::MergeConflict {
+                                    entry: key,
+                                    reason: "type mismatch".into(),
+                                });
+                            }
+                        }
+                    }
+                }
                 (Some(b), Some(o), Some(t)) => match (&o.kind, &t.kind) {
                     (EntryKind::Blob, EntryKind::Blob) => {
                         let base_data = store.get_blob(&b.hash)?;
@@ -113,7 +165,15 @@ impl ThreeWayMerger {
                         });
                     }
                 },
-                _ => return Err(VctrlError::Other("unexpected merge state".into())),
+                _ => {
+                    return Err(VctrlError::Other(format!(
+                        "internal merge error for key '{}': base={:?}, ours={:?}, theirs={:?}",
+                        key,
+                        base.map(|_| "Some"),
+                        ours.map(|_| "Some"),
+                        theirs.map(|_| "Some"),
+                    )));
+                }
             };
             entries.push(entry);
         }
