@@ -5,7 +5,7 @@ use crate::domain::object::Object;
 use crate::error::VctrlError;
 use crate::storage::traits::{ObjectStore, RefStore};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -20,6 +20,7 @@ const REC_TAG: u8 = 0x04;
 const REC_SET_REF: u8 = 0x10;
 const REC_DEL_REF: u8 = 0x11;
 const REC_SET_HEAD: u8 = 0x12;
+const REC_DEL_OBJECT: u8 = 0x20;
 
 struct ObjectInfo {
     rec_type: u8,
@@ -32,6 +33,7 @@ pub struct FileStore {
     objects: HashMap<Hash, ObjectInfo>,
     refs: HashMap<String, Hash>,
     head: Option<String>,
+    deleted: HashSet<Hash>,
     encoder: BinaryEncoder,
     decoder: BinaryDecoder,
     writer: Option<BufWriter<File>>,
@@ -45,6 +47,7 @@ impl FileStore {
             objects: HashMap::new(),
             refs: HashMap::new(),
             head: None,
+            deleted: HashSet::new(),
             encoder: BinaryEncoder,
             decoder: BinaryDecoder,
             writer: None,
@@ -77,7 +80,9 @@ impl FileStore {
                 .map_err(VctrlError::Io)?;
             self.writer = Some(BufWriter::new(file));
         }
-        Ok(self.writer.as_mut().unwrap())
+        self.writer
+            .as_mut()
+            .ok_or_else(|| VctrlError::Backend("no writer".into()))
     }
 
     fn load(&mut self) -> Result<(), VctrlError> {
@@ -96,6 +101,7 @@ impl FileStore {
                 version
             )));
         }
+        let mut deleted_hashes = HashSet::new();
         loop {
             let rec_type = match file.read_u8() {
                 Ok(t) => t,
@@ -111,14 +117,16 @@ impl FileStore {
                     let offset = file.stream_position().map_err(VctrlError::Io)?;
                     file.seek(SeekFrom::Current(length as i64))
                         .map_err(VctrlError::Io)?;
-                    self.objects.insert(
-                        hash,
-                        ObjectInfo {
-                            rec_type,
-                            offset,
-                            length,
-                        },
-                    );
+                    if !deleted_hashes.contains(&hash) {
+                        self.objects.insert(
+                            hash,
+                            ObjectInfo {
+                                rec_type,
+                                offset,
+                                length,
+                            },
+                        );
+                    }
                 }
                 REC_SET_REF => {
                     let name_len = file.read_u16::<BigEndian>().map_err(VctrlError::Io)?;
@@ -146,6 +154,11 @@ impl FileStore {
                         String::from_utf8(target).map_err(|e| VctrlError::Other(e.to_string()))?;
                     self.head = Some(target);
                 }
+                REC_DEL_OBJECT => {
+                    let mut h = [0u8; 64];
+                    file.read_exact(&mut h).map_err(VctrlError::Io)?;
+                    deleted_hashes.insert(Hash::from_bytes(h));
+                }
                 _ => {
                     return Err(VctrlError::Other(format!(
                         "unknown record type {}",
@@ -154,6 +167,10 @@ impl FileStore {
                 }
             }
         }
+        for hash in &deleted_hashes {
+            self.objects.remove(hash);
+        }
+        self.deleted = deleted_hashes;
         Ok(())
     }
 
@@ -203,6 +220,7 @@ impl ObjectStore for FileStore {
         if self.objects.contains_key(hash) {
             return Ok(());
         }
+        self.deleted.remove(hash);
         let (rec_type, data) = self.encode_object(obj)?;
         let writer = self.ensure_writer()?;
         writer.write_u8(rec_type).map_err(VctrlError::Io)?;
@@ -226,6 +244,9 @@ impl ObjectStore for FileStore {
     }
 
     fn get(&self, hash: &Hash) -> Result<Option<Object>, VctrlError> {
+        if self.deleted.contains(hash) {
+            return Ok(None);
+        }
         match self.objects.get(hash) {
             Some(info) => {
                 let mut file = File::open(&self.path).map_err(VctrlError::Io)?;
@@ -241,13 +262,25 @@ impl ObjectStore for FileStore {
     }
 
     fn exists(&self, hash: &Hash) -> Result<bool, VctrlError> {
-        Ok(self.objects.contains_key(hash))
+        Ok(self.objects.contains_key(hash) && !self.deleted.contains(hash))
     }
+
     fn all_hashes(&self) -> Result<Vec<Hash>, VctrlError> {
-        Ok(self.objects.keys().copied().collect())
+        Ok(self
+            .objects
+            .keys()
+            .filter(|h| !self.deleted.contains(h))
+            .copied()
+            .collect())
     }
+
     fn remove(&mut self, hash: &Hash) -> Result<(), VctrlError> {
         if self.objects.remove(hash).is_some() {
+            self.deleted.insert(*hash);
+            let writer = self.ensure_writer()?;
+            writer.write_u8(REC_DEL_OBJECT).map_err(VctrlError::Io)?;
+            writer.write_all(hash.as_bytes()).map_err(VctrlError::Io)?;
+            writer.flush().map_err(VctrlError::Io)?;
             Ok(())
         } else {
             Err(VctrlError::NotFound(format!("object '{}' not found", hash)))

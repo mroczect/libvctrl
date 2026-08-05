@@ -59,7 +59,7 @@ impl<'a> RevWalk<'a> {
 }
 
 impl<'a> Iterator for RevWalk<'a> {
-    type Item = Result<Commit, VctrlError>;
+    type Item = Result<(Hash, Commit), VctrlError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -72,7 +72,7 @@ impl<'a> Iterator for RevWalk<'a> {
                             return Some(Err(e));
                         }
                     }
-                    return Some(Ok(*commit));
+                    return Some(Ok((hash, *commit)));
                 }
                 Ok(_) => continue,
                 Err(e) => return Some(Err(e)),
