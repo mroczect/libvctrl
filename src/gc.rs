@@ -47,10 +47,18 @@ pub fn mark_reachable(
     Ok(reachable)
 }
 
-pub fn count_reachable(
-    store: &mut dyn ObjectStore,
-    refs: &dyn RefStore,
-) -> Result<usize, VctrlError> {
+pub fn gc(store: &mut dyn ObjectStore, refs: &dyn RefStore) -> Result<usize, VctrlError> {
     let reachable = mark_reachable(store, refs)?;
-    Ok(reachable.len())
+    let all = store.all_hashes()?;
+    let mut removed = 0;
+    for hash in all {
+        if !reachable.contains(&hash) {
+            match store.remove(&hash) {
+                Ok(()) => removed += 1,
+                Err(VctrlError::Unsupported(_)) => {}
+                Err(e) => return Err(e),
+            }
+        }
+    }
+    Ok(removed)
 }
