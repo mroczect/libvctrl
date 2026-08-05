@@ -2,11 +2,15 @@ pub mod branch;
 pub mod checkout;
 pub mod cherry_pick;
 pub mod create_commit;
+pub mod init;
 pub mod log;
 pub mod merge;
 pub mod revert;
 pub mod tag_cmd;
 pub mod verify_commit;
+pub use init::*;
+pub mod merge_branch;
+pub use merge_branch::*;
 
 pub use branch::*;
 pub use checkout::*;

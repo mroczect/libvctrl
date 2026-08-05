@@ -34,7 +34,7 @@ impl Encoder for BinaryEncoder {
     }
 
     fn encode_commit(&self, commit: &Commit, buf: &mut Vec<u8>) -> Result<(), VctrlError> {
-        buf.push(1u8);
+        buf.push(2u8);
         buf.extend_from_slice(commit.tree.as_bytes());
         let np = u32::try_from(commit.parents.len())
             .map_err(|_| VctrlError::Other("commit has too many parents".into()))?;
@@ -53,6 +53,23 @@ impl Encoder for BinaryEncoder {
             .map_err(|_| VctrlError::Other("commit message too long".into()))?;
         buf.extend_from_slice(&msg_len.to_be_bytes());
         buf.extend_from_slice(msg);
+
+        let hdr_count = u16::try_from(commit.headers.len())
+            .map_err(|_| VctrlError::Other("too many headers".into()))?;
+        buf.extend_from_slice(&hdr_count.to_be_bytes());
+        for (key, value) in &commit.headers {
+            let key_bytes = key.as_bytes();
+            let key_len = u16::try_from(key_bytes.len())
+                .map_err(|_| VctrlError::Other("header key too long".into()))?;
+            buf.extend_from_slice(&key_len.to_be_bytes());
+            buf.extend_from_slice(key_bytes);
+            let val_bytes = value.as_bytes();
+            let val_len = u32::try_from(val_bytes.len())
+                .map_err(|_| VctrlError::Other("header value too long".into()))?;
+            buf.extend_from_slice(&val_len.to_be_bytes());
+            buf.extend_from_slice(val_bytes);
+        }
+
         if let Some(sig) = &commit.signature {
             let sig_len = u32::try_from(sig.len())
                 .map_err(|_| VctrlError::Other("signature too long".into()))?;
@@ -144,7 +161,7 @@ impl Decoder for BinaryDecoder {
         let version = cursor
             .read_u8()
             .map_err(|e| VctrlError::Other(e.to_string()))?;
-        if version != 1 {
+        if version != 1 && version != 2 {
             return Err(VctrlError::Other("unsupported commit version".into()));
         }
         let mut tree_hash = [0u8; 64];
@@ -183,6 +200,38 @@ impl Decoder for BinaryDecoder {
             .read_exact(&mut msg_bytes)
             .map_err(|e| VctrlError::Other(e.to_string()))?;
         let message = String::from_utf8(msg_bytes).map_err(|e| VctrlError::Other(e.to_string()))?;
+
+        let headers = if version >= 2 {
+            let hdr_count = cursor
+                .read_u16::<BigEndian>()
+                .map_err(|e| VctrlError::Other(e.to_string()))?;
+            let mut hdrs = Vec::with_capacity(hdr_count as usize);
+            for _ in 0..hdr_count {
+                let key_len = cursor
+                    .read_u16::<BigEndian>()
+                    .map_err(|e| VctrlError::Other(e.to_string()))?;
+                let mut key_bytes = vec![0u8; key_len as usize];
+                cursor
+                    .read_exact(&mut key_bytes)
+                    .map_err(|e| VctrlError::Other(e.to_string()))?;
+                let key =
+                    String::from_utf8(key_bytes).map_err(|e| VctrlError::Other(e.to_string()))?;
+                let val_len = cursor
+                    .read_u32::<BigEndian>()
+                    .map_err(|e| VctrlError::Other(e.to_string()))?;
+                let mut val_bytes = vec![0u8; val_len as usize];
+                cursor
+                    .read_exact(&mut val_bytes)
+                    .map_err(|e| VctrlError::Other(e.to_string()))?;
+                let value =
+                    String::from_utf8(val_bytes).map_err(|e| VctrlError::Other(e.to_string()))?;
+                hdrs.push((key, value));
+            }
+            hdrs
+        } else {
+            Vec::new()
+        };
+
         let sig_len = cursor
             .read_u32::<BigEndian>()
             .map_err(|e| VctrlError::Other(e.to_string()))?;
@@ -195,6 +244,7 @@ impl Decoder for BinaryDecoder {
                 .map_err(|e| VctrlError::Other(e.to_string()))?;
             Some(sig)
         };
+
         Ok(Commit {
             tree,
             parents,
@@ -203,6 +253,7 @@ impl Decoder for BinaryDecoder {
             timestamp,
             message,
             signature,
+            headers,
         })
     }
 

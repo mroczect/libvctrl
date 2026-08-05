@@ -3,9 +3,12 @@ pub mod command;
 pub mod diff;
 pub mod domain;
 pub mod error;
+pub mod gc;
 pub mod hashing;
 pub mod merge;
+pub mod revwalk;
 pub mod storage;
+pub mod transport;
 
 pub use codec::*;
 pub use command::*;

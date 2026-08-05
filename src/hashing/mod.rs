@@ -1,5 +1,7 @@
 pub mod sha512;
 pub use sha512::*;
+pub mod verify;
+pub use verify::*;
 
 use crate::domain::hash::Hash;
 
