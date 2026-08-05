@@ -75,7 +75,13 @@ impl RefStore for MemoryRefStore {
     }
     fn head_ref_name(&self) -> Result<Option<String>, VctrlError> {
         match &self.head {
-            Some(target) if target.starts_with("refs/heads/") => Ok(Some(target.clone())),
+            Some(target) if target.starts_with("refs/heads/") => {
+                if self.refs.contains_key(target) {
+                    Ok(Some(target.clone()))
+                } else {
+                    Ok(None)
+                }
+            }
             _ => Ok(None),
         }
     }
