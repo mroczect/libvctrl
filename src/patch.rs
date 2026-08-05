@@ -9,27 +9,61 @@ use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::io::Read;
 
+const PATCH_VERSION: u8 = 1;
+
 pub fn generate_patch(old_tree: &Tree, new_tree: &Tree) -> Result<Vec<u8>, VctrlError> {
     let differ = TreeDiffer;
     let diffs = differ.diff(old_tree, new_tree)?;
 
+    for d in &diffs {
+        match &d.kind {
+            DiffKind::Added { .. } => {
+                if let Some(entry) = new_tree.entries().iter().find(|e| e.name == d.name)
+                    && entry.kind == EntryKind::Tree
+                {
+                    return Err(VctrlError::Other(
+                        "patch does not support tree entries".into(),
+                    ));
+                }
+            }
+            DiffKind::Modified { .. } => {
+                let old_entry = old_tree.entries().iter().find(|e| e.name == d.name);
+                let new_entry = new_tree.entries().iter().find(|e| e.name == d.name);
+                if old_entry.map(|e| e.kind) == Some(EntryKind::Tree)
+                    || new_entry.map(|e| e.kind) == Some(EntryKind::Tree)
+                {
+                    return Err(VctrlError::Other(
+                        "patch does not support tree entries".into(),
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+
     let mut buf = Vec::new();
-    buf.write_u32::<BigEndian>(diffs.len() as u32).unwrap();
+    buf.write_u8(PATCH_VERSION)
+        .map_err(|e| VctrlError::Other(e.to_string()))?;
+    buf.write_u32::<BigEndian>(diffs.len() as u32)
+        .map_err(|e| VctrlError::Other(e.to_string()))?;
 
     for d in &diffs {
         match &d.kind {
             DiffKind::Added { new_hash } => {
-                buf.write_u8(0u8).unwrap();
-                write_diff_entry_name(&d.name, &mut buf);
+                buf.write_u8(0u8)
+                    .map_err(|e| VctrlError::Other(e.to_string()))?;
+                write_diff_entry_name(&d.name, &mut buf)?;
                 buf.extend_from_slice(new_hash.as_bytes());
             }
             DiffKind::Removed => {
-                buf.write_u8(1u8).unwrap();
-                write_diff_entry_name(&d.name, &mut buf);
+                buf.write_u8(1u8)
+                    .map_err(|e| VctrlError::Other(e.to_string()))?;
+                write_diff_entry_name(&d.name, &mut buf)?;
             }
             DiffKind::Modified { old_hash, new_hash } => {
-                buf.write_u8(2u8).unwrap();
-                write_diff_entry_name(&d.name, &mut buf);
+                buf.write_u8(2u8)
+                    .map_err(|e| VctrlError::Other(e.to_string()))?;
+                write_diff_entry_name(&d.name, &mut buf)?;
                 buf.extend_from_slice(old_hash.as_bytes());
                 buf.extend_from_slice(new_hash.as_bytes());
             }
@@ -38,10 +72,12 @@ pub fn generate_patch(old_tree: &Tree, new_tree: &Tree) -> Result<Vec<u8>, Vctrl
     Ok(buf)
 }
 
-fn write_diff_entry_name(name: &str, buf: &mut Vec<u8>) {
+fn write_diff_entry_name(name: &str, buf: &mut Vec<u8>) -> Result<(), VctrlError> {
     let bytes = name.as_bytes();
-    buf.write_u16::<BigEndian>(bytes.len() as u16).unwrap();
+    buf.write_u16::<BigEndian>(bytes.len() as u16)
+        .map_err(|e| VctrlError::Other(e.to_string()))?;
     buf.extend_from_slice(bytes);
+    Ok(())
 }
 
 pub fn apply_patch(
@@ -51,6 +87,17 @@ pub fn apply_patch(
     _hasher: &dyn Hasher,
 ) -> Result<Tree, VctrlError> {
     let mut cursor = Cursor::new(patch_data);
+
+    let version = cursor
+        .read_u8()
+        .map_err(|e| VctrlError::Other(e.to_string()))?;
+    if version != PATCH_VERSION {
+        return Err(VctrlError::Other(format!(
+            "unsupported patch version {}",
+            version
+        )));
+    }
+
     let count = cursor
         .read_u32::<BigEndian>()
         .map_err(|e| VctrlError::Other(e.to_string()))?;

@@ -34,6 +34,11 @@ impl Index {
         Tree::new(entries)
     }
 
+    pub fn into_tree(self) -> Result<Tree, TreeError> {
+        let entries: Vec<_> = self.entries.into_values().collect();
+        Tree::new(entries)
+    }
+
     pub fn clear(&mut self) {
         self.entries.clear();
     }

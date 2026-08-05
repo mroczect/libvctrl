@@ -53,6 +53,7 @@ impl Command for DiffPatch {
 pub struct ApplyPatch {
     pub base_tree_hash: Hash,
     pub patch_data: Vec<u8>,
+    pub encoder: Box<dyn Encoder>,
     pub hasher: Box<dyn Hasher>,
 }
 
@@ -67,7 +68,7 @@ impl Command for ApplyPatch {
         let base_tree = store.get_tree(&self.base_tree_hash)?;
         let new_tree = apply_patch(&base_tree, &self.patch_data, store, self.hasher.as_ref())?;
         let mut buf = Vec::new();
-        crate::codec::BinaryEncoder.encode_tree(&new_tree, &mut buf)?;
+        self.encoder.encode_tree(&new_tree, &mut buf)?;
         let hash = self.hasher.hash_tree_encoded(&buf);
         store.put(&hash, &crate::domain::object::Object::Tree(new_tree))?;
         Ok(hash)
