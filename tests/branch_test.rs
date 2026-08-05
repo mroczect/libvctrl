@@ -1,6 +1,6 @@
 mod common;
 use common::{blob_hash, setup_refs, setup_store};
-
+use libvctrl::*;
 use libvctrl::{Command, CreateBranch, DeleteBranch, GetBranch, RefStore, SetHead};
 
 #[test]
@@ -66,4 +66,46 @@ fn set_head_works() {
     set_head.execute(&mut store, &mut refs).unwrap();
 
     assert_eq!(refs.head().unwrap(), Some(hash));
+}
+
+#[test]
+fn set_head_to_nonexistent_branch() {
+    let mut store = setup_store();
+    let mut refs = setup_refs();
+    let cmd = SetHead {
+        target: "refs/heads/ghost".into(),
+    };
+    let err = cmd.execute(&mut store, &mut refs).unwrap_err();
+    assert!(matches!(err, VctrlError::InvalidRef(_)));
+}
+
+#[test]
+fn list_branches() {
+    let mut store = setup_store();
+    let mut refs = setup_refs();
+    let hash = blob_hash(b"x");
+    CreateBranch {
+        name: "refs/heads/a".into(),
+        hash,
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+    CreateBranch {
+        name: "refs/heads/b".into(),
+        hash,
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+    SetHead {
+        target: "refs/heads/a".into(),
+    }
+    .execute(&mut store, &mut refs)
+    .unwrap();
+
+    let list = ListBranches.execute(&mut store, &mut refs).unwrap();
+    assert_eq!(list.len(), 2);
+    let a = list.iter().find(|(name, _, _)| name == "a").unwrap();
+    assert!(a.2);
+    let b = list.iter().find(|(name, _, _)| name == "b").unwrap();
+    assert!(!b.2);
 }
