@@ -1,5 +1,6 @@
 use crate::codec::Encoder;
 use crate::command::Command;
+use crate::crypto::Signer;
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
 use crate::domain::tag::Tag;
@@ -32,16 +33,26 @@ pub struct CreateAnnotatedTag {
     pub message: String,
     pub encoder: Box<dyn Encoder>,
     pub hasher: Box<dyn Hasher>,
+    pub signer: Option<Box<dyn Signer>>,
 }
-
 impl Command for CreateAnnotatedTag {
     type Output = Hash;
+
     fn execute(
         &self,
         store: &mut dyn ObjectStore,
         refs: &mut dyn RefStore,
     ) -> Result<Hash, VctrlError> {
-        let tag = Tag::new(self.target, self.tagger.clone(), self.message.clone());
+        let mut tag = Tag::new(self.target, self.tagger.clone(), self.message.clone());
+
+        if let Some(signer) = &self.signer {
+            let mut buf = Vec::new();
+            self.encoder.encode_tag(&tag, &mut buf)?;
+            let pre_sig_hash = self.hasher.hash_tag_encoded(&buf);
+            let sig = signer.sign(pre_sig_hash.as_bytes())?;
+            tag.signature = Some(sig);
+        }
+
         let mut buf = Vec::new();
         self.encoder.encode_tag(&tag, &mut buf)?;
         let hash = self.hasher.hash_tag_encoded(&buf);

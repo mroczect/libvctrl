@@ -1,12 +1,14 @@
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
 use crate::error::VctrlError;
+use crate::reflog::ReflogEntry;
 use crate::storage::traits::{ObjectStore, RefStore};
 use std::collections::HashMap;
 
 pub struct MemoryStore {
     objects: HashMap<Hash, Object>,
 }
+
 impl MemoryStore {
     pub fn new() -> Self {
         Self {
@@ -30,17 +32,27 @@ impl ObjectStore for MemoryStore {
     fn exists(&self, hash: &Hash) -> Result<bool, VctrlError> {
         Ok(self.objects.contains_key(hash))
     }
+    fn all_hashes(&self) -> Result<Vec<Hash>, VctrlError> {
+        Ok(self.objects.keys().copied().collect())
+    }
+    fn remove(&mut self, hash: &Hash) -> Result<(), VctrlError> {
+        self.objects.remove(hash);
+        Ok(())
+    }
 }
 
 pub struct MemoryRefStore {
     refs: HashMap<String, Hash>,
     head: Option<String>,
+    reflog: Vec<ReflogEntry>,
 }
+
 impl MemoryRefStore {
     pub fn new() -> Self {
         Self {
             refs: HashMap::new(),
             head: None,
+            reflog: Vec::new(),
         }
     }
 }
@@ -52,7 +64,15 @@ impl Default for MemoryRefStore {
 
 impl RefStore for MemoryRefStore {
     fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError> {
+        let old = self.refs.get(name).copied();
         self.refs.insert(name.to_string(), *hash);
+        self.reflog.push(ReflogEntry {
+            ref_name: name.to_string(),
+            old_hash: old,
+            new_hash: *hash,
+            timestamp: chrono::Utc::now(),
+            message: format!("set_ref {}", name),
+        });
         Ok(())
     }
     fn get_ref(&self, name: &str) -> Result<Option<Hash>, VctrlError> {
@@ -90,6 +110,33 @@ impl RefStore for MemoryRefStore {
             .refs
             .keys()
             .filter(|k| k.starts_with(prefix))
+            .cloned()
+            .collect())
+    }
+}
+
+impl crate::reflog::ReflogStore for MemoryRefStore {
+    fn log_ref_update(
+        &mut self,
+        ref_name: &str,
+        old_hash: Option<Hash>,
+        new_hash: Hash,
+        message: &str,
+    ) -> Result<(), VctrlError> {
+        self.reflog.push(ReflogEntry {
+            ref_name: ref_name.to_string(),
+            old_hash,
+            new_hash,
+            timestamp: chrono::Utc::now(),
+            message: message.to_string(),
+        });
+        Ok(())
+    }
+    fn reflog(&self, ref_name: &str) -> Result<Vec<ReflogEntry>, VctrlError> {
+        Ok(self
+            .reflog
+            .iter()
+            .filter(|e| e.ref_name == ref_name)
             .cloned()
             .collect())
     }

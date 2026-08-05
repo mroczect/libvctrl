@@ -24,6 +24,8 @@ pub enum VctrlError {
     Other(String),
     #[error("data corrupted: {0}")]
     Corrupted(String),
+    #[error("operation not supported: {0}")]
+    Unsupported(String),
 }
 impl From<serde_json::Error> for VctrlError {
     fn from(e: serde_json::Error) -> Self {

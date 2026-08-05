@@ -243,6 +243,16 @@ impl ObjectStore for FileStore {
     fn exists(&self, hash: &Hash) -> Result<bool, VctrlError> {
         Ok(self.objects.contains_key(hash))
     }
+    fn all_hashes(&self) -> Result<Vec<Hash>, VctrlError> {
+        Ok(self.objects.keys().copied().collect())
+    }
+    fn remove(&mut self, hash: &Hash) -> Result<(), VctrlError> {
+        if self.objects.remove(hash).is_some() {
+            Ok(())
+        } else {
+            Err(VctrlError::NotFound(format!("object '{}' not found", hash)))
+        }
+    }
 }
 
 impl RefStore for FileStore {

@@ -1,5 +1,6 @@
 pub mod codec;
 pub mod command;
+pub mod crypto;
 pub mod diff;
 pub mod domain;
 pub mod error;
@@ -11,9 +12,10 @@ pub mod patch;
 pub mod revwalk;
 pub mod storage;
 pub mod transport;
-
 pub use codec::*;
 pub use command::*;
+pub use crypto::*;
+pub mod reflog;
 pub use diff::*;
 pub use domain::*;
 pub use error::*;
@@ -21,4 +23,5 @@ pub use hashing::*;
 pub use index::*;
 pub use merge::*;
 pub use patch::*;
+pub use reflog::*;
 pub use storage::*;
