@@ -5,7 +5,7 @@ use crate::domain::object::Object;
 use crate::domain::user::UserID;
 use crate::error::VctrlError;
 use crate::hashing::Hasher;
-use crate::merge::{ConflictResolver, ThreeWayMerge, find_merge_base};
+use crate::merge::{ConflictResolver, ThreeWayMerge, find_merge_base, is_ancestor};
 use crate::storage::traits::{ObjectStore, RefStore};
 
 pub struct MergeBranch {
@@ -32,6 +32,13 @@ impl Command for MergeBranch {
         let theirs_hash = refs.get_ref(&self.branch_name)?.ok_or_else(|| {
             VctrlError::NotFound(format!("branch '{}' not found", self.branch_name))
         })?;
+
+        if is_ancestor(store as &dyn ObjectStore, head_hash, theirs_hash)? {
+            if let Some(head_ref) = refs.head_ref_name()? {
+                refs.set_ref(&head_ref, &theirs_hash)?;
+            }
+            return Ok(theirs_hash);
+        }
 
         let base = find_merge_base(store, head_hash, theirs_hash)?
             .ok_or_else(|| VctrlError::Other("no common ancestor".into()))?;

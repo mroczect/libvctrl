@@ -55,3 +55,12 @@ pub fn find_merge_base(
     }
     Ok(None)
 }
+
+pub fn is_ancestor(
+    store: &dyn ObjectStore,
+    ancestor: Hash,
+    descendant: Hash,
+) -> Result<bool, VctrlError> {
+    let base = find_merge_base(store, ancestor, descendant)?;
+    Ok(base == Some(ancestor))
+}
