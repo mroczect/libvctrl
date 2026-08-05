@@ -24,4 +24,5 @@ pub use index::*;
 pub use merge::*;
 pub use patch::*;
 pub use reflog::*;
+pub use revwalk::*;
 pub use storage::*;
