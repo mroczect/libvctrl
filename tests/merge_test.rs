@@ -162,3 +162,61 @@ fn merge_resolved() {
     };
     assert_eq!(blob.into_bytes(), b"ours");
 }
+
+#[test]
+fn recursive_tree_merge() {
+    let mut store = setup_store();
+    let mut refs = setup_refs();
+    let base_inner_hash = put_blob(&mut store, b"base");
+    let base_inner_tree = Tree::new(vec![
+        TreeEntry::new("f".into(), EntryKind::Blob, base_inner_hash).unwrap(),
+    ])
+    .unwrap();
+    let base_inner = put_tree(&mut store, &base_inner_tree);
+
+    let base_root = Tree::new(vec![
+        TreeEntry::new("sub".into(), EntryKind::Tree, base_inner).unwrap(),
+    ])
+    .unwrap();
+    let base_hash = put_tree(&mut store, &base_root);
+
+    let ours_inner_hash = put_blob(&mut store, b"ours");
+    let ours_inner = put_tree(
+        &mut store,
+        &Tree::new(vec![
+            TreeEntry::new("f".into(), EntryKind::Blob, ours_inner_hash).unwrap(),
+        ])
+        .unwrap(),
+    );
+    let ours_root = Tree::new(vec![
+        TreeEntry::new("sub".into(), EntryKind::Tree, ours_inner).unwrap(),
+    ])
+    .unwrap();
+    let ours_hash = put_tree(&mut store, &ours_root);
+
+    let theirs_inner_hash = put_blob(&mut store, b"theirs");
+    let theirs_inner = put_tree(
+        &mut store,
+        &Tree::new(vec![
+            TreeEntry::new("f".into(), EntryKind::Blob, theirs_inner_hash).unwrap(),
+        ])
+        .unwrap(),
+    );
+    let theirs_root = Tree::new(vec![
+        TreeEntry::new("sub".into(), EntryKind::Tree, theirs_inner).unwrap(),
+    ])
+    .unwrap();
+    let theirs_hash = put_tree(&mut store, &theirs_root);
+
+    let merge = MergeCommand {
+        base: base_hash,
+        ours: ours_hash,
+        theirs: theirs_hash,
+        merger: Box::new(ThreeWayMerger),
+        resolver: Box::new(SimpleResolver),
+        encoder: Box::new(encoder()),
+        hasher: Box::new(hasher()),
+    };
+    let err = merge.execute(&mut store, &mut refs).unwrap_err();
+    assert!(matches!(err, VctrlError::MergeConflict { .. }));
+}
