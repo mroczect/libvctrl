@@ -213,6 +213,7 @@ impl ObjectStore for FileStore {
         let data_offset = writer.stream_position().map_err(VctrlError::Io)?;
         writer.write_all(&data).map_err(VctrlError::Io)?;
         writer.flush().map_err(VctrlError::Io)?;
+        writer.get_mut().sync_all().map_err(VctrlError::Io)?;
         self.objects.insert(
             *hash,
             ObjectInfo {
@@ -300,7 +301,13 @@ impl RefStore for FileStore {
 
     fn head_ref_name(&self) -> Result<Option<String>, VctrlError> {
         match &self.head {
-            Some(target) if target.starts_with("refs/heads/") => Ok(Some(target.clone())),
+            Some(target) if target.starts_with("refs/heads/") => {
+                if self.refs.contains_key(target) {
+                    Ok(Some(target.clone()))
+                } else {
+                    Ok(None)
+                }
+            }
             _ => Ok(None),
         }
     }
