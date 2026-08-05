@@ -32,6 +32,14 @@ impl Command for OctopusMerge {
             ));
         }
 
+        let total_parents = 1 + self.branch_names.len();
+        if total_parents > 255 {
+            return Err(VctrlError::Other(format!(
+                "too many parents: {} (max 255)",
+                total_parents
+            )));
+        }
+
         let head_hash = refs
             .head()?
             .ok_or_else(|| VctrlError::Other("no HEAD".into()))?;
