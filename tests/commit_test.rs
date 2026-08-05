@@ -34,8 +34,6 @@ fn create_commit_and_log() {
         message: "initial".into(),
         encoder: Box::new(common::encoder()),
         hasher: Box::new(common::hasher()),
-        signer: None,
-        transaction_id: None,
     };
     let commit_hash = cmd.execute(&mut store, &mut refs).unwrap();
     assert_eq!(commit_hash.as_bytes().len(), 64);
@@ -79,8 +77,6 @@ fn commit_chain_log() {
         message: "first".into(),
         encoder: Box::new(common::encoder()),
         hasher: Box::new(common::hasher()),
-        signer: None,
-        transaction_id: None,
     };
     let c1 = cmd1.execute(&mut store, &mut refs).unwrap();
 
@@ -92,8 +88,6 @@ fn commit_chain_log() {
         message: "second".into(),
         encoder: Box::new(common::encoder()),
         hasher: Box::new(common::hasher()),
-        signer: None,
-        transaction_id: None,
     };
     let _c2 = cmd2.execute(&mut store, &mut refs).unwrap();
 
