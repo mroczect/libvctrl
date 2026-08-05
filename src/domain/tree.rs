@@ -16,8 +16,15 @@ pub struct TreeEntry {
     pub hash: Hash,
 }
 
+pub const MAX_ENTRY_NAME_LEN: usize = 255;
+
 impl TreeEntry {
     pub fn new(name: String, kind: EntryKind, hash: Hash) -> Result<Self, TreeError> {
+        if name.len() > MAX_ENTRY_NAME_LEN {
+            return Err(TreeError::InvalidEntryName(
+                "name exceeds maximum length (255)".into(),
+            ));
+        }
         if name.is_empty()
             || name.contains('/')
             || name.contains('\\')
