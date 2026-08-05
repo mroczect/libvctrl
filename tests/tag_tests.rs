@@ -33,6 +33,7 @@ fn test_annotated_tag() {
         message: "Release v2.0".into(),
         encoder: Box::new(encoder()),
         hasher: Box::new(hasher()),
+        signer: None,
     };
     let tag_hash = cmd.execute(&mut store, &mut refs).unwrap();
     assert!(store.exists(&tag_hash).unwrap());
