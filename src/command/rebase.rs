@@ -10,6 +10,8 @@ use crate::merge::{ConflictResolver, ThreeWayMerge};
 use crate::storage::traits::{ObjectStore, ObjectStoreExt, RefStore};
 use std::collections::HashSet;
 
+const MAX_REBASE_COMMITS: usize = 10_000;
+
 pub struct Rebase {
     pub upstream: Hash,
     pub onto: Hash,
@@ -46,6 +48,13 @@ impl Command for Rebase {
             let commit = store.get_commit(&h)?;
             current = commit.parents.first().copied();
             to_rebase.push(commit);
+
+            if to_rebase.len() > MAX_REBASE_COMMITS {
+                return Err(VctrlError::Other(format!(
+                    "too many commits to rebase (limit {})",
+                    MAX_REBASE_COMMITS
+                )));
+            }
         }
         to_rebase.reverse();
 
