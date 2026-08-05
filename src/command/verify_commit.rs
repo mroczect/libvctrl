@@ -40,6 +40,7 @@ impl Command for VerifyCommit {
             timestamp: commit.timestamp,
             message: commit.message.clone(),
             signature: None,
+            headers: vec![],
         };
 
         let mut buf = Vec::new();
