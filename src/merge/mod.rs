@@ -4,12 +4,13 @@ pub use resolver::*;
 pub use three_way::*;
 pub mod base;
 pub use base::*;
-
+pub mod strategy;
 use crate::codec::Encoder;
 use crate::domain::hash::Hash;
 use crate::error::VctrlError;
 use crate::hashing::Hasher;
 use crate::storage::traits::ObjectStore;
+pub use strategy::*;
 
 #[allow(clippy::too_many_arguments)]
 pub trait ThreeWayMerge {
