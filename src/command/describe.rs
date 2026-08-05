@@ -2,8 +2,10 @@ use crate::command::Command;
 use crate::domain::hash::Hash;
 use crate::domain::object::Object;
 use crate::error::VctrlError;
-use crate::storage::traits::{ObjectStore, RefStore};
+use crate::storage::traits::{ObjectStore, ObjectStoreExt, RefStore};
 use std::collections::{HashSet, VecDeque};
+
+const MAX_DESCRIBE_SEARCH: usize = 100_000;
 
 pub struct Describe {
     pub commit_hash: Hash,
@@ -18,6 +20,15 @@ impl Command for Describe {
         store: &mut dyn ObjectStore,
         refs: &mut dyn RefStore,
     ) -> Result<Option<String>, VctrlError> {
+        if self.max_commits_to_search > MAX_DESCRIBE_SEARCH {
+            return Err(VctrlError::Other(format!(
+                "max_commits_to_search must be <= {}",
+                MAX_DESCRIBE_SEARCH
+            )));
+        }
+
+        store.get_commit(&self.commit_hash)?;
+
         let tag_refs = refs.list_refs("refs/tags/")?;
         let mut tag_map: Vec<(Hash, String)> = Vec::new();
         for ref_name in &tag_refs {
