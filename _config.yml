@@ -1,9 +1,9 @@
 title: "libvctrl"
 description: "Content-Addressed Version Control Framework"
-url: "https://mroczect.biz.id"
+url: "https://mroczect.biz.id"          
 baseurl: ""
 markdown: kramdown
-theme: minima
+theme: cayman
 exclude:
   - Cargo.toml
   - Cargo.lock
