@@ -1,6 +1,13 @@
 [package]
 name = "libvctrl_plumbing"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2024"
+description = "Atomic operations for version control (plumbing layer) – generic over libvctrl traits"
+license = "MIT"
+authors = ["mroczect"]
+repository = "https://github.com/mroczect/libvctrl"
+readme = "README.md"
+keywords = ["version-control", "vcs", "plumbing"]
+categories = ["development-tools"]
 
 [dependencies]
