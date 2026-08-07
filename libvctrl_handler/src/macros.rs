@@ -1,9 +1,12 @@
-/// Convenience macro to create a [`VctrlError::Other`] with a formatted message.
+//! Convenience macros for working with errors and other common patterns.
+
+/// Convenience macro to create a [`crate::VctrlError::Other`] with a formatted message.
 ///
 /// # Example
-/// ```rust
-/// use libvctrl_handler::vctrl_error_other;
-/// let err = vctrl_error_other!("unexpected condition: {}", 42);
+/// ```
+/// # use libvctrl_handler::*;
+/// let err = vctrl_error_other!("something went wrong: {}", 42);
+/// assert_eq!(err.to_string(), "something went wrong: 42");
 /// ```
 #[macro_export]
 macro_rules! vctrl_error_other {

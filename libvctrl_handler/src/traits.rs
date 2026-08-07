@@ -12,9 +12,14 @@ use crate::types::{Blob, Commit, Hash, Tag, Tree};
 ///
 /// Implementations may store objects in memory, on disk, in a database,
 /// or any other backend. The only requirement is that objects are
-/// indexed by their [`Hash`].
+/// indexed by their [`struct@Hash`].
 pub trait ObjectStore {
     /// Store raw data under the given hash.
+    ///
+    /// The store **does not** verify that `hash` is the actual hash of `data`.
+    /// The caller must ensure the integrity of this relationship.
+    /// Failing to do so may cause objects to become irretrievable or incorrectly
+    /// addressable.
     ///
     /// # Errors
     /// Returns an error if the write operation fails.
@@ -33,11 +38,13 @@ pub trait ObjectStore {
     fn delete(&mut self, hash: &Hash) -> Result<(), VctrlError>;
 
     /// Check whether an object exists under the given hash.
-    #[must_use]
-    fn exists(&self, hash: &Hash) -> bool;
+    ///
+    /// # Errors
+    /// Returns an error if the existence check itself fails (e.g., I/O error).
+    fn exists(&self, hash: &Hash) -> Result<bool, VctrlError>;
 }
 
-/// A reference store – maps names to [`Hash`] values.
+/// A reference store – maps names to [`struct@Hash`] values.
 ///
 /// References are typically used for branches, tags (lightweight),
 /// or any symbolic name that points to a commit or other object.
@@ -69,7 +76,7 @@ pub trait RefStore {
 
 /// A cryptographically secure hash function.
 ///
-/// Implementations must return a [`Hash`] whose length is exactly
+/// Implementations must return a [`struct@Hash`] whose length is exactly
 /// [`HASH_LENGTH`](crate::HASH_LENGTH) bytes.
 pub trait Hasher {
     /// Compute the hash of `data`.

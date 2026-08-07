@@ -13,9 +13,11 @@ use std::fmt;
 /// data corruption, I/O issues, and more. Variants like [`IoError`](Self::IoError)
 /// store the message as a `String` to keep the type object‑safe and
 /// independent of platform‑specific error types.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VctrlError {
     /// The given hash does not have the required length ([`HASH_LENGTH`](crate::HASH_LENGTH)).
+    /// The contained `usize` is the invalid length that was provided.
     InvalidHashLength(usize),
     /// The provided name is invalid (empty, too long, or contains forbidden characters).
     InvalidName(String),
@@ -52,4 +54,9 @@ impl fmt::Display for VctrlError {
     }
 }
 
-impl std::error::Error for VctrlError {}
+impl std::error::Error for VctrlError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // VctrlError does not wrap external errors, so there is no source.
+        None
+    }
+}
