@@ -1,0 +1,16 @@
+title: "libvctrl"
+description: "Content-Addressed Version Control Framework"
+baseurl: ""
+url: "https://<username>.github.io"
+markdown: kramdown
+theme: minima
+exclude:
+  - Cargo.toml
+  - Cargo.lock
+  - target/
+  - .github/
+  - src/
+  - libvctrl_handler/
+  - libvctrl_core/
+  - libvctrl_plumbing/
+  - libvctrl_porcelain/
