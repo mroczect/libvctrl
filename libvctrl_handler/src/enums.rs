@@ -5,6 +5,7 @@
 /// In a version control system, a tree represents a directory.
 /// Each entry can be either a file ([`Blob`](crate::Blob)) or a
 /// sub‑directory ([`Tree`](crate::Tree) itself).
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EntryKind {
     /// A regular file. The entry's hash points to a [`Blob`](crate::Blob).
