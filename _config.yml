@@ -1,7 +1,7 @@
 title: "libvctrl"
 description: "Content-Addressed Version Control Framework"
+url: "https://mroczect.biz.id"
 baseurl: ""
-url: "https://<username>.github.io"
 markdown: kramdown
 theme: minima
 exclude:
