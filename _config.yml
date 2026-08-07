@@ -3,7 +3,7 @@ description: "Content-Addressed Version Control Framework"
 url: "https://mroczect.biz.id"          
 baseurl: ""
 markdown: kramdown
-theme: cayman
+theme: jekyll-theme-cayman
 exclude:
   - Cargo.toml
   - Cargo.lock
