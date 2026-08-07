@@ -25,6 +25,7 @@
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
+#![doc(html_root_url = "https://docs.rs/libvctrl_handler/1.0.0")]
 #![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod constants;
