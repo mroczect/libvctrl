@@ -3,11 +3,11 @@ name: Publish to crates.io
 on:
   push:
     tags:
-      - 'libvctrl[0-9]*'
-      - 'libvctrl_core[0-9]*'
-      - 'libvctrl_handler[0-9]*'
-      - 'libvctrl_plumbing[0-9]*'
-      - 'libvctrl_porcelain[0-9]*'
+      - "libvctrl[0-9]*"
+      - "libvctrl_core[0-9]*"
+      - "libvctrl_handler[0-9]*"
+      - "libvctrl_plumbing[0-9]*"
+      - "libvctrl_porcelain[0-9]*"
 
 jobs:
   publish:
