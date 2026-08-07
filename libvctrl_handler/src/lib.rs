@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 //! # `libvctrl_handler` – The Unshakeable Contract
 //!
 //! This crate **only** defines the fundamental traits, types, errors, and constants
@@ -17,19 +19,28 @@
 //! ## Usage
 //! ```rust
 //! use libvctrl_handler::*;
+//! let hash = Hash::from_bytes(&[0u8; HASH_LENGTH]).unwrap();
+//! let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, hash).unwrap();
 //! ```
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod constants;
 pub mod enums;
 pub mod errors;
+/// Convenience macros for working with errors.
+pub mod macros;
 pub mod traits;
 pub mod types;
 
-pub use constants::*;
-pub use enums::*;
-pub use errors::*;
-pub use traits::*;
-pub use types::*;
+// Re-export fundamental items with explicit paths to avoid wildcard imports.
+pub use constants::{HASH_LENGTH, MAX_NAME_LENGTH};
+pub use enums::EntryKind;
+pub use errors::VctrlError;
+pub use traits::{Decoder, Encoder, Hasher, ObjectStore, RefStore, Signer, Transport, Verifier};
+pub use types::{Blob, Commit, Hash, Tag, Tree, TreeEntry, UserID};
+
+// Macros are exported automatically via #[macro_export] from the macros module,
+// so no explicit re-export is needed here.
