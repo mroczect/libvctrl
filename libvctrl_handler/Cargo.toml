@@ -1,6 +1,27 @@
 [package]
 name = "libvctrl_handler"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2024"
+description = "Fundamental contracts for building a version control system – no implementations, only traits and types"
+license = "MIT"
+authors = ["mroczect"]
+documentation = "https://docs.rs/libvctrl"
+homepage = "https://github.com/mroczect/libvctrl"
+repository = "https://github.com/mroczect/libvctrl"
+readme = "README.md"
+keywords = ["version-control", "vcs", "library", "traits"]
+categories = ["development-tools", "data-structures"]
 
-[dependencies]
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+unused_qualifications = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unused_results = "warn"
+rust_2018_idioms = "warn"
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+cargo = "warn"

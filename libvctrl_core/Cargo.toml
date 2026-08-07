@@ -1,6 +1,13 @@
 [package]
 name = "libvctrl_core"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2024"
+description = "Reference implementations of the libvctrl contracts (in-memory store, SHA-512 hasher, binary codec)"
+license = "MIT"
+authors = ["mroczect"]
+repository = "https://github.com/mroczect/libvctrl"
+readme = "README.md"
+keywords = ["version-control", "vcs", "core"]
+categories = ["development-tools"]
 
 [dependencies]

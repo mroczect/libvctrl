@@ -2,5 +2,10 @@
 name = "libvctrl"
 version = "1.0.0"
 edition = "2024"
-
-[dependencies]
+description = "A precision toolkit for building custom version control systems"
+license = "MIT"
+authors = ["mroczect"]
+repository = "https://github.com/mroczect/libvctrl"
+readme = "README.md"
+keywords = ["version-control", "vcs"]
+categories = ["development-tools"]

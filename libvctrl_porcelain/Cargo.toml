@@ -1,6 +1,13 @@
 [package]
 name = "libvctrl_porcelain"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2024"
+description = "Convenient high-level version control operations (porcelain layer) built on top of libvctrl_plumbing"
+license = "MIT"
+authors = ["mroczect"]
+repository = "https://github.com/mroczect/libvctrl"
+readme = "README.md"
+keywords = ["version-control", "vcs", "porcelain"]
+categories = ["development-tools"]
 
 [dependencies]
