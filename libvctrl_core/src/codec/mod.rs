@@ -3,8 +3,10 @@
 //! This module provides a pair of reference implementations:
 //! [`BinaryEncoder`] and [`BinaryDecoder`].
 //!
-//! They operate on a simple, deterministic binary format that is easy
-//! to inspect, debug, and replace with custom implementations.
+//! **Stability note:** The binary format used here is a *reference format*
+//! and is **not covered by semantic versioning guarantees**. It may change
+//! between minor releases. For production use, build your own encoder/decoder
+//! or pin to a specific version of this crate after verifying compatibility.
 
 pub mod binary_decoder;
 pub mod binary_encoder;
