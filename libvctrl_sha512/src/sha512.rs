@@ -1,4 +1,3 @@
-//! - **Zero‑dependency** – it relies only on `core` and is `#![no_std]`
 use crate::utils::{load_be, store_be, verify};
 
 struct W([u64; 16]);
