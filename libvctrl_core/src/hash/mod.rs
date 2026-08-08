@@ -30,15 +30,15 @@
 //! To provide a custom hash function, implement the [`Hasher`] trait:
 //!
 //! ```rust
-//! use libvctrl_handler::{Hash, Hasher, HASH_LENGTH};
+//! use libvctrl_handler::{Hash, Hasher};
+//! // libvctrl_sha512 must be in your Cargo.toml dependencies
 //!
 //! struct MyHasher;
 //!
 //! impl Hasher for MyHasher {
 //!     fn hash(&self, data: &[u8]) -> Hash {
-//!         // Compute the digest and convert it to a Hash.
-//!         // The digest MUST be exactly HASH_LENGTH bytes.
-//!         let digest = my_hash_function(data);
+//!         // Use the SHA‑512 function from the libvctrl_sha512 crate
+//!         let digest: [u8; 64] = libvctrl_sha512::Hash::hash(data);
 //!         Hash::from_bytes(&digest).expect("must produce 64 bytes")
 //!     }
 //! }

@@ -45,9 +45,7 @@
 //! // Valid names
 //! assert!(validate_name("hello").is_ok());
 //! assert!(validate_name("README.md").is_ok());
-//! assert!(validate_name("refs/heads/main").is_ok()); // '/' is allowed in ref names? No, wait...
-//! // Actually, '/' is forbidden. Let's correct:
-//! assert!(validate_name("refs-heads-main").is_ok());
+//! assert!(validate_name("refs-heads-main").is_ok()); // '/' is not allowed
 //!
 //! // Invalid names
 //! assert!(validate_name("").is_err());                  // empty
