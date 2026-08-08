@@ -1,5 +1,3 @@
-//! This module defines the core data structures that represent the version control
-//! let author = UserID::new("Alice".into(), "alice@example.com".into()).unwrap();
 use crate::constants::MAX_NAME_LENGTH;
 use crate::errors::VctrlError;
 

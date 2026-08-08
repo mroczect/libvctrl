@@ -1,15 +1,3 @@
-#![no_std]
-#![allow(
-    non_snake_case,
-    clippy::cast_lossless,
-    clippy::eq_op,
-    clippy::identity_op,
-    clippy::many_single_char_names,
-    clippy::unreadable_literal,
-    clippy::cargo_common_metadata
-)]
-//! A **self‑contained**, **zero‑dependency**, `#![no_std]` Rust implementation of the
-//! - **`#![no_std]` compatible** – works on bare‑metal, kernels, and
 pub mod hkdf;
 pub mod hmac;
 pub mod sha512;

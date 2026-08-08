@@ -1,4 +1,3 @@
-//! let tagger = UserID::new("Releaser".into(), "rel@example.com".into()).unwrap();
 use libvctrl_handler::{CommitMeta, Hash, Tag, UserID, VctrlError};
 
 #[derive(Debug, Default)]

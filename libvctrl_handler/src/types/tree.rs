@@ -1,11 +1,9 @@
-//! A `Tree` represents a directory (folder) in the version‑controlled repository.
 use crate::enums::EntryKind;
 use crate::errors::VctrlError;
 use crate::types::hash::Hash;
 
 use super::validate_name;
 
-///     .expect("valid entry");
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TreeEntry {
     name: String,
@@ -35,7 +33,6 @@ impl TreeEntry {
     }
 }
 
-/// let tree = Tree::new(vec![file, dir]).expect("sorted entries");
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tree {
     entries: Vec<TreeEntry>,

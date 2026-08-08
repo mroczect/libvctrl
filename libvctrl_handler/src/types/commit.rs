@@ -1,8 +1,3 @@
-//! The `Commit` type is the core version‑control object. It records a point‑in‑time
-//! # let author = UserID::new("Bob".into(), "bob@example.com".into()).unwrap();
-//! # let author = UserID::new("Bob".into(), "bob@example.com".into()).unwrap();
-//! # let author = UserID::new("Bob".into(), "bob@example.com".into()).unwrap();
-//! assert_eq!(commit.committer().email(), "bob@example.com");
 use crate::types::hash::Hash;
 use crate::types::user_id::UserID;
 
