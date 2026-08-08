@@ -1,7 +1,7 @@
 #![cfg(feature = "sha384")]
 #![no_std]
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use libvctrl_sha512::sha384;
 
 fn bench_sha384(c: &mut Criterion) {
