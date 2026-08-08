@@ -1,14 +1,14 @@
 //! Builder for [`Commit`] objects.
 
-use libvctrl_handler::{Commit, Hash, UserID};
+use libvctrl_handler::{Commit, Hash, UserID, VctrlError};
 
 /// Builder for [`Commit`] objects.
 ///
-/// All mandatory fields must be set before calling [`build`](CommitBuilder::build).
+/// All mandatory fields (tree, author, committer, message) must be set
+/// before calling [`build`](CommitBuilder::build).
 ///
-/// # Panics
-/// Panics if a required field is missing. This is intentional: plumbing
-/// code is expected to always set all fields before building.
+/// # Errors
+/// Returns a [`VctrlError`] if any required field is missing.
 #[derive(Debug, Default)]
 pub struct CommitBuilder {
     tree: Option<Hash>,
@@ -68,16 +68,21 @@ impl CommitBuilder {
 
     /// Builds the commit.
     ///
-    /// # Panics
-    /// Panics if any mandatory field is missing.
-    #[must_use]
-    pub fn build(self) -> Commit {
-        Commit::new(
-            self.tree.expect("tree not set"),
-            self.parents,
-            self.author.expect("author not set"),
-            self.committer.expect("committer not set"),
-            self.message.expect("message not set"),
-        )
+    /// # Errors
+    /// Returns `VctrlError::Other` if any mandatory field is missing.
+    pub fn build(self) -> Result<Commit, VctrlError> {
+        let tree = self
+            .tree
+            .ok_or_else(|| VctrlError::Other("tree is required".into()))?;
+        let author = self
+            .author
+            .ok_or_else(|| VctrlError::Other("author is required".into()))?;
+        let committer = self
+            .committer
+            .ok_or_else(|| VctrlError::Other("committer is required".into()))?;
+        let message = self
+            .message
+            .ok_or_else(|| VctrlError::Other("message is required".into()))?;
+        Ok(Commit::new(tree, self.parents, author, committer, message))
     }
 }
