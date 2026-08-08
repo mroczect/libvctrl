@@ -61,6 +61,15 @@
 //!    (consuming the state).  Use [`finalize_verify`](HMAC::finalize_verify)
 //!    for constant‑time verification without intermediate copies.
 //!
+//! ## When to use which pattern?
+//!
+//! - If the entire message fits in memory and is available at once, use the
+//!   one‑shot `mac` / `verify` functions. They are simpler and avoid
+//!   intermediate state handling.
+//! - If the message is streamed (e.g., reading a large file in chunks),
+//!   or if you need to process data incrementally before seeing the whole
+//!   input, use the streaming API.
+//!
 //! ## Example
 //!
 //! ```rust
@@ -288,8 +297,9 @@ impl HMAC {
     /// This computes `mac(input, k)` and compares it with `expected` in
     /// constant time.  It is equivalent to:
     ///
-    /// ```rust,ignore
-    /// verify(&HMAC::mac(input, k), expected)
+    /// ```rust
+    /// # use libvctrl_sha512::HMAC;
+    /// // verify(&HMAC::mac(input, k), expected)
     /// ```
     ///
     /// # Returns
