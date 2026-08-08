@@ -60,11 +60,15 @@ Once created, an instance is guaranteed to be valid.
 
 ### Macros
 
-- **`vctrl_error_other!`** – convenience macro for ad‑hoc `VctrlError::Other` messages.  
-  Example (not executed as a doc‑test):
-  ```rust,ignore
-  vctrl_error_other!("something went wrong: {}", 42);
+- **`vctrl_error_other!`** – convenience macro for ad‑hoc `VctrlError::Other` messages.
+
+  ```rust
+  use libvctrl_handler::vctrl_error_other;
+
+  let err = vctrl_error_other!("something went wrong: {}", 42);
+  assert_eq!(err.to_string(), "something went wrong: 42");
   ```
+
   Equivalent to `VctrlError::Other(format!(...))`.
 
 ---
@@ -188,8 +192,11 @@ Below is a concise summary of every public item.
 ### Macros
 
 - **`vctrl_error_other!`**
-  ```rust,ignore
-  vctrl_error_other!("something went wrong: {}", 42);
+  ```rust
+  use libvctrl_handler::vctrl_error_other;
+
+  let err = vctrl_error_other!("something went wrong: {}", 42);
+  assert_eq!(err.to_string(), "something went wrong: 42");
   ```
   Expands to `VctrlError::Other(format!(...))`.
 
