@@ -1,4 +1,43 @@
 //! Builder for [`Commit`] objects.
+//!
+//! A [`CommitBuilder`] constructs a [`Commit`] step by step. All mandatory
+//! fields (`tree`, `author`, `committer`, `message`) must be set before
+//! calling [`build`](CommitBuilder::build). If any required field is missing,
+//! an error is returned.
+//!
+//! # Why use a builder?
+//!
+//! Commits can have many parents, and the author and committer may be
+//! different. The builder pattern makes it clear which field is which,
+//! especially when method chaining:
+//!
+//! ```rust
+//! # use libvctrl_core::object::CommitBuilder;
+//! # use libvctrl_handler::*;
+//! let hash = Hash::from_bytes(&[0xAB; 64]).unwrap();
+//! let user = UserID::new("Alice".into(), "alice@example.com".into()).unwrap();
+//!
+//! let commit = CommitBuilder::new()
+//!     .tree(hash)
+//!     .parent(hash)          // first parent
+//!     .parent(hash)          // second parent
+//!     .author(user.clone())
+//!     .committer(user)
+//!     .message("Merge branch 'feature'")
+//!     .build()
+//!     .unwrap();
+//! ```
+//!
+//! # Error handling
+//!
+//! The `build()` method returns `Result<Commit, VctrlError>`. It will
+//! fail with `VctrlError::Other` if any of the required fields is missing.
+//! This is a deliberate design choice: instead of panicking, we give the
+//! caller a chance to handle the error gracefully.
+//!
+//! Note that the builder does **not** validate the content of hashes or
+//! user identities – those are already guaranteed to be valid by their
+//! own constructors in `libvctrl_handler`.
 
 use libvctrl_handler::{Commit, Hash, UserID, VctrlError};
 
@@ -9,6 +48,22 @@ use libvctrl_handler::{Commit, Hash, UserID, VctrlError};
 ///
 /// # Errors
 /// Returns a [`VctrlError`] if any required field is missing.
+///
+/// # Example
+///
+/// ```rust
+/// # use libvctrl_core::object::CommitBuilder;
+/// # use libvctrl_handler::*;
+/// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+/// let user = UserID::new("A".into(), "a@b.c".into()).unwrap();
+/// let commit = CommitBuilder::new()
+///     .tree(hash)
+///     .author(user.clone())
+///     .committer(user)
+///     .message("msg")
+///     .build()
+///     .unwrap();
+/// ```
 #[derive(Debug, Default)]
 pub struct CommitBuilder {
     tree: Option<Hash>,
