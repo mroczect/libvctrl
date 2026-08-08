@@ -1,6 +1,6 @@
 //! Integration tests untuk semua fitur.
 
-use libvctrl_sha512::{Hash, HKDF, HMAC};
+use libvctrl_sha512::{HKDF, HMAC, Hash};
 
 // ============================================================================
 // SHA512 Hash Tests

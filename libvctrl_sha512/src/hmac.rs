@@ -129,7 +129,7 @@ impl HMAC {
     /// # Arguments
     ///
     /// * `input` – The message to authenticate. Can be any type that implements
-    ///            `AsRef<[u8]>` (e.g., `&[u8]`, `&str`, `Vec<u8>`).
+    ///   `AsRef<[u8]>` (e.g., `&[u8]`, `&str`, `Vec<u8>`).
     /// * `k`     – The secret key. Same flexibility as `input`.
     ///
     /// # Returns
@@ -145,6 +145,7 @@ impl HMAC {
     /// ```
     ///
     /// # Security
+    ///
     /// This function does **not** verify the MAC; it only computes it. For
     /// verification, use `verify` or `finalize_verify`.
     #[inline]
@@ -198,6 +199,7 @@ impl HMAC {
     /// ```
     ///
     /// # Key Handling
+    ///
     /// If the key is longer than 128 bytes, it is first hashed using SHA-512 to
     /// reduce it to 64 bytes, then padded to 128 bytes. This follows the HMAC
     /// specification.

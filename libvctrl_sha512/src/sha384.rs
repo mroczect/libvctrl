@@ -30,6 +30,22 @@
 //! enabled by default). To disable it, add `default-features = false` to your
 //! `Cargo.toml` dependency.
 //!
+//! ## Security Notes
+//!
+//! - SHA‑384 is considered secure and is not known to be broken.
+//! - The HMAC implementation uses constant‑time verification to resist timing
+//!   attacks.
+//! - HKDF provides domain separation via the `info` parameter; always use distinct
+//!   `info` strings for different purposes.
+//!
+//! ## Performance
+//!
+//! - SHA‑384 is about as fast as SHA‑512 on 64‑bit hardware because it uses the
+//!   same compression function, only the initial state differs.
+//! - HMAC‑SHA384 requires two hash passes (inner and outer), similar to SHA‑512.
+//! - For bulk hashing, the `hash` function is optimized for short inputs; for
+//!   very large data, use the streaming API.
+//!
 //! ## Examples
 //!
 //! ### SHA‑384 hashing
@@ -75,14 +91,6 @@
 //! // `okm` is a 32‑byte derived key.
 //! ```
 //!
-//! ## Security Notes
-//!
-//! - SHA‑384 is considered secure and is not known to be broken.
-//! - The HMAC implementation uses constant‑time verification to resist timing
-//!   attacks.
-//! - HKDF provides domain separation via the `info` parameter; always use distinct
-//!   `info` strings for different purposes.
-//!
 //! ## References
 //!
 //! - [FIPS 180-4: Secure Hash Standard (SHS)](https://csrc.nist.gov/publications/detail/fips/180/4/final)
@@ -97,14 +105,11 @@ use crate::utils::verify;
 #[inline]
 fn new_state() -> State {
     const IV: [u8; 64] = [
-        0xcb, 0xbb, 0x9d, 0x5d, 0xc1, 0x05, 0x9e, 0xd8,
-        0x62, 0x9a, 0x29, 0x2a, 0x36, 0x7c, 0xd5, 0x07,
-        0x91, 0x59, 0x01, 0x5a, 0x30, 0x70, 0xdd, 0x17,
-        0x15, 0x2f, 0xec, 0xd8, 0xf7, 0x0e, 0x59, 0x39,
-        0x67, 0x33, 0x26, 0x67, 0xff, 0xc0, 0x0b, 0x31,
-        0x8e, 0xb4, 0x4a, 0x87, 0x68, 0x58, 0x15, 0x11,
-        0xdb, 0x0c, 0x2e, 0x0d, 0x64, 0xf9, 0x8f, 0xa7,
-        0x47, 0xb5, 0x48, 0x1d, 0xbe, 0xfa, 0x4f, 0xa4,
+        0xcb, 0xbb, 0x9d, 0x5d, 0xc1, 0x05, 0x9e, 0xd8, 0x62, 0x9a, 0x29, 0x2a, 0x36, 0x7c, 0xd5,
+        0x07, 0x91, 0x59, 0x01, 0x5a, 0x30, 0x70, 0xdd, 0x17, 0x15, 0x2f, 0xec, 0xd8, 0xf7, 0x0e,
+        0x59, 0x39, 0x67, 0x33, 0x26, 0x67, 0xff, 0xc0, 0x0b, 0x31, 0x8e, 0xb4, 0x4a, 0x87, 0x68,
+        0x58, 0x15, 0x11, 0xdb, 0x0c, 0x2e, 0x0d, 0x64, 0xf9, 0x8f, 0xa7, 0x47, 0xb5, 0x48, 0x1d,
+        0xbe, 0xfa, 0x4f, 0xa4,
     ];
     let mut t = [0u64; 8];
     for (i, e) in t.iter_mut().enumerate() {
@@ -163,7 +168,9 @@ impl Hash {
     /// This method can be called multiple times to process a message in chunks.
     ///
     /// # Arguments
-    /// * `input` – The chunk of data to hash.
+    ///
+    /// * `input` – The chunk of data to hash. Any type that implements
+    ///   `AsRef<[u8]>` is accepted.
     ///
     /// # Example
     /// ```
@@ -184,6 +191,7 @@ impl Hash {
     /// Consumes the hasher and returns the SHA‑384 hash of all absorbed data.
     ///
     /// # Returns
+    ///
     /// A `[u8; 48]` array containing the digest.
     ///
     /// # Example
@@ -205,9 +213,11 @@ impl Hash {
     /// the input, and finalizes it in one step.
     ///
     /// # Arguments
+    ///
     /// * `input` – The data to hash (any `AsRef<[u8]>`).
     ///
     /// # Returns
+    ///
     /// The 48‑byte hash digest.
     ///
     /// # Example
@@ -256,10 +266,12 @@ impl HMAC {
     /// Computes the HMAC‑SHA384 of a message in one shot.
     ///
     /// # Arguments
+    ///
     /// * `input` – The message to authenticate.
     /// * `k`     – The secret key.
     ///
     /// # Returns
+    ///
     /// A 48‑byte MAC.
     ///
     /// # Example
@@ -281,7 +293,15 @@ impl HMAC {
     /// Keys shorter are zero‑padded.
     ///
     /// # Arguments
-    /// * `k` – The secret key.
+    ///
+    /// * `k` – The secret key. Any `AsRef<[u8]>` is accepted.
+    ///
+    /// # Key Handling
+    ///
+    /// This follows the HMAC specification: if the key is longer than the
+    /// hash block size (128 bytes), it is first hashed using SHA‑384 (which
+    /// produces 48 bytes), then padded to 128 bytes. Otherwise, the key is
+    /// zero‑padded to the block size.
     #[inline]
     pub fn new(k: impl AsRef<[u8]>) -> Self {
         let k = k.as_ref();
@@ -304,6 +324,7 @@ impl HMAC {
     /// Absorbs more data into the HMAC state.
     ///
     /// # Arguments
+    ///
     /// * `input` – The chunk of data to authenticate.
     #[inline]
     pub fn update(&mut self, input: impl AsRef<[u8]>) {
@@ -312,7 +333,12 @@ impl HMAC {
 
     /// Finalizes the HMAC computation and returns the 48‑byte MAC.
     ///
-    /// This consumes the instance.
+    /// This consumes the instance; after calling this, the HMAC cannot be
+    /// used further.
+    ///
+    /// # Returns
+    ///
+    /// A `[u8; 48]` array containing the HMAC‑SHA384.
     #[inline]
     pub fn finalize(mut self) -> [u8; 48] {
         for p in self.padded.iter_mut() {
@@ -326,12 +352,15 @@ impl HMAC {
 
     /// Finalizes and verifies the computed MAC against an expected value.
     ///
-    /// Comparison is constant‑time.
+    /// The comparison is performed in **constant time**, protecting against
+    /// timing side‑channel attacks.
     ///
     /// # Arguments
+    ///
     /// * `expected` – The expected 48‑byte MAC.
     ///
     /// # Returns
+    ///
     /// `true` if the MAC matches, `false` otherwise.
     #[inline]
     pub fn finalize_verify(self, expected: &[u8; 48]) -> bool {
@@ -341,12 +370,17 @@ impl HMAC {
 
     /// One‑shot verification of a message's HMAC.
     ///
+    /// This is a convenience function that computes the MAC and compares it
+    /// to the expected value in constant time.
+    ///
     /// # Arguments
+    ///
     /// * `input`    – The message.
     /// * `k`        – The key.
     /// * `expected` – The expected MAC.
     ///
     /// # Returns
+    ///
     /// `true` if the MAC matches, `false` otherwise.
     #[inline]
     pub fn verify<T: AsRef<[u8]>, U: AsRef<[u8]>>(input: T, k: U, expected: &[u8; 48]) -> bool {
@@ -378,14 +412,21 @@ impl HKDF {
     /// HKDF‑Extract: produces a 48‑byte pseudorandom key from the input keying material.
     ///
     /// # Arguments
-    /// * `salt` – Optional salt value (can be empty).
-    /// * `ikm`  – Input keying material.
+    ///
+    /// * `salt` – Optional salt value (can be empty). A non‑secret random value
+    ///   is recommended for best security, but a static salt is acceptable if the
+    ///   IKM already has sufficient entropy.
+    /// * `ikm`  – Input keying material. This is the secret value to be
+    ///   derived (e.g., a shared secret from a key exchange).
     ///
     /// # Returns
-    /// A 48‑byte PRK.
+    ///
+    /// A 48‑byte pseudorandom key (PRK).
     ///
     /// # Security
-    /// Use a random salt when possible for maximum security.
+    ///
+    /// Use a random salt when possible to achieve maximum security. The salt
+    /// is not secret and can be stored alongside the ciphertext.
     #[inline]
     pub fn extract(salt: impl AsRef<[u8]>, ikm: impl AsRef<[u8]>) -> [u8; 48] {
         HMAC::mac(ikm, salt)
@@ -394,20 +435,32 @@ impl HKDF {
     /// HKDF‑Expand: derives output keying material of the requested length.
     ///
     /// # Arguments
-    /// * `out` – Mutable slice to fill with derived key material.
-    /// * `prk` – Pseudorandom key (from the extract step).
-    /// * `info` – Optional context information (can be empty).
+    ///
+    /// * `out` – Mutable slice to fill with derived key material. The length
+    ///   of this slice determines how many bytes are produced.
+    /// * `prk` – Pseudorandom key (from the extract step). Must be 48 bytes
+    ///   when using SHA‑384.
+    /// * `info` – Optional context information (can be empty). This provides
+    ///   domain separation: use distinct `info` for different purposes.
     ///
     /// # Panics
-    /// Panics if the requested output length exceeds `255 * 48 = 12240` bytes.
+    ///
+    /// Panics if the requested output length exceeds `255 * 48 = 12240` bytes,
+    /// as per RFC 5869.
     ///
     /// # Security
-    /// Use distinct `info` strings for different contexts to ensure domain separation.
+    ///
+    /// Always use distinct `info` strings for different contexts to ensure
+    /// that keys are not reused across applications. The output is deterministic
+    /// given the same `prk`, `info`, and output length.
     #[inline]
     pub fn expand(out: &mut [u8], prk: impl AsRef<[u8]>, info: impl AsRef<[u8]>) {
         let info = info.as_ref();
         let mut counter: u8 = 1;
-        assert!(out.len() < 0xff * 48, "Requested output length exceeds RFC 5869 limit (12240 bytes)");
+        assert!(
+            out.len() < 0xff * 48,
+            "Requested output length exceeds RFC 5869 limit (12240 bytes)"
+        );
         let mut i = 0;
         while i < out.len() {
             let mut hmac = HMAC::new(&prk);

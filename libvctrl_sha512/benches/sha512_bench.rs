@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use libvctrl_sha512::{Hash, HKDF, HMAC};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use libvctrl_sha512::{HKDF, HMAC, Hash};
 
 fn bench_sha512(c: &mut Criterion) {
     let data = [0x42u8; 1024];

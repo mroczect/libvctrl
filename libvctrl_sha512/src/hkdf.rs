@@ -120,9 +120,9 @@ impl HKDF {
     /// # Arguments
     ///
     /// * `salt` – An optional salt value. This should be a non‑secret random string,
-    ///           but can be empty or static. It is used to "strengthen" the IKM.
+    ///   but can be empty or static. It is used to "strengthen" the IKM.
     /// * `ikm`  – The input keying material. This is the secret value to be derived.
-    ///            It can be any byte sequence (e.g., DH shared secret, master key).
+    ///   It can be any byte sequence (e.g., DH shared secret, master key).
     ///
     /// # Returns
     ///
@@ -158,10 +158,10 @@ impl HKDF {
     /// # Arguments
     ///
     /// * `out` – A mutable slice that will be filled with the derived key material.
-    ///           The length of `out` determines how many bytes are produced.
+    ///   The length of `out` determines how many bytes are produced.
     /// * `prk` – The pseudorandom key (64 bytes) from the extract step.
     /// * `info` – Optional context and application‑specific information.
-    ///            This provides domain separation. It can be empty.
+    ///   This provides domain separation. It can be empty.
     ///
     /// # Panics
     ///
@@ -200,7 +200,10 @@ impl HKDF {
         let info = info.as_ref();
         let mut counter: u8 = 1;
         // RFC 5869: L <= 255 * HashLen
-        assert!(out.len() < 0xff * 64, "Requested output length exceeds RFC 5869 limit (16320 bytes)");
+        assert!(
+            out.len() < 0xff * 64,
+            "Requested output length exceeds RFC 5869 limit (16320 bytes)"
+        );
         let mut i = 0;
         while i < out.len() {
             let mut hmac = HMAC::new(&prk);

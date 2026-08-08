@@ -1,10 +1,9 @@
 [package]
 name = "libvctrl_sha512"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-description = "Zero-dependency SHA512, HMAC-SHA512, HKDF-SHA512, and optional SHA384 (fork of hmac-sha512 by Frank Denis)"
+description = "Zero-dependency SHA512, HMAC-SHA512, HKDF-SHA512, and optional SHA384"
 license = "ISC"
-license-file = "LICENSE"
 authors = ["mroczect"]
 repository = "https://github.com/mroczect/libvctrl"
 readme = "README.md"
@@ -31,12 +30,3 @@ name = "sha384_bench"
 harness = false
 path = "benches/sha384_bench.rs"
 required-features = ["sha384"]
-
-[profile.release]
-lto = true
-panic = "abort"
-opt-level = 3
-
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
