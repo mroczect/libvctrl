@@ -4,7 +4,9 @@
 //! trait. The format is designed to be simple, predictable, and easy to
 //! implement in any language.
 
-use libvctrl_handler::{Blob, Commit, Encoder, EntryKind, Tag, Tree, VctrlError};
+use libvctrl_handler::{
+    Blob, Commit, Encoder, EntryKind, MAX_MESSAGE_LENGTH, Tag, Tree, VctrlError,
+};
 
 /// Current binary format version.
 ///
@@ -147,6 +149,11 @@ impl Encoder for BinaryEncoder {
         let msg = commit.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
+        if msg_len as usize > MAX_MESSAGE_LENGTH {
+            return Err(VctrlError::SerializationError(
+                "commit message exceeds size limit".into(),
+            ));
+        }
         out.extend_from_slice(&msg_len.to_le_bytes());
         out.extend_from_slice(msg.as_bytes());
         Ok(out)
