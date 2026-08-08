@@ -1,4 +1,14 @@
 //! `tests/codec_roundtrip.rs`
+//!
+//! Integration tests for the binary codec.
+//!
+//! These tests verify:
+//! - Successful round‑tripping of all object types.
+//! - Proper error handling on corrupted or malicious input.
+//! - Version byte acceptance/rejection.
+//!
+//! The current binary format version is **2**.
+
 use libvctrl_core::codec::{BinaryDecoder, BinaryEncoder};
 use libvctrl_handler::{
     Blob, Commit, Decoder, Encoder, EntryKind, Hash, Tag, Tree, TreeEntry, UserID,
@@ -23,7 +33,7 @@ fn blob_of_size(size: usize) -> Blob {
     Blob::new(vec![0x42; size])
 }
 
-/// A valid tree with `n` entries named "e1", "e2", …
+/// A valid tree with `n` entries named "`entry_000`", "`entry_001`", …
 fn tree_with_n_entries(n: usize) -> Tree {
     let mut entries = Vec::with_capacity(n);
     for i in 0..n {
@@ -33,13 +43,13 @@ fn tree_with_n_entries(n: usize) -> Tree {
     Tree::new(entries).unwrap()
 }
 
-/// A minimal valid commit with no parents.
+/// A minimal valid commit with no parents and default metadata.
 fn minimal_commit() -> Commit {
     let user = UserID::new("author".into(), "author@example.com".into()).unwrap();
     Commit::new(dummy_hash(), vec![], user.clone(), user, "message".into())
 }
 
-/// A lightweight tag.
+/// A lightweight tag with default metadata.
 fn lightweight_tag(name: &str) -> Tag {
     Tag::new(name.into(), dummy_hash(), None, String::new()).unwrap()
 }
@@ -134,6 +144,10 @@ mod roundtrip_success {
         assert_eq!(dec.author().name(), "author");
         assert_eq!(dec.committer().name(), "author");
         assert_eq!(dec.message(), "message");
+        // Metadata default: timestamp=0, timezone_offset=0, encoding=None
+        assert_eq!(dec.timestamp(), 0);
+        assert_eq!(dec.timezone_offset(), 0);
+        assert!(dec.encoding().is_none());
     }
 
     #[test]
@@ -167,6 +181,10 @@ mod roundtrip_success {
         assert_eq!(dec.name(), "v0.1");
         assert!(dec.tagger().is_none());
         assert!(dec.message().is_empty());
+        // Metadata default
+        assert_eq!(dec.timestamp(), 0);
+        assert_eq!(dec.timezone_offset(), 0);
+        assert!(dec.encoding().is_none());
     }
 
     #[test]
@@ -225,7 +243,7 @@ mod error_handling {
 
     #[test]
     fn blob_missing_length() {
-        let mut data = vec![0x01]; // version byte only
+        let mut data = vec![0x02]; // version byte only
         assert!(BinaryDecoder.decode_blob(&data).is_err());
         data.extend_from_slice(&[0; 4]); // only 4 of 8 length bytes
         assert!(BinaryDecoder.decode_blob(&data).is_err());
@@ -243,7 +261,7 @@ mod error_handling {
     fn blob_length_exceeds_max() {
         // Craft an encoding with length = MAX_BLOB_SIZE + 1
         let over_size = libvctrl_handler::MAX_BLOB_SIZE + 1;
-        let mut bytes = vec![0x01u8]; // version
+        let mut bytes = vec![0x02u8]; // version 2
         bytes.extend_from_slice(&(over_size as u64).to_le_bytes());
         bytes.extend(vec![0x00; over_size]); // actual data of that length
         // But decoder should reject because length exceeds limit
@@ -257,7 +275,7 @@ mod error_handling {
 
     #[test]
     fn tree_missing_entry_count() {
-        let mut enc = vec![0x01]; // version only
+        let mut enc = vec![0x02]; // version only
         assert!(BinaryDecoder.decode_tree(&enc).is_err());
         enc.push(0x00); // only 1 byte, not 4
         assert!(BinaryDecoder.decode_tree(&enc).is_err());
@@ -266,7 +284,7 @@ mod error_handling {
     #[test]
     fn tree_entry_count_exceeds_max() {
         let over = libvctrl_handler::MAX_TREE_ENTRIES + 1;
-        let mut enc = vec![0x01u8];
+        let mut enc = vec![0x02u8];
         enc.extend_from_slice(
             &u32::try_from(over)
                 .expect("MAX_TREE_ENTRIES is small enough to fit in u32")
@@ -290,7 +308,7 @@ mod error_handling {
         // Build a tree with one entry, then corrupt the kind byte
         let tree = tree_with_n_entries(1);
         let mut enc = BinaryEncoder.encode_tree(&tree).unwrap();
-        // The kind byte follows the name. For entry "entry_000" (9 chars), layout:
+        // The kind byte follows the name. For entry "`entry_000`" (9 chars), layout:
         // [1b ver][4b count][1b name_len(9)][9b name][1b kind][64b hash]
         let kind_pos = 6 + 9;
         enc[kind_pos] = 99; // invalid kind
@@ -343,6 +361,7 @@ mod error_handling {
     fn commit_message_truncated() {
         let mut enc = valid_commit_encoding();
         // The message length is stored near the end (last 4 bytes before message). Remove the message bytes.
+        // But now there's extra metadata after message. So we truncate inside the message.
         enc.truncate(enc.len() - 2); // truncate inside message
         assert!(BinaryDecoder.decode_commit(&enc).is_err());
     }
@@ -426,13 +445,13 @@ mod version_handling {
     fn correct_version_accepted() {
         let blob = blob_of_size(0);
         let enc = BinaryEncoder.encode_blob(&blob).unwrap();
-        assert_eq!(enc[0], 1);
+        assert_eq!(enc[0], 2); // version 2
         assert!(BinaryDecoder.decode_blob(&enc).is_ok());
     }
 
     #[test]
     fn wrong_version_rejected() {
-        let mut enc = vec![0x02u8]; // unsupported version
+        let mut enc = vec![0x01u8]; // unsupported version (1)
         enc.extend_from_slice(&0u64.to_le_bytes()); // length 0
         assert!(BinaryDecoder.decode_blob(&enc).is_err());
 
