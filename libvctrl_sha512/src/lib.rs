@@ -19,6 +19,23 @@
 //! resource‑constrained or bare‑metal environments, as well as in standard
 //! applications that require **auditable**, **minimal dependency** code.
 //!
+//! ## Why this crate?
+//!
+//! - **Zero external dependencies** – only the Rust `core` library, no `std`,
+//!   no `alloc`. This minimises the attack surface and simplifies supply‑chain
+//!   audits.
+//! - **FIPS 180‑4 / RFC 2104 / RFC 5869 compliant** – output matches official
+//!   test vectors.
+//! - **Constant‑time where it matters** – MAC and hash verification use a
+//!   data‑independent comparison with a volatile read barrier to prevent
+//!   timing side‑channels.
+//! - **Memory zeroisation** – secret key material is overwritten in memory
+//!   after use, both in one‑shot and streaming APIs.
+//! - **`#![no_std]` compatible** – works on bare‑metal, kernels, and
+//!   WebAssembly.
+//! - **Optional SHA‑384** – feature‑gated, shares the same compression
+//!   function.
+//!
 //! ## Compliance & Auditing
 //!
 //! The implementation has undergone a security audit (v0.2.0) with all findings
