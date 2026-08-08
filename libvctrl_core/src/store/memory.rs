@@ -131,3 +131,58 @@ impl ObjectStore for MemoryStore {
         Ok(self.objects.contains_key(hash))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libvctrl_handler::{HASH_LENGTH, Hash, ObjectStore};
+
+    fn dummy_hash(byte: u8) -> Hash {
+        let mut arr = [byte; HASH_LENGTH];
+        arr[0] = byte; // ensure uniqueness
+        Hash::from_bytes(&arr).unwrap()
+    }
+
+    #[test]
+    fn put_and_get() {
+        let mut store = MemoryStore::new();
+        let hash = dummy_hash(1);
+        let data = b"hello world";
+        store.put(&hash, data).unwrap();
+        assert!(store.exists(&hash).unwrap());
+        assert_eq!(store.get(&hash).unwrap(), data);
+    }
+
+    #[test]
+    fn get_non_existent_returns_error() {
+        let store = MemoryStore::new();
+        let hash = dummy_hash(2);
+        assert!(store.get(&hash).is_err());
+        assert!(!store.exists(&hash).unwrap());
+    }
+
+    #[test]
+    fn delete_existing_object() {
+        let mut store = MemoryStore::new();
+        let hash = dummy_hash(3);
+        store.put(&hash, b"data").unwrap();
+        store.delete(&hash).unwrap();
+        assert!(!store.exists(&hash).unwrap());
+    }
+
+    #[test]
+    fn delete_non_existent_is_noop() {
+        let mut store = MemoryStore::new();
+        let hash = dummy_hash(4);
+        assert!(store.delete(&hash).is_ok()); // must not panic
+    }
+
+    #[test]
+    fn put_overwrites() {
+        let mut store = MemoryStore::new();
+        let hash = dummy_hash(5);
+        store.put(&hash, b"old").unwrap();
+        store.put(&hash, b"new").unwrap();
+        assert_eq!(store.get(&hash).unwrap(), b"new");
+    }
+}

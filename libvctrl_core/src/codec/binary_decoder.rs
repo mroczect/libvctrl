@@ -255,7 +255,15 @@ impl Decoder for BinaryDecoder {
                 "missing tagger presence byte".into(),
             ));
         }
-        let has_tagger = data[pos] == 1;
+        let has_tagger = match data[pos] {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(VctrlError::CorruptedData(
+                    "invalid tagger presence byte".into(),
+                ));
+            }
+        };
         pos += 1;
         let tagger = if has_tagger {
             if pos >= data.len() {
@@ -293,7 +301,7 @@ impl Decoder for BinaryDecoder {
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
         if msg_len > MAX_MESSAGE_LENGTH {
-            return Err(VctrlError::CorruptedData(
+            return Err(VctrlError::SerializationError(
                 "tag message exceeds size limit".into(),
             ));
         }
