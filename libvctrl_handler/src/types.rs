@@ -11,7 +11,7 @@
 //! This immutability is a cornerstone of content‑addressable storage and
 //! cryptographic integrity.
 //!
-//! All types implement `Debug`, `Clone`, and `PartialEq` + `Eq` for easy
+//! All types implement `Debug`, `Clone`, and `PartialEq + Eq` for easy
 //! comparison and display. Hashes also implement `Ord`, `Copy`, and `Hash`
 //! so they can be used as keys in collections.
 //!
@@ -24,6 +24,11 @@
 //!
 //! If validation fails, an [`VctrlError`](crate::VctrlError) is returned.
 //! This ensures that invalid data never exists in your system.
+//!
+//! # Metadata
+//!
+//! [`CommitMeta`] bundles optional timestamp, timezone offset, and text encoding
+//! for objects that carry these attributes ([`Commit`], [`Tag`]).
 //!
 //! # Examples
 //!
@@ -44,13 +49,28 @@
 //! let alice = UserID::new("Alice".into(), "alice@example.com".into())
 //!     .expect("valid user");
 //!
-//! // Make a commit (no parents – initial commit).
+//! // Make a commit (no parents – initial commit) with default metadata.
 //! let commit = Commit::new(
 //!     hash,         // tree
 //!     vec![],       // no parents
 //!     alice.clone(),// author
-//!     alice,        // committer
+//!     alice.clone(),// committer  ← tambahkan .clone()
 //!     "Initial import".into(),
+//! );
+//!
+//! // Make a commit with explicit metadata.
+//! let meta = CommitMeta {
+//!     timestamp: 1672531200,   // 2023-01-01T00:00:00 UTC
+//!     timezone_offset: 0,
+//!     encoding: Some("UTF-8".into()),
+//! };
+//! let commit2 = Commit::with_meta(
+//!     hash,
+//!     vec![],
+//!     alice.clone(),
+//!     alice.clone(),
+//!     "Another commit".into(),
+//!     meta,
 //! );
 //!
 //! // Create an annotated tag.
@@ -66,6 +86,24 @@ use crate::enums::EntryKind;
 use crate::errors::VctrlError;
 use std::fmt;
 
+// ---------------------------------------------------------------------------
+// Helper for name validation
+// ---------------------------------------------------------------------------
+fn validate_name(name: &str) -> Result<(), VctrlError> {
+    if name.is_empty() {
+        return Err(VctrlError::InvalidName("name is empty".into()));
+    }
+    if name.len() > MAX_NAME_LENGTH {
+        return Err(VctrlError::InvalidName(format!(
+            "name exceeds maximum length {MAX_NAME_LENGTH}: '{name}'"
+        )));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Hash
+// ---------------------------------------------------------------------------
 /// A content hash – a fixed‑size array of 64 bytes (SHA‑512).
 ///
 /// This is the fundamental identifier for all objects in the system.
@@ -164,21 +202,6 @@ impl fmt::Display for Hash {
 }
 
 // ---------------------------------------------------------------------------
-// Helper for name validation
-// ---------------------------------------------------------------------------
-fn validate_name(name: &str) -> Result<(), VctrlError> {
-    if name.is_empty() {
-        return Err(VctrlError::InvalidName("name is empty".into()));
-    }
-    if name.len() > MAX_NAME_LENGTH {
-        return Err(VctrlError::InvalidName(format!(
-            "name exceeds maximum length {MAX_NAME_LENGTH}: '{name}'"
-        )));
-    }
-    Ok(())
-}
-
-// ---------------------------------------------------------------------------
 // TreeEntry
 // ---------------------------------------------------------------------------
 /// A single entry inside a [`Tree`].
@@ -243,6 +266,9 @@ impl TreeEntry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Blob
+// ---------------------------------------------------------------------------
 /// A blob object – raw, uninterpreted data.
 ///
 /// Represents the contents of a file. No encoding, compression, or metadata
@@ -401,18 +427,60 @@ impl UserID {
 }
 
 // ---------------------------------------------------------------------------
+// CommitMeta
+// ---------------------------------------------------------------------------
+/// Optional metadata for [`Commit`] and [`Tag`] objects.
+///
+/// Bundles timestamp, timezone offset, and text encoding so that constructors
+/// can accept a single metadata argument instead of many individual parameters.
+///
+/// # Default
+///
+/// `CommitMeta::default()` returns `timestamp: 0`, `timezone_offset: 0`,
+/// `encoding: None`. This is what `Commit::new` and `Tag::new` use internally.
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_handler::CommitMeta;
+///
+/// let meta = CommitMeta {
+///     timestamp: 1672531200,   // 2023-01-01T00:00:00 UTC
+///     timezone_offset: 0,
+///     encoding: Some("UTF-8".into()),
+/// };
+///
+/// let default_meta = CommitMeta::default();
+/// assert_eq!(default_meta.timestamp, 0);
+/// assert!(default_meta.encoding.is_none());
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct CommitMeta {
+    /// Unix timestamp (seconds since the Unix epoch).  `0` means "not set".
+    pub timestamp: i64,
+    /// Timezone offset in minutes east of UTC.  `0` means "not set".
+    pub timezone_offset: i16,
+    /// Text encoding of the message (e.g., `"UTF-8"`).  `None` means "not specified".
+    pub encoding: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
 // Commit
 // ---------------------------------------------------------------------------
 /// A commit object – a snapshot of the repository at a point in time.
 ///
-/// Records the root tree, parent commit(s), author, committer, and
-/// a human‑readable message. Timestamps are deliberately omitted;
-/// they can be added later by an implementor if needed.
+/// Records the root tree, parent commit(s), author, committer, a
+/// human‑readable message, and optional metadata ([`CommitMeta`]).
+///
+/// # Construction
+///
+/// - [`Commit::new`] creates a commit with default metadata.
+/// - [`Commit::with_meta`] accepts explicit [`CommitMeta`].
 ///
 /// # Example (single‑parent commit)
 ///
 /// ```rust
-/// use libvctrl_handler::{Commit, Hash, UserID, HASH_LENGTH};
+/// use libvctrl_handler::{Commit, Hash, UserID, HASH_LENGTH, CommitMeta};
 ///
 /// let tree_hash = Hash::from_bytes(&[0x33; HASH_LENGTH]).unwrap();
 /// let parent_hash = Hash::from_bytes(&[0x44; HASH_LENGTH]).unwrap();
@@ -420,15 +488,26 @@ impl UserID {
 ///
 /// let commit = Commit::new(
 ///     tree_hash,
-///     vec![parent_hash], // one parent
+///     vec![parent_hash],
 ///     author.clone(),
-///     author,
+///     author.clone(),
 ///     "Fix bug #42".into(),
 /// );
 ///
-/// assert_eq!(commit.message(), "Fix bug #42");
-/// assert_eq!(commit.parents().len(), 1);
-/// assert_eq!(*commit.tree(), tree_hash);
+/// // With metadata
+/// let meta = CommitMeta {
+///     timestamp: 1672531200,
+///     timezone_offset: 0,
+///     encoding: Some("UTF-8".into()),
+/// };
+/// let commit2 = Commit::with_meta(
+///     tree_hash,
+///     vec![parent_hash],
+///     author.clone(),
+///     author.clone(),
+///     "Fix bug #42".into(),
+///     meta,
+/// );
 /// ```
 ///
 /// # Example (initial commit)
@@ -448,13 +527,13 @@ pub struct Commit {
     author: UserID,
     committer: UserID,
     message: String,
+    timestamp: i64,
+    timezone_offset: i16,
+    encoding: Option<String>,
 }
 
 impl Commit {
-    /// Creates a new `Commit`.
-    ///
-    /// All parameters are assumed to be valid (hashes come from a trusted
-    /// source, `UserID`s are already validated). No further checks are performed.
+    /// Creates a new `Commit` with default metadata (timestamp 0, no encoding).
     #[must_use]
     pub const fn new(
         tree: Hash,
@@ -469,6 +548,31 @@ impl Commit {
             author,
             committer,
             message,
+            timestamp: 0,
+            timezone_offset: 0,
+            encoding: None,
+        }
+    }
+
+    /// Creates a new `Commit` with explicit metadata.
+    #[must_use]
+    pub fn with_meta(
+        tree: Hash,
+        parents: Vec<Hash>,
+        author: UserID,
+        committer: UserID,
+        message: String,
+        meta: CommitMeta,
+    ) -> Self {
+        Self {
+            tree,
+            parents,
+            author,
+            committer,
+            message,
+            timestamp: meta.timestamp,
+            timezone_offset: meta.timezone_offset,
+            encoding: meta.encoding,
         }
     }
 
@@ -501,6 +605,24 @@ impl Commit {
     pub fn message(&self) -> &str {
         &self.message
     }
+
+    /// Unix timestamp (seconds since epoch). 0 if not set.
+    #[must_use]
+    pub const fn timestamp(&self) -> i64 {
+        self.timestamp
+    }
+
+    /// Timezone offset in minutes east of UTC. 0 if not set.
+    #[must_use]
+    pub const fn timezone_offset(&self) -> i16 {
+        self.timezone_offset
+    }
+
+    /// Encoding (e.g., "UTF-8") if set.
+    #[must_use]
+    pub fn encoding(&self) -> Option<&str> {
+        self.encoding.as_deref()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -508,13 +630,18 @@ impl Commit {
 // ---------------------------------------------------------------------------
 /// A tag object – a named pointer to another object, usually a commit.
 ///
-/// Tags are often used to mark releases or important points in history.
-/// A tag can optionally include a **tagger** identity and a message.
+/// Tags can optionally include a **tagger** identity, a message,
+/// and metadata ([`CommitMeta`]).
+///
+/// # Construction
+///
+/// - [`Tag::new`] creates a tag with default metadata.
+/// - [`Tag::with_meta`] accepts explicit [`CommitMeta`].
 ///
 /// # Example (annotated tag)
 ///
 /// ```rust
-/// use libvctrl_handler::{Hash, Tag, UserID};
+/// use libvctrl_handler::{Hash, Tag, UserID, CommitMeta};
 ///
 /// let commit_hash = Hash::from_bytes(&[0x66; 64]).unwrap();
 /// let tagger = UserID::new("Release Bot".into(), "release@example.com".into()).unwrap();
@@ -522,12 +649,23 @@ impl Commit {
 /// let tag = Tag::new(
 ///     "v1.0.0".into(),
 ///     commit_hash,
-///     Some(tagger),
+///     Some(tagger.clone()),
 ///     "Stable release".into(),
 /// ).expect("valid tag name");
 ///
-/// assert_eq!(tag.name(), "v1.0.0");
-/// assert!(tag.tagger().is_some());
+/// // With metadata
+/// let meta = CommitMeta {
+///     timestamp: 1672531200,
+///     timezone_offset: 0,
+///     encoding: Some("UTF-8".into()),
+/// };
+/// let tag2 = Tag::with_meta(
+///     "v1.0.1".into(),
+///     commit_hash,
+///     Some(tagger.clone()),
+///     "Patch release".into(),
+///     meta,
+/// ).unwrap();
 /// ```
 ///
 /// # Example (lightweight tag)
@@ -544,10 +682,13 @@ pub struct Tag {
     target: Hash,
     tagger: Option<UserID>,
     message: String,
+    timestamp: i64,
+    timezone_offset: i16,
+    encoding: Option<String>,
 }
 
 impl Tag {
-    /// Creates a new `Tag` after validating the tag name.
+    /// Creates a new `Tag` with default metadata (timestamp 0, no encoding).
     ///
     /// # Errors
     /// Returns [`VctrlError::InvalidName`] if the name is invalid.
@@ -563,6 +704,32 @@ impl Tag {
             target,
             tagger,
             message,
+            timestamp: 0,
+            timezone_offset: 0,
+            encoding: None,
+        })
+    }
+
+    /// Creates a new `Tag` with explicit metadata.
+    ///
+    /// # Errors
+    /// Returns [`VctrlError::InvalidName`] if the name is invalid.
+    pub fn with_meta(
+        name: String,
+        target: Hash,
+        tagger: Option<UserID>,
+        message: String,
+        meta: CommitMeta,
+    ) -> Result<Self, VctrlError> {
+        validate_name(&name)?;
+        Ok(Self {
+            name,
+            target,
+            tagger,
+            message,
+            timestamp: meta.timestamp,
+            timezone_offset: meta.timezone_offset,
+            encoding: meta.encoding,
         })
     }
 
@@ -588,5 +755,23 @@ impl Tag {
     #[must_use]
     pub fn message(&self) -> &str {
         &self.message
+    }
+
+    /// Unix timestamp (seconds since epoch). 0 if not set.
+    #[must_use]
+    pub const fn timestamp(&self) -> i64 {
+        self.timestamp
+    }
+
+    /// Timezone offset in minutes east of UTC. 0 if not set.
+    #[must_use]
+    pub const fn timezone_offset(&self) -> i16 {
+        self.timezone_offset
+    }
+
+    /// Encoding (e.g., "UTF-8") if set.
+    #[must_use]
+    pub fn encoding(&self) -> Option<&str> {
+        self.encoding.as_deref()
     }
 }

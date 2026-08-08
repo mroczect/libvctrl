@@ -14,13 +14,13 @@ use libvctrl_handler::{
 /// When the format evolves, this version number will be incremented,
 /// allowing decoders to maintain backward compatibility or reject
 /// unsupported versions.
-pub const VERSION: u8 = 1;
+pub const VERSION: u8 = 2;
 
 /// Encodes objects into a deterministic binary format.
 ///
-/// # Format specification
+/// # Format specification (version 0x02)
 ///
-/// Every encoded object starts with a **version byte** (`0x01`),
+/// Every encoded object starts with a **version byte** (`0x02`),
 /// followed by type‑specific payload as described below.
 /// The payload can be parsed by [`BinaryDecoder`](super::binary_decoder::BinaryDecoder).
 /// Every multi‑byte integer is encoded as little‑endian.
@@ -48,6 +48,9 @@ pub const VERSION: u8 = 1;
 /// [ 1 byte committer_name_length | committer_name_bytes... ]
 /// [ 1 byte committer_email_length | committer_email_bytes... ]
 /// [ 4 bytes message_length | message_bytes... ]
+/// [ 8 bytes timestamp (i64 LE) ]
+/// [ 2 bytes timezone_offset (i16 LE) ]
+/// [ 1 byte encoding_length | encoding_bytes... ]   (0x00 if None)
 /// ```
 ///
 /// ## Tag
@@ -59,6 +62,9 @@ pub const VERSION: u8 = 1;
 ///     [ 1 byte tagger_name_length | tagger_name_bytes... ]
 ///     [ 1 byte tagger_email_length | tagger_email_bytes... ]
 /// [ 4 bytes message_length | message_bytes... ]
+/// [ 8 bytes timestamp (i64 LE) ]
+/// [ 2 bytes timezone_offset (i16 LE) ]
+/// [ 1 byte encoding_length | encoding_bytes... ]   (0x00 if None)
 /// ```
 ///
 /// # Error handling
@@ -81,7 +87,7 @@ pub const VERSION: u8 = 1;
 /// let encoder = BinaryEncoder;
 /// let blob = Blob::new(b"example".to_vec());
 /// let encoded = encoder.encode_blob(&blob).expect("encode should succeed");
-/// // encoded starts with version byte 0x01
+/// // encoded starts with version byte 0x02
 /// ```
 pub struct BinaryEncoder;
 
@@ -156,6 +162,19 @@ impl Encoder for BinaryEncoder {
         }
         out.extend_from_slice(&msg_len.to_le_bytes());
         out.extend_from_slice(msg.as_bytes());
+        // Timestamp & timezone
+        out.extend_from_slice(&commit.timestamp().to_le_bytes());
+        out.extend_from_slice(&commit.timezone_offset().to_le_bytes());
+        // Encoding
+        match commit.encoding() {
+            Some(enc) => {
+                let len = u8::try_from(enc.len())
+                    .map_err(|_| VctrlError::SerializationError("encoding too long".into()))?;
+                out.push(len);
+                out.extend_from_slice(enc.as_bytes());
+            }
+            None => out.push(0u8),
+        }
         Ok(out)
     }
 
@@ -185,6 +204,19 @@ impl Encoder for BinaryEncoder {
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
         out.extend_from_slice(&msg_len.to_le_bytes());
         out.extend_from_slice(msg.as_bytes());
+        // Timestamp & timezone
+        out.extend_from_slice(&tag.timestamp().to_le_bytes());
+        out.extend_from_slice(&tag.timezone_offset().to_le_bytes());
+        // Encoding
+        match tag.encoding() {
+            Some(enc) => {
+                let len = u8::try_from(enc.len())
+                    .map_err(|_| VctrlError::SerializationError("encoding too long".into()))?;
+                out.push(len);
+                out.extend_from_slice(enc.as_bytes());
+            }
+            None => out.push(0u8),
+        }
         Ok(out)
     }
 }

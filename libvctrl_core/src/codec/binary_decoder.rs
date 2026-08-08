@@ -5,13 +5,18 @@
 //! reject malicious or corrupted data.
 
 use libvctrl_handler::{
-    Blob, Commit, Decoder, EntryKind, Hash, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_TREE_ENTRIES,
-    Tag, Tree, TreeEntry, UserID, VctrlError,
+    Blob, Commit, CommitMeta, Decoder, EntryKind, Hash, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH,
+    MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID, VctrlError,
 };
 use std::str;
 
-/// Expected version byte for the current binary format.
-const EXPECTED_VERSION: u8 = 1;
+/// Expected version byte for the current binary format (v2).
+///
+/// Version 2 added:
+/// - `timestamp` (i64 LE)
+/// - `timezone_offset` (i16 LE)
+/// - `encoding` (length‑prefixed optional UTF‑8 string)
+const EXPECTED_VERSION: u8 = 2;
 
 /// Decodes objects from the binary format produced by [`BinaryEncoder`](super::binary_encoder::BinaryEncoder).
 ///
@@ -19,7 +24,7 @@ const EXPECTED_VERSION: u8 = 1;
 ///
 /// The decoder is the **first line of defence** against corrupted or malicious
 /// data. It performs strict checks on every field:
-/// - The first byte must match the expected version (`0x01`).
+/// - The first byte must match the expected version (`0x02`).
 /// - Length prefixes must match the actual data length.
 /// - Names must be valid UTF‑8 and within the allowed length.
 /// - Entry kinds must be known values.
@@ -44,8 +49,8 @@ const EXPECTED_VERSION: u8 = 1;
 /// use libvctrl_handler::{Blob, Decoder};
 ///
 /// let decoder = BinaryDecoder;
-/// // A valid blob encoding: version byte 1, length 5, data "hello"
-/// let valid_input = [1, 5, 0, 0, 0, 0, 0, 0, 0, b'h', b'e', b'l', b'l', b'o'];
+/// // A valid blob encoding: version byte 2, length 5, data "hello"
+/// let valid_input = [2, 5, 0, 0, 0, 0, 0, 0, 0, b'h', b'e', b'l', b'l', b'o'];
 /// let blob = decoder.decode_blob(&valid_input).expect("valid blob");
 /// assert_eq!(blob.data(), b"hello");
 ///
@@ -138,6 +143,7 @@ impl Decoder for BinaryDecoder {
         Tree::new(entries)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn decode_commit(&self, data: &[u8]) -> Result<Commit, VctrlError> {
         let data = Self::check_version(data)?;
         if data.len() < 64 + 1 {
@@ -228,9 +234,48 @@ impl Decoder for BinaryDecoder {
         let message = str::from_utf8(&data[pos..pos + msg_len])
             .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in message".into()))?
             .to_string();
-        Ok(Commit::new(tree, parents, author, committer, message))
+        pos += msg_len; // <- PERBAIKAN: majukan pos sebesar panjang pesan
+
+        // Timestamp
+        if pos + 8 > data.len() {
+            return Err(VctrlError::CorruptedData("missing timestamp".into()));
+        }
+        let timestamp = i64::from_le_bytes(data[pos..pos + 8].try_into().unwrap());
+        pos += 8;
+        // Timezone offset
+        if pos + 2 > data.len() {
+            return Err(VctrlError::CorruptedData("missing timezone offset".into()));
+        }
+        let timezone_offset = i16::from_le_bytes(data[pos..pos + 2].try_into().unwrap());
+        pos += 2;
+        // Encoding
+        if pos >= data.len() {
+            return Err(VctrlError::CorruptedData("missing encoding length".into()));
+        }
+        let encoding_len = data[pos] as usize;
+        pos += 1;
+        let encoding = if encoding_len > 0 {
+            if pos + encoding_len > data.len() {
+                return Err(VctrlError::CorruptedData("encoding truncated".into()));
+            }
+            let enc = str::from_utf8(&data[pos..pos + encoding_len])
+                .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in encoding".into()))?
+                .to_string();
+            Some(enc)
+        } else {
+            None
+        };
+        let meta = CommitMeta {
+            timestamp,
+            timezone_offset,
+            encoding,
+        };
+        Ok(Commit::with_meta(
+            tree, parents, author, committer, message, meta,
+        ))
     }
 
+    #[allow(clippy::too_many_lines)]
     fn decode_tag(&self, data: &[u8]) -> Result<Tag, VctrlError> {
         let data = Self::check_version(data)?;
         if data.is_empty() {
@@ -311,6 +356,42 @@ impl Decoder for BinaryDecoder {
         let message = str::from_utf8(&data[pos..pos + msg_len])
             .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in message".into()))?
             .to_string();
-        Tag::new(name, target, tagger, message)
+        pos += msg_len; // <- PERBAIKAN: majukan pos sebesar panjang pesan
+
+        // Timestamp
+        if pos + 8 > data.len() {
+            return Err(VctrlError::CorruptedData("missing timestamp".into()));
+        }
+        let timestamp = i64::from_le_bytes(data[pos..pos + 8].try_into().unwrap());
+        pos += 8;
+        // Timezone offset
+        if pos + 2 > data.len() {
+            return Err(VctrlError::CorruptedData("missing timezone offset".into()));
+        }
+        let timezone_offset = i16::from_le_bytes(data[pos..pos + 2].try_into().unwrap());
+        pos += 2;
+        // Encoding
+        if pos >= data.len() {
+            return Err(VctrlError::CorruptedData("missing encoding length".into()));
+        }
+        let encoding_len = data[pos] as usize;
+        pos += 1;
+        let encoding = if encoding_len > 0 {
+            if pos + encoding_len > data.len() {
+                return Err(VctrlError::CorruptedData("encoding truncated".into()));
+            }
+            let enc = str::from_utf8(&data[pos..pos + encoding_len])
+                .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in encoding".into()))?
+                .to_string();
+            Some(enc)
+        } else {
+            None
+        };
+        let meta = CommitMeta {
+            timestamp,
+            timezone_offset,
+            encoding,
+        };
+        Tag::with_meta(name, target, tagger, message, meta)
     }
 }

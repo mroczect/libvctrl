@@ -7,7 +7,8 @@
 //! - The cryptographic hash length (`HASH_LENGTH`),
 //! - Name length limits (`MAX_NAME_LENGTH`),
 //! - Denial‑of‑Service prevention bounds (`MAX_BLOB_SIZE`, `MAX_TREE_ENTRIES`,
-//!   `MAX_MESSAGE_LENGTH`).
+//!   `MAX_MESSAGE_LENGTH`),
+//! - Entry mode bits for tree entries ([`entry_mode`]).
 //!
 //! # Why constants instead of associated types?
 //!
@@ -143,3 +144,87 @@ pub const MAX_TREE_ENTRIES: usize = 100_000;
 /// // if msg_len > MAX_MESSAGE_LENGTH { return Err(…); }
 /// ```
 pub const MAX_MESSAGE_LENGTH: usize = 1024 * 1024; // 1 MiB
+
+/// Mode bits for tree entries.
+///
+/// These constants define the **file type** and **permission** bits that
+/// describe an entry inside a [`Tree`](crate::Tree).  The values follow
+/// POSIX conventions and are compatible with Git's internal representation.
+///
+/// # Why a `u32` bit‑field?
+///
+/// A tree entry is not just “file” or “directory”.  Real systems need to
+/// distinguish:
+/// - regular files,
+/// - executable files,
+/// - symbolic links,
+/// - sub‑directories,
+/// - submodules (references to other repositories).
+///
+/// Using a `u32` mode word (instead of a simple enum) allows the system to
+/// carry full POSIX file metadata without sacrificing extensibility.  New
+/// mode bits can be added in the future without breaking existing parsers.
+///
+/// # How the modes are used
+///
+/// The [`EntryKind`](crate::EntryKind) struct stores the mode internally as a
+/// `u32`.  It provides convenience constructors (`EntryKind::blob()`,
+/// `EntryKind::tree()`, …) that set the correct mode bits.  This design keeps
+/// the common cases ergonomic while still allowing arbitrary mode values when
+/// necessary.
+///
+/// # Bit layout
+///
+/// The lower 16 bits follow POSIX file‑type conventions:
+///
+/// | Bit range | Meaning |
+/// |---|---|
+/// | 12‑15 | File type (0o100000 = regular, 0o040000 = directory, …) |
+/// | 9‑11  | Owner permission (rwx) |
+/// | 6‑8   | Group permission (rwx) |
+/// | 0‑5   | Others permission (rwx) |
+///
+/// # Examples
+///
+/// ```rust
+/// use libvctrl_handler::constants::entry_mode;
+///
+/// assert_eq!(entry_mode::BLOB, 0o100_644);    // regular file, rw-r--r--
+/// assert_eq!(entry_mode::TREE, 0o040_000);    // directory
+/// assert_eq!(entry_mode::EXECUTABLE, 0o100_755); // regular file, rwxr-xr-x
+/// ```
+///
+/// # Compatibility with Git
+///
+/// Git uses the same mode values for its tree entries.  This means that a
+/// `libvctrl` repository can be written in a Git‑compatible way, should that
+/// be desired.
+pub mod entry_mode {
+    /// Regular file, non‑executable (`rw‑r--r--`).
+    ///
+    /// This is the most common mode for source files, documents, and
+    /// other non‑executable content.
+    pub const BLOB: u32 = 0o100_644;
+
+    /// Regular file, executable (`rwxr‑xr‑x`).
+    ///
+    /// Used for scripts, compiled binaries, or any file that should be
+    /// runnable.
+    pub const EXECUTABLE: u32 = 0o100_755;
+
+    /// Symbolic link.
+    ///
+    /// The entry's hash points to a blob whose content is the link target.
+    pub const SYMLINK: u32 = 0o120_000;
+
+    /// Sub‑directory (tree).
+    ///
+    /// The entry's hash points to another [`Tree`](crate::Tree) object.
+    pub const TREE: u32 = 0o040_000;
+
+    /// Git‑compatible submodule (commit link).
+    ///
+    /// The entry's hash points to a commit in another repository.
+    /// This is used for tracking external dependencies.
+    pub const SUBMODULE: u32 = 0o160_000;
+}
