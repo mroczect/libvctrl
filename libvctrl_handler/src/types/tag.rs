@@ -1,6 +1,3 @@
-//! landmarks in the commit history, such as release versions (`v1.0.0`).
-//! # let tagger = UserID::new("Release Bot".into(), "release@example.com".into()).unwrap();
-//! # let tagger = UserID::new("Bob".into(), "bob@example.com".into()).unwrap();
 use crate::errors::VctrlError;
 use crate::types::commit::CommitMeta;
 use crate::types::hash::Hash;
