@@ -7,6 +7,8 @@ use libvctrl_handler::{MAX_NAME_LENGTH, VctrlError};
 /// A valid name:
 /// - Is not empty.
 /// - Does not exceed `MAX_NAME_LENGTH` bytes.
+/// - Does not contain the path separator `/`.
+/// - Is not `.` or `..`.
 ///
 /// This function is the single point of truth for name validation in
 /// `libvctrl_core`. All higher-level modules (builders, stores) call it
@@ -21,6 +23,8 @@ use libvctrl_handler::{MAX_NAME_LENGTH, VctrlError};
 /// assert!(validate_name("hello").is_ok());
 /// assert!(validate_name("").is_err());
 /// assert!(validate_name(&"a".repeat(300)).is_err());
+/// assert!(validate_name("src/main.rs").is_err());  // contains '/'
+/// assert!(validate_name("..").is_err());
 /// ```
 pub fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
@@ -30,6 +34,15 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
         return Err(VctrlError::InvalidName(format!(
             "name exceeds maximum length {MAX_NAME_LENGTH}: '{name}'"
         )));
+    }
+    // Reject path separators and relative path components.
+    if name.contains('/') {
+        return Err(VctrlError::InvalidName("name must not contain '/'".into()));
+    }
+    if name == "." || name == ".." {
+        return Err(VctrlError::InvalidName(
+            "name must not be '.' or '..'".into(),
+        ));
     }
     Ok(())
 }
