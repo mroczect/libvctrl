@@ -51,19 +51,18 @@ impl TagBuilder {
         self
     }
 
-    /// Builds the tag, validating the name.
+    /// Builds the tag, validating the name and required fields.
     ///
     /// # Errors
-    /// Returns [`VctrlError::InvalidName`] if the name is invalid.
-    ///
-    /// # Panics
-    /// Panics if `name` or `target` have not been set.
+    /// Returns [`VctrlError::InvalidName`] if the name is invalid, or
+    /// [`VctrlError::Other`] if `name` or `target` is missing.
     pub fn build(self) -> Result<Tag, VctrlError> {
-        Tag::new(
-            self.name.expect("name not set"),
-            self.target.expect("target not set"),
-            self.tagger,
-            self.message.unwrap_or_default(),
-        )
+        let name = self
+            .name
+            .ok_or_else(|| VctrlError::Other("tag name is required".into()))?;
+        let target = self
+            .target
+            .ok_or_else(|| VctrlError::Other("target is required".into()))?;
+        Tag::new(name, target, self.tagger, self.message.unwrap_or_default())
     }
 }
