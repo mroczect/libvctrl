@@ -266,9 +266,6 @@ impl TreeEntry {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Blob
-// ---------------------------------------------------------------------------
 /// A blob object – raw, uninterpreted data.
 ///
 /// Represents the contents of a file. No encoding, compression, or metadata
@@ -278,6 +275,13 @@ impl TreeEntry {
 /// An empty blob (`Blob::new(vec![])`) is perfectly valid and represents
 /// an empty file.
 ///
+/// # Size limits
+/// There is **no** size limit enforced at the type level. A `Blob` can hold
+/// any amount of data that fits in memory. However, decoders that process
+/// untrusted input **should** respect [`MAX_BLOB_SIZE`](crate::constants::MAX_BLOB_SIZE)
+/// to prevent memory‑exhaustion attacks. The reference decoder in
+/// `libvctrl_core` enforces this limit.
+///
 /// # Example
 ///
 /// ```rust
@@ -286,6 +290,13 @@ impl TreeEntry {
 /// let data = b"Hello, world!".to_vec();
 /// let blob = Blob::new(data.clone());
 /// assert_eq!(blob.data(), b"Hello, world!");
+/// assert_eq!(blob.size(), 13);
+/// assert!(!blob.is_empty());
+///
+/// // Empty blob
+/// let empty = Blob::new(vec![]);
+/// assert!(empty.is_empty());
+/// assert_eq!(empty.size(), 0);
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Blob {
@@ -303,6 +314,34 @@ impl Blob {
     #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
+    }
+
+    /// Returns the size of the blob in bytes.
+    ///
+    /// This is a convenience method equivalent to `blob.data().len()`.
+    ///
+    /// ```rust
+    /// use libvctrl_handler::Blob;
+    ///
+    /// let blob = Blob::new(b"hello".to_vec());
+    /// assert_eq!(blob.size(), 5);
+    /// ```
+    #[must_use]
+    pub const fn size(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Returns `true` if the blob contains no data.
+    ///
+    /// ```rust
+    /// use libvctrl_handler::Blob;
+    ///
+    /// let blob = Blob::new(vec![]);
+    /// assert!(blob.is_empty());
+    /// ```
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
 }
 
