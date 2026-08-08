@@ -8,6 +8,7 @@ on:
       - "libvctrl_handler[0-9]*"
       - "libvctrl_plumbing[0-9]*"
       - "libvctrl_porcelain[0-9]*"
+      - "libvctrl_sha512[0-9]*"
 
 jobs:
   publish:
