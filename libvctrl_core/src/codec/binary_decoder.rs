@@ -10,12 +10,16 @@ use libvctrl_handler::{
 };
 use std::str;
 
+/// Expected version byte for the current binary format.
+const EXPECTED_VERSION: u8 = 1;
+
 /// Decodes objects from the binary format produced by [`BinaryEncoder`](super::binary_encoder::BinaryEncoder).
 ///
 /// # Safety and validation
 ///
 /// The decoder is the **first line of defence** against corrupted or malicious
 /// data. It performs strict checks on every field:
+/// - The first byte must match the expected version (`0x01`).
 /// - Length prefixes must match the actual data length.
 /// - Names must be valid UTF‑8 and within the allowed length.
 /// - Entry kinds must be known values.
@@ -40,19 +44,37 @@ use std::str;
 /// use libvctrl_handler::{Blob, Decoder};
 ///
 /// let decoder = BinaryDecoder;
-/// // A valid blob encoding: length 5, data "hello"
-/// let valid_input = [5, 0, 0, 0, 0, 0, 0, 0, b'h', b'e', b'l', b'l', b'o'];
+/// // A valid blob encoding: version byte 1, length 5, data "hello"
+/// let valid_input = [1, 5, 0, 0, 0, 0, 0, 0, 0, b'h', b'e', b'l', b'l', b'o'];
 /// let blob = decoder.decode_blob(&valid_input).expect("valid blob");
 /// assert_eq!(blob.data(), b"hello");
 ///
-/// // Truncated input
-/// let short_input = [5, 0, 0, 0, 0, 0, 0, 0, b'h'];
-/// assert!(decoder.decode_blob(&short_input).is_err());
+/// // Truncated input (missing version byte)
+/// let no_version = [5, 0, 0, 0, 0, 0, 0, 0, b'h'];
+/// assert!(decoder.decode_blob(&no_version).is_err());
 /// ```
 pub struct BinaryDecoder;
 
+impl BinaryDecoder {
+    /// Check that the input starts with the expected version byte,
+    /// returning the slice without that byte.
+    fn check_version(data: &[u8]) -> Result<&[u8], VctrlError> {
+        if data.is_empty() {
+            return Err(VctrlError::CorruptedData("missing version byte".into()));
+        }
+        if data[0] != EXPECTED_VERSION {
+            return Err(VctrlError::CorruptedData(format!(
+                "unsupported version: {} (expected {})",
+                data[0], EXPECTED_VERSION
+            )));
+        }
+        Ok(&data[1..])
+    }
+}
+
 impl Decoder for BinaryDecoder {
     fn decode_blob(&self, data: &[u8]) -> Result<Blob, VctrlError> {
+        let data = Self::check_version(data)?;
         if data.len() < 8 {
             return Err(VctrlError::CorruptedData(
                 "blob too short for length prefix".into(),
@@ -71,6 +93,7 @@ impl Decoder for BinaryDecoder {
     }
 
     fn decode_tree(&self, data: &[u8]) -> Result<Tree, VctrlError> {
+        let data = Self::check_version(data)?;
         if data.len() < 4 {
             return Err(VctrlError::CorruptedData("tree too short".into()));
         }
@@ -116,6 +139,7 @@ impl Decoder for BinaryDecoder {
     }
 
     fn decode_commit(&self, data: &[u8]) -> Result<Commit, VctrlError> {
+        let data = Self::check_version(data)?;
         if data.len() < 64 + 1 {
             return Err(VctrlError::CorruptedData("commit too short".into()));
         }
@@ -208,6 +232,7 @@ impl Decoder for BinaryDecoder {
     }
 
     fn decode_tag(&self, data: &[u8]) -> Result<Tag, VctrlError> {
+        let data = Self::check_version(data)?;
         if data.is_empty() {
             return Err(VctrlError::CorruptedData("tag too short".into()));
         }
