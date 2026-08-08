@@ -40,7 +40,9 @@ pub mod traits;
 pub mod types;
 
 // Re-export fundamental items with explicit paths to avoid wildcard imports.
-pub use constants::{HASH_LENGTH, MAX_NAME_LENGTH};
+pub use constants::{
+    HASH_LENGTH, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, MAX_TREE_ENTRIES,
+};
 pub use enums::EntryKind;
 pub use errors::VctrlError;
 pub use traits::{Decoder, Encoder, Hasher, ObjectStore, RefStore, Signer, Transport, Verifier};
