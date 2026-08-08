@@ -11,3 +11,20 @@ keywords = ["version-control", "vcs", "core"]
 categories = ["development-tools"]
 
 [dependencies]
+libvctrl_handler = {path = "../libvctrl_handler", version = "1.0.0" }
+sha2 = "0.11.0"
+
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+unused_qualifications = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unused_results = "warn"
+rust_2018_idioms = "warn"
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+cargo = "warn"
