@@ -23,17 +23,37 @@
 //! The HMAC and HKDF variants follow the same standards as their SHA‑512
 //! counterparts (RFC 2104 and RFC 5869), producing 48‑byte tags / PRKs.
 //!
+//! ## Why use SHA‑384 over SHA‑512?
+//!
+//! - **Smaller footprint** – digests and signatures are 48 bytes instead of 64,
+//!   saving storage and bandwidth.
+//! - **Resistance to length‑extension attacks** – the truncation of the full
+//!   SHA‑512 output makes SHA‑384 inherently immune to length‑extension attacks
+//!   without needing HMAC constructs.
+//! - **FIPS compliance** – SHA‑384 is approved for U.S. government use and is
+//!   widely supported.
+//!
 //! ## Usage
 //!
 //! Enable the `sha384` feature (on by default) and import the types from
 //! the crate root:
 //!
-//! ```rust,ignore
+//! ```rust
 //! use libvctrl_sha512::sha384::{Hash, HMAC, HKDF};
 //! ```
 //!
 //! All APIs mirror the SHA‑512 versions exactly, except for the output size
 //! (48 bytes instead of 64).
+//!
+//! ## Feature flag
+//!
+//! The `sha384` feature is **enabled by default**. If you do not need SHA‑384,
+//! disable default features in your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! libvctrl_sha512 = { version = "0.3.0", default-features = false }
+//! ```
 //!
 //! ## Examples
 //!
@@ -97,7 +117,15 @@ fn new_state() -> State {
 /// the SHA‑384 IV and truncates the final output to 48 bytes.  All other
 /// aspects (message scheduling, compression) are identical to SHA‑512.
 ///
-/// # Examples
+/// # Features
+///
+/// - **One‑shot** – [`Hash::hash`] digests an entire message in one call.
+/// - **Streaming** – [`Hash::new`], [`update`](Hash::update), and
+///   [`finalize`](Hash::finalize) allow incremental processing.
+/// - **Copy / Clone** – the hasher state is `Copy`, making it easy to create
+///   checkpoints during streaming.
+///
+/// # Example
 ///
 /// ```rust
 /// use libvctrl_sha512::sha384::Hash;
@@ -215,6 +243,27 @@ impl Default for Hash {
 /// from lingering on the stack.  The inner hasher is not zeroised (it contains
 /// only the intermediate hash state, not the key), which is consistent with
 /// standard practice.
+///
+/// # One‑shot vs streaming
+///
+/// Use [`HMAC::mac`] / [`HMAC::verify`] when the entire message fits in memory.
+/// Use [`HMAC::new`] together with [`update`](HMAC::update) and
+/// [`finalize`](HMAC::finalize) for large or incremental data.
+///
+/// # Examples
+///
+/// ```rust
+/// use libvctrl_sha512::sha384::HMAC;
+///
+/// // One‑shot
+/// let mac = HMAC::mac(b"message", b"key");
+/// assert_eq!(mac.len(), 48);
+///
+/// // Streaming
+/// let mut ctx = HMAC::new(b"key");
+/// ctx.update(b"data");
+/// let mac2 = ctx.finalize();
+/// ```
 pub struct HMAC {
     ih: Hash,
     padded: [u8; 128],
@@ -238,6 +287,15 @@ impl HMAC {
     ///
     /// A `[u8; 48]` containing the HMAC tag.
     ///
+    /// # Security
+    ///
+    /// - Keys longer than the block size (128 bytes) are hashed with SHA‑384
+    ///   before use, conforming to RFC 2104.
+    /// - The tag is computed using constant‑time operations for the inner and
+    ///   outer hash; however, the comparison of tags should be done using
+    ///   [`verify`](HMAC::verify) or [`finalize_verify`](HMAC::finalize_verify)
+    ///   to avoid timing leaks.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -257,6 +315,11 @@ impl HMAC {
     /// The key is processed immediately: if it exceeds the block size
     /// (128 bytes), it is first hashed with SHA‑384.  The resulting key is
     /// XORed with `ipad` and fed into the inner hasher.
+    ///
+    /// # Panics
+    ///
+    /// This method does not panic.  An empty key is allowed (though not
+    /// recommended for security).
     ///
     /// # Example
     ///
@@ -287,6 +350,9 @@ impl HMAC {
 
     /// Feed additional data into the HMAC computation.
     ///
+    /// This method can be called multiple times to incrementally process a
+    /// message.  Internally it updates the inner SHA‑384 hasher.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -303,7 +369,12 @@ impl HMAC {
     /// Finalize the HMAC computation and return the 48‑byte tag.
     ///
     /// This method consumes the state, completes the outer hash, and produces
-    /// the final MAC.
+    /// the final MAC.  The internal padded key buffer is zeroised after use
+    /// (via `Drop`).
+    ///
+    /// # Returns
+    ///
+    /// `[u8; 48]` – the HMAC‑SHA‑384 tag.
     ///
     /// # Example
     ///
@@ -328,7 +399,8 @@ impl HMAC {
     /// Finalize and compare against `expected` in constant time.
     ///
     /// Uses [`utils::verify`](crate::utils::verify) for a timing‑attack
-    /// resistant comparison.
+    /// resistant comparison.  This prevents the compiler from optimising
+    /// the comparison into a short‑circuiting branch.
     ///
     /// # Returns
     ///
@@ -351,6 +423,9 @@ impl HMAC {
     }
 
     /// One‑shot verification of `input` under key `k` against `expected`.
+    ///
+    /// This computes `mac(input, k)` and compares it with `expected` in
+    /// constant time.  It is equivalent to `verify(&HMAC::mac(input, k), expected)`.
     ///
     /// # Returns
     ///
@@ -378,6 +453,21 @@ impl HMAC {
 /// for SHA‑384.  The output sizes are 48 bytes for the PRK and arbitrary
 /// (up to 255×48 bytes) for the OKM.
 ///
+/// # Design
+///
+/// - **Zero‑sized struct** – `HKDF` has no state; all methods are called on the
+///   type itself.
+/// - **Panics on misuse** – invalid PRK length or excessive output length cause
+///   a panic, because a cryptographic library must never silently produce weak
+///   keys.
+///
+/// # Security
+///
+/// - Use a random, non‑secret salt whenever possible.
+/// - Always use a unique `info` string per key purpose for domain separation.
+/// - The PRK may be reused with different `info` values to derive multiple
+///   independent keys.
+///
 /// # Example
 ///
 /// ```rust
@@ -396,6 +486,20 @@ impl HKDF {
     ///
     /// Returns a 48‑byte pseudorandom key (PRK).
     ///
+    /// # Arguments
+    ///
+    /// * `salt` – An optional salt value (may be empty).
+    /// * `ikm`  – The input keying material.
+    ///
+    /// # Returns
+    ///
+    /// A `[u8; 48]` PRK.
+    ///
+    /// # Security
+    ///
+    /// The salt may be public; using even a fixed salt is better than none.
+    /// When the IKM is already uniformly random, the salt can be omitted.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -413,6 +517,13 @@ impl HKDF {
     ///
     /// Expands the PRK into `out.len()` bytes of output keying material
     /// using the given `info` string.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` – The buffer to fill with derived key material.
+    /// * `prk` – The pseudorandom key from the extract step. **Must be exactly
+    ///   48 bytes** for SHA‑384.
+    /// * `info` – Optional context information for domain separation.
     ///
     /// # Panics
     ///
