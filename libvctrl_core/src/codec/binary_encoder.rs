@@ -6,22 +6,31 @@
 
 use libvctrl_handler::{Blob, Commit, Encoder, EntryKind, Tag, Tree, VctrlError};
 
+/// Current binary format version.
+///
+/// This byte is written as the very first byte of every encoded object.
+/// When the format evolves, this version number will be incremented,
+/// allowing decoders to maintain backward compatibility or reject
+/// unsupported versions.
+pub const VERSION: u8 = 1;
+
 /// Encodes objects into a deterministic binary format.
 ///
 /// # Format specification
 ///
-/// The encoder produces a byte sequence that can be parsed by
-/// [`BinaryDecoder`](super::binary_decoder::BinaryDecoder). Every multi‑byte
-/// integer is encoded as little‑endian.
+/// Every encoded object starts with a **version byte** (`0x01`),
+/// followed by type‑specific payload as described below.
+/// The payload can be parsed by [`BinaryDecoder`](super::binary_decoder::BinaryDecoder).
+/// Every multi‑byte integer is encoded as little‑endian.
 ///
 /// ## Blob
 /// ```text
-/// [ 8 bytes data_length | data_bytes... ]
+/// [ 1 byte version | 8 bytes data_length | data_bytes... ]
 /// ```
 ///
 /// ## Tree
 /// ```text
-/// [ 4 bytes entry_count ]
+/// [ 1 byte version | 4 bytes entry_count ]
 /// for each entry:
 ///     [ 1 byte name_length | name_bytes... | 1 byte kind | 64 bytes hash ]
 /// ```
@@ -29,7 +38,7 @@ use libvctrl_handler::{Blob, Commit, Encoder, EntryKind, Tag, Tree, VctrlError};
 ///
 /// ## Commit
 /// ```text
-/// [ 64 bytes tree_hash ]
+/// [ 1 byte version | 64 bytes tree_hash ]
 /// [ 1 byte parent_count ]
 /// [ for each parent: 64 bytes parent_hash ]
 /// [ 1 byte author_name_length | author_name_bytes... ]
@@ -41,7 +50,7 @@ use libvctrl_handler::{Blob, Commit, Encoder, EntryKind, Tag, Tree, VctrlError};
 ///
 /// ## Tag
 /// ```text
-/// [ 1 byte name_length | name_bytes... ]
+/// [ 1 byte version | 1 byte name_length | name_bytes... ]
 /// [ 64 bytes target_hash ]
 /// [ 1 byte has_tagger ]
 /// if has_tagger == 1:
@@ -70,14 +79,15 @@ use libvctrl_handler::{Blob, Commit, Encoder, EntryKind, Tag, Tree, VctrlError};
 /// let encoder = BinaryEncoder;
 /// let blob = Blob::new(b"example".to_vec());
 /// let encoded = encoder.encode_blob(&blob).expect("encode should succeed");
-/// // encoded is now a Vec<u8> ready for storage.
+/// // encoded starts with version byte 0x01
 /// ```
 pub struct BinaryEncoder;
 
 impl Encoder for BinaryEncoder {
     fn encode_blob(&self, blob: &Blob) -> Result<Vec<u8>, VctrlError> {
         let data = blob.data();
-        let mut out = Vec::with_capacity(8 + data.len());
+        let mut out = Vec::with_capacity(1 + 8 + data.len());
+        out.push(VERSION);
         out.extend_from_slice(&(data.len() as u64).to_le_bytes());
         out.extend_from_slice(data);
         Ok(out)
@@ -85,7 +95,7 @@ impl Encoder for BinaryEncoder {
 
     fn encode_tree(&self, tree: &Tree) -> Result<Vec<u8>, VctrlError> {
         let entries = tree.entries();
-        let mut out = Vec::new();
+        let mut out = vec![VERSION];
         let entry_count = u32::try_from(entries.len())
             .map_err(|_| VctrlError::SerializationError("too many entries".into()))?;
         out.extend_from_slice(&entry_count.to_le_bytes());
@@ -106,7 +116,7 @@ impl Encoder for BinaryEncoder {
     }
 
     fn encode_commit(&self, commit: &Commit) -> Result<Vec<u8>, VctrlError> {
-        let mut out = Vec::new();
+        let mut out = vec![VERSION];
         out.extend_from_slice(commit.tree().as_bytes());
         let parents = commit.parents();
         let parent_count = u8::try_from(parents.len())
@@ -143,7 +153,7 @@ impl Encoder for BinaryEncoder {
     }
 
     fn encode_tag(&self, tag: &Tag) -> Result<Vec<u8>, VctrlError> {
-        let mut out = Vec::new();
+        let mut out = vec![VERSION];
         let name_len = u8::try_from(tag.name().len())
             .map_err(|_| VctrlError::SerializationError("tag name too long".into()))?;
         out.push(name_len);
