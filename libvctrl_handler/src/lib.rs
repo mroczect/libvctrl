@@ -134,4 +134,4 @@ pub use constants::{
 pub use enums::EntryKind;
 pub use errors::VctrlError;
 pub use traits::{Decoder, Encoder, Hasher, ObjectStore, RefStore, Signer, Transport, Verifier};
-pub use types::{Blob, Commit, Hash, Tag, Tree, TreeEntry, UserID};
+pub use types::{Blob, Commit, CommitMeta, Hash, Tag, Tree, TreeEntry, UserID};
