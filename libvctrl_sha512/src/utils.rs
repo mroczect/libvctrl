@@ -62,18 +62,21 @@
 /// SHA‑512 block size in bytes.
 ///
 /// Every complete message block processed by the compression function is
-/// exactly 128 bytes (1024 bits).
+/// exactly 128 bytes (1024 bits). This constant is used internally for buffer
+/// management and padding.
 pub const BLOCKBYTES: usize = 128;
 
 /// SHA‑512 output size in bytes.
 ///
-/// The final digest is always 64 bytes (512 bits).
+/// The final digest is always 64 bytes (512 bits). This constant is re‑exported
+/// at the crate root for convenience.
 pub const BYTES: usize = 64;
 
 /// Load a big‑endian `u64` from `base` starting at `offset`.
 ///
 /// This is equivalent to reading 8 bytes from `base[offset..offset+8]` and
-/// interpreting them as a big‑endian unsigned 64‑bit integer.
+/// interpreting them as a big‑endian unsigned 64‑bit integer. It is used to
+/// load the message schedule words and initial vector values.
 ///
 /// # Panics
 ///
@@ -84,6 +87,16 @@ pub const BYTES: usize = 64;
 ///
 /// Uses [`u64::from_be_bytes`], which maps to a single `bswap` instruction
 /// on little‑endian targets and a simple load on big‑endian targets.
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_sha512::utils::load_be;
+///
+/// let bytes = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+/// let value = load_be(&bytes, 0);
+/// assert_eq!(value, 0x0102030405060708);
+/// ```
 #[inline(always)]
 pub fn load_be(base: &[u8], offset: usize) -> u64 {
     u64::from_be_bytes(base[offset..offset + 8].try_into().unwrap())
@@ -92,7 +105,8 @@ pub fn load_be(base: &[u8], offset: usize) -> u64 {
 /// Store a `u64` as big‑endian bytes into `base` starting at `offset`.
 ///
 /// Writes the 8‑byte big‑endian representation of `x` into
-/// `base[offset..offset+8]`.
+/// `base[offset..offset+8]`. This is used to write the final hash digest and
+/// the message length in the padding block.
 ///
 /// # Panics
 ///
@@ -102,6 +116,16 @@ pub fn load_be(base: &[u8], offset: usize) -> u64 {
 ///
 /// Uses [`u64::to_be_bytes`], which generates optimal code on all
 /// architectures.
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_sha512::utils::store_be;
+///
+/// let mut buffer = [0u8; 8];
+/// store_be(&mut buffer, 0, 0x0102030405060708);
+/// assert_eq!(buffer, [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
+/// ```
 #[inline(always)]
 pub fn store_be(base: &mut [u8], offset: usize, x: u64) {
     base[offset..offset + 8].copy_from_slice(&x.to_be_bytes());
@@ -134,6 +158,13 @@ pub fn store_be(base: &mut [u8], offset: usize, x: u64) {
 /// data‑dependent branch.  The additional WASM mixing compensates for
 /// the fact that some WASM engines may not implement bitwise operations
 /// in constant time.
+///
+/// # Why not use `subtle`?
+///
+/// This crate intentionally avoids external dependencies to keep the
+/// trusted code base minimal. The `verify` function is small and
+/// well‑audited, making it suitable for the security needs of SHA‑512,
+/// HMAC, and HKDF.
 ///
 /// # Examples
 ///
