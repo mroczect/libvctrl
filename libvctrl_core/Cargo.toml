@@ -11,7 +11,7 @@ keywords = ["version-control", "vcs", "core"]
 categories = ["development-tools"]
 
 [dependencies]
-libvctrl_handler = {path = "../libvctrl_handler", version = "1.2.0" }
+libvctrl_handler = {path = "../libvctrl_handler", version = "2.0.0" }
 libvctrl_sha512 = { path = "../libvctrl_sha512", version = "0.4.0" }
 
 [lints.rust]
