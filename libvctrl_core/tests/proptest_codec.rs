@@ -28,8 +28,7 @@ fn email_strategy() -> impl Strategy<Value = String> {
 }
 
 fn user_id_strategy() -> impl Strategy<Value = UserID> {
-    (name_strategy(), email_strategy())
-        .prop_map(|(name, email)| UserID::new(name, email).unwrap())
+    (name_strategy(), email_strategy()).prop_map(|(name, email)| UserID::new(name, email).unwrap())
 }
 
 fn blob_strategy() -> impl Strategy<Value = Blob> {
@@ -48,12 +47,11 @@ fn tree_entry_strategy() -> impl Strategy<Value = TreeEntry> {
 }
 
 fn tree_strategy() -> impl Strategy<Value = Tree> {
-    proptest::collection::vec(tree_entry_strategy(), 0..20)
-        .prop_map(|mut entries| {
-            entries.sort_by(|a, b| a.name().cmp(b.name()));
-            entries.dedup_by(|a, b| a.name() == b.name());
-            Tree::new(entries).unwrap()
-        })
+    proptest::collection::vec(tree_entry_strategy(), 0..20).prop_map(|mut entries| {
+        entries.sort_by(|a, b| a.name().cmp(b.name()));
+        entries.dedup_by(|a, b| a.name() == b.name());
+        Tree::new(entries).unwrap()
+    })
 }
 
 fn message_strategy() -> impl Strategy<Value = String> {
