@@ -30,6 +30,19 @@
 //! - **Configurable code size** – enable the `opt_size` feature to trade
 //!   a small amount of speed for a significantly smaller binary.
 //!
+//! ## Internal architecture
+//!
+//! SHA‑512 operates on 1024‑bit (128‑byte) message blocks. The hashing
+//! state consists of:
+//!
+//! - Eight 64‑bit working variables (`a`–`h`) stored in [`State`].
+//! - A message schedule of 16 × 64‑bit words stored in [`W`].
+//! - An input buffer, a read pointer, and a total message length counter
+//!   kept in the [`Hash`] struct.
+//!
+//! The compression function performs 80 rounds of bitwise operations
+//! (Σ, Maj, Ch, etc.) using round‑specific constants.
+//!
 //! ## Core types
 //!
 //! The primary public type is [`Hash`]. It provides three usage patterns:
@@ -114,26 +127,32 @@ impl W {
     }
 
     // ----- SHA‑512 logical functions -----
+    /// The `Ch` function: `(x & y) ^ (!x & z)`.
     #[inline(always)]
     fn Ch(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (!x & z)
     }
+    /// The `Maj` function: `(x & y) ^ (x & z) ^ (y & z)`.
     #[inline(always)]
     fn Maj(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (x & z) ^ (y & z)
     }
+    /// The `Σ0` function for the hash computation.
     #[inline(always)]
     fn Sigma0(x: u64) -> u64 {
         x.rotate_right(28) ^ x.rotate_right(34) ^ x.rotate_right(39)
     }
+    /// The `Σ1` function for the hash computation.
     #[inline(always)]
     fn Sigma1(x: u64) -> u64 {
         x.rotate_right(14) ^ x.rotate_right(18) ^ x.rotate_right(41)
     }
+    /// The `σ0` function for message schedule expansion.
     #[inline(always)]
     fn sigma0(x: u64) -> u64 {
         x.rotate_right(1) ^ x.rotate_right(8) ^ (x >> 7)
     }
+    /// The `σ1` function for message schedule expansion.
     #[inline(always)]
     fn sigma1(x: u64) -> u64 {
         x.rotate_right(19) ^ x.rotate_right(61) ^ (x >> 6)
@@ -151,6 +170,10 @@ impl W {
     }
 
     /// Expand the 16‑word message schedule into 80 words.
+    ///
+    /// This method generates the full 80‑word message schedule required
+    /// for the SHA‑512 compression function. It applies the message
+    /// schedule recurrence to compute new words from previous ones.
     #[inline]
     fn expand(&mut self) {
         // Each call updates one word of the schedule using the circular
@@ -176,6 +199,8 @@ impl W {
     /// Perform one SHA‑512 round (`F` function) on the working state.
     ///
     /// `i` is the round index (0..=79), `k` is the round constant.
+    /// This method updates the eight working variables according to
+    /// the SHA‑512 round operation.
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     fn F(&mut self, state: &mut State, i: usize, k: u64) {
@@ -203,6 +228,9 @@ impl W {
     }
 
     /// Run 16 consecutive rounds starting at offset `s` (0‑4).
+    ///
+    /// Each call processes 16 rounds (out of the total 80 rounds).
+    /// The four rounds are interleaved with message expansion operations.
     fn G(&mut self, state: &mut State, s: usize) {
         const ROUND_CONSTANTS: [u64; 80] = [
             0x428a2f98d728ae22,
@@ -308,6 +336,9 @@ impl W {
 
 impl State {
     /// Initialise the working state with the SHA‑512 initial vector (IV).
+    ///
+    /// Returns a new `State` with the eight 64‑bit words set to the
+    /// standard initial hash values of SHA‑512.
     pub(crate) fn new() -> Self {
         const IV: [u8; 64] = [
             0x6a, 0x09, 0xe6, 0x67, 0xf3, 0xbc, 0xc9, 0x08, 0xbb, 0x67, 0xae, 0x85, 0x84, 0xca,
@@ -324,6 +355,9 @@ impl State {
     }
 
     /// Add another `State` to this one (word‑wise wrapping addition).
+    ///
+    /// This is used after processing a message block to add the result
+    /// to the initial state of the block.
     #[inline(always)]
     pub(crate) fn add(&mut self, x: &State) {
         let sx = &mut self.0;
@@ -339,6 +373,8 @@ impl State {
     }
 
     /// Serialise the state into 64 bytes of big‑endian output.
+    ///
+    /// Each 64‑bit word is converted to 8 bytes in big‑endian order.
     pub(crate) fn store(&self, out: &mut [u8]) {
         for (i, &e) in self.0.iter().enumerate() {
             store_be(out, i * 8, e);
@@ -348,6 +384,11 @@ impl State {
     /// Process as many complete 128‑byte blocks as possible from `input`.
     ///
     /// Returns the number of unprocessed bytes (0..127).
+    ///
+    /// # Algorithm
+    /// For each complete 128‑byte block, it creates a message schedule,
+    /// performs 80 rounds of compression (in groups of 16), and adds the
+    /// result to the current state.
     pub(crate) fn blocks(&mut self, mut input: &[u8]) -> usize {
         let mut t = *self;
         let mut inlen = input.len();
