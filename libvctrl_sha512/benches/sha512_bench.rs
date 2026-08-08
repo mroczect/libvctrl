@@ -20,7 +20,7 @@ fn bench_hmac(c: &mut Criterion) {
         b.iter_batched(
             || (key, data),
             |(k, d)| {
-                let mut hmac = HMAC::new(k); // langsung pass array, tanpa &
+                let mut hmac = HMAC::new(k);
                 for chunk in d.chunks(64) {
                     hmac.update(chunk);
                 }
@@ -40,14 +40,14 @@ fn bench_hkdf(c: &mut Criterion) {
         b.iter(|| HKDF::extract(core::hint::black_box(salt), core::hint::black_box(ikm)))
     });
 
-    let prk = HKDF::extract(salt, ikm); // tanpa &
+    let prk = HKDF::extract(salt, ikm);
     c.bench_function("HKDF-SHA512/expand_64_bytes", |b| {
         b.iter(|| {
             let mut out = [0u8; 64];
             HKDF::expand(
                 &mut out,
-                core::hint::black_box(prk),  // tanpa &
-                core::hint::black_box(info), // tanpa &
+                core::hint::black_box(prk),
+                core::hint::black_box(info),
             );
             out
         })

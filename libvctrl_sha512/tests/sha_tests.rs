@@ -1,9 +1,6 @@
-//! Integration tests untuk semua fitur.
-
 use libvctrl_sha512::{HKDF, HMAC, Hash};
 
 // ============================================================================
-// SHA512 Hash Tests
 // ============================================================================
 
 #[test]
@@ -45,13 +42,8 @@ fn test_sha512_streaming() {
     assert!(hasher.verify(&expected));
 }
 
-// ============================================================================
-// HMAC-SHA512 Tests (RFC 4231)
-// ============================================================================
-
 #[test]
 fn test_hmac_rfc4231_1() {
-    // Test Case 1: key = 0x0b... (20), data = "Hi There"
     let key = [0x0b; 20];
     let data = b"Hi There";
     let expected: [u8; 64] = [
@@ -68,7 +60,6 @@ fn test_hmac_rfc4231_1() {
 
 #[test]
 fn test_hmac_rfc4231_2() {
-    // Test Case 2: key = "Jefe", data = "what do ya want for nothing?"
     // NOTE: Nilai ini adalah output aktual dari implementasi.
     let key = b"Jefe";
     let data = b"what do ya want for nothing?";
@@ -83,10 +74,6 @@ fn test_hmac_rfc4231_2() {
     assert_eq!(mac, expected);
     assert!(HMAC::verify(data, key, &expected));
 }
-
-// ============================================================================
-// HKDF-SHA512 Tests (RFC 5869 equivalent)
-// ============================================================================
 
 #[test]
 fn test_hkdf_vectors() {
@@ -106,7 +93,6 @@ fn test_hkdf_vectors() {
     HKDF::expand(&mut okm, prk, info);
     assert_eq!(okm, expected);
 
-    // empty salt & info
     let ikm = [0x0bu8; 22];
     let expected_empty: [u8; 42] = [
         0xf5, 0xfa, 0x02, 0xb1, 0x82, 0x98, 0xa7, 0x2a, 0x8c, 0x23, 0x89, 0x8a, 0x87, 0x03, 0x47,
@@ -118,10 +104,6 @@ fn test_hkdf_vectors() {
     HKDF::expand(&mut okm, prk, []);
     assert_eq!(okm, expected_empty);
 }
-
-// ============================================================================
-// HMAC Streaming Tests
-// ============================================================================
 
 #[test]
 fn test_hmac_streaming() {
@@ -150,10 +132,6 @@ fn test_hmac_verify_fail() {
     wrong[0] ^= 0x01;
     assert!(!HMAC::verify(data, key, &wrong));
 }
-
-// ============================================================================
-// SHA384 Tests (feature-gated)
-// ============================================================================
 
 #[cfg(feature = "sha384")]
 mod sha384_tests {
@@ -185,7 +163,6 @@ mod sha384_tests {
 
     #[test]
     fn test_hmac_sha384_rfc4231() {
-        // Test Case 1: key = 0x0b... (20), data = "Hi There"
         // NOTE: Nilai ini adalah output aktual dari implementasi.
         let key = [0x0b; 20];
         let data = b"Hi There";
@@ -217,7 +194,6 @@ mod sha384_tests {
         sha384::HKDF::expand(&mut okm, prk, info);
         assert_eq!(okm, expected);
 
-        // empty
         let expected_empty: [u8; 42] = [
             0xc8, 0xc9, 0x6e, 0x71, 0x0f, 0x89, 0xb0, 0xd7, 0x99, 0x0b, 0xca, 0x68, 0xbc, 0xde,
             0xc8, 0xcf, 0x85, 0x40, 0x62, 0xe5, 0x4c, 0x73, 0xa7, 0xab, 0xc7, 0x43, 0xfa, 0xde,

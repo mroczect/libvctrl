@@ -1,17 +1,8 @@
-//! Property‑based tests for the binary codec.
-//!
-//! * Round‑trip: `decode(encode(obj)) == obj`
-//! * Fuzzing: truncating the encoded data at a random position must make decoding fail
-
 use libvctrl_core::codec::{BinaryDecoder, BinaryEncoder};
 use libvctrl_handler::{
     Blob, Commit, Decoder, Encoder, EntryKind, Hash, Tag, Tree, TreeEntry, UserID,
 };
 use proptest::prelude::*;
-
-// ============================================================================
-// Strategies (generators)
-// ============================================================================
 
 fn hash_strategy() -> impl Strategy<Value = Hash> {
     any::<[u8; 64]>().prop_map(|bytes| Hash::from_bytes(&bytes).unwrap())
@@ -83,10 +74,6 @@ fn tag_strategy() -> impl Strategy<Value = Tag> {
         })
 }
 
-// ============================================================================
-// Round‑trip property tests
-// ============================================================================
-
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
@@ -131,10 +118,6 @@ proptest! {
     }
 }
 
-// ============================================================================
-// Fuzzing tests – truncate the encoded data at a random position, decoding must fail
-// ============================================================================
-
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(500))]
 
@@ -144,8 +127,8 @@ proptest! {
         if encoded.is_empty() {
             return Ok(());
         }
-        let idx = truncate_pos % encoded.len(); // idx in [0, len-1]
-        encoded.truncate(idx);                  // remove bytes from idx to end
+        let idx = truncate_pos % encoded.len();
+        encoded.truncate(idx);
         assert!(BinaryDecoder.decode_blob(&encoded).is_err());
     }
 
