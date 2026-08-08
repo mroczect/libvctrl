@@ -26,3 +26,29 @@ pub const HASH_LENGTH: usize = 64;
 /// Any name exceeding this length must be rejected with
 /// [`InvalidName`](crate::VctrlError::InvalidName).
 pub const MAX_NAME_LENGTH: usize = 255;
+
+// ---------------------------------------------------------------------------
+// Denial‑of‑Service prevention limits
+// ---------------------------------------------------------------------------
+
+/// Maximum size of a blob in bytes (100 MiB).
+///
+/// [`Decoder`](crate::Decoder) implementations **should** reject blobs
+/// larger than this limit to prevent memory‑exhaustion attacks.
+/// This is not enforced at the type level because legitimate use‑cases
+/// may require larger blobs, but decoders that process untrusted input
+/// must respect this bound.
+pub const MAX_BLOB_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
+
+/// Maximum number of entries in a single tree.
+///
+/// Decoders must reject trees with more than this many entries.
+/// A typical Git repository rarely exceeds a few thousand entries
+/// per directory; 100 000 provides ample headroom.
+pub const MAX_TREE_ENTRIES: usize = 100_000;
+
+/// Maximum length of a commit or tag message in bytes (1 MiB).
+///
+/// Prevents an attacker from exhausting memory by supplying an
+/// extremely long message.
+pub const MAX_MESSAGE_LENGTH: usize = 1024 * 1024; // 1 MiB
