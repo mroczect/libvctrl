@@ -12,7 +12,7 @@ categories = ["development-tools"]
 
 [dependencies]
 libvctrl_handler = {path = "../libvctrl_handler", version = "1.0.2" }
-libvctrl_sha512 = { path = "../libvctrl_sha512", version = "0.2.0" }
+libvctrl_sha512 = { path = "../libvctrl_sha512", version = "0.3.0" }
 
 [lints.rust]
 unsafe_code = "forbid"
