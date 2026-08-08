@@ -1,107 +1,7 @@
-//! # SHA-384, HMAC-SHA384, and HKDF-SHA384
-//!
-//! This module provides cryptographic primitives based on SHA-384, which is a
-//! variant of SHA-512 with different initial values and a truncated output (48 bytes).
-//! SHA-384 is specified in FIPS 180-4 and offers stronger resistance against
-//! length-extension attacks than SHA-256, while being more efficient than SHA-512
-//! on 64‑bit platforms (though it uses the same compression function).
-//!
-//! ## Overview
-//!
-//! This module includes:
-//! - **SHA‑384 hash** (`Hash`) – computes a 48‑byte digest.
-//! - **HMAC‑SHA384** (`HMAC`) – keyed message authentication code using SHA‑384.
-//! - **HKDF‑SHA384** (`HKDF`) – key derivation function (RFC 5869) using SHA‑384.
-//!
-//! All types mirror the SHA‑512 versions but with a smaller output size (48 bytes
-//! instead of 64). The internal block size remains 128 bytes.
-//!
-//! ## When to use SHA‑384
-//!
-//! - Use SHA‑384 when you need a strong hash with a 384‑bit digest.
-//! - It is commonly used in TLS/SSL, digital signatures, and certificate
-//!   verification.
-//! - For new applications that require a 384‑bit hash, SHA‑384 is a solid
-//!   choice.
-//!
-//! ## Features
-//!
-//! This module is only available when the `sha384` feature is enabled (it is
-//! enabled by default). To disable it, add `default-features = false` to your
-//! `Cargo.toml` dependency.
-//!
-//! ## Security Notes
-//!
-//! - SHA‑384 is considered secure and is not known to be broken.
-//! - The HMAC implementation uses constant‑time verification to resist timing
-//!   attacks.
-//! - HKDF provides domain separation via the `info` parameter; always use distinct
-//!   `info` strings for different purposes.
-//!
-//! ## Performance
-//!
-//! - SHA‑384 is about as fast as SHA‑512 on 64‑bit hardware because it uses the
-//!   same compression function, only the initial state differs.
-//! - HMAC‑SHA384 requires two hash passes (inner and outer), similar to SHA‑512.
-//! - For bulk hashing, the `hash` function is optimized for short inputs; for
-//!   very large data, use the streaming API.
-//!
-//! ## Examples
-//!
-//! ### SHA‑384 hashing
-//! ```
-//! use libvctrl_sha512::sha384::Hash;
-//!
-//! let digest = Hash::hash(b"hello world");
-//! assert_eq!(digest.len(), 48);
-//!
-//! // Streaming
-//! let mut hasher = Hash::new();
-//! hasher.update(b"hello ");
-//! hasher.update(b"world");
-//! let digest2 = hasher.finalize();
-//! assert_eq!(digest, digest2);
-//! ```
-//!
-//! ### HMAC‑SHA384
-//! ```
-//! use libvctrl_sha512::sha384::HMAC;
-//!
-//! let key = b"my-secret-key";
-//! let msg = b"important data";
-//! let mac = HMAC::mac(msg, key);
-//! assert_eq!(mac.len(), 48);
-//!
-//! // Verify
-//! let expected = HMAC::mac(msg, key);
-//! assert!(HMAC::verify(msg, key, &expected));
-//! ```
-//!
-//! ### HKDF‑SHA384
-//! ```
-//! use libvctrl_sha512::sha384::HKDF;
-//!
-//! let ikm = b"shared-secret";
-//! let salt = b"random-salt";
-//! let info = b"session-encryption";
-//! let prk = HKDF::extract(salt, ikm);
-//!
-//! let mut okm = [0u8; 32];
-//! HKDF::expand(&mut okm, prk, info);
-//! // `okm` is a 32‑byte derived key.
-//! ```
-//!
-//! ## References
-//!
-//! - [FIPS 180-4: Secure Hash Standard (SHS)](https://csrc.nist.gov/publications/detail/fips/180/4/final)
-//! - [RFC 2104 – HMAC](https://datatracker.ietf.org/doc/html/rfc2104)
-//! - [RFC 5869 – HKDF](https://datatracker.ietf.org/doc/html/rfc5869)
-
 use crate::sha512::{Hash as Sha512Hash, State};
 use crate::utils::load_be;
 use crate::utils::verify;
 
-/// Initial state (IV) for SHA‑384, as defined in FIPS 180‑4.
 #[inline]
 fn new_state() -> State {
     const IV: [u8; 64] = [
@@ -118,34 +18,10 @@ fn new_state() -> State {
     State(t)
 }
 
-/// SHA‑384 hasher with streaming support.
-///
-/// This struct wraps the SHA‑512 hasher but uses the SHA‑384 initial vector and
-/// truncates the output to 48 bytes. It implements the same API as `Sha512Hash`.
-///
-/// # Example
-/// ```
-/// use libvctrl_sha512::sha384::Hash;
-///
-/// let mut hasher = Hash::new();
-/// hasher.update(b"Hello, ");
-/// hasher.update(b"world!");
-/// let digest = hasher.finalize();
-/// assert_eq!(digest.len(), 48);
-/// ```
 #[derive(Copy, Clone)]
 pub struct Hash(Sha512Hash);
 
 impl Hash {
-    /// Creates a new SHA‑384 hasher with the default initial state.
-    ///
-    /// # Example
-    /// ```
-    /// use libvctrl_sha512::sha384::Hash;
-    /// let hasher = Hash::new();
-    /// // Hasher is ready to absorb data.
-    /// ```
-    #[inline]
     pub fn new() -> Self {
         Hash(Sha512Hash {
             state: new_state(),
@@ -155,78 +31,20 @@ impl Hash {
         })
     }
 
-    /// Internal update function (used by the digest trait implementations).
-    ///
-    /// This is not intended for direct public use; use `update` instead.
-    #[doc(hidden)]
     pub(crate) fn _update<T: AsRef<[u8]>>(&mut self, input: T) {
         self.0.update(input)
     }
 
-    /// Absorbs more data into the hash state.
-    ///
-    /// This method can be called multiple times to process a message in chunks.
-    ///
-    /// # Arguments
-    ///
-    /// * `input` – The chunk of data to hash. Any type that implements
-    ///   `AsRef<[u8]>` is accepted.
-    ///
-    /// # Example
-    /// ```
-    /// use libvctrl_sha512::sha384::Hash;
-    ///
-    /// let mut hasher = Hash::new();
-    /// hasher.update(b"first part ");
-    /// hasher.update(b"second part");
-    /// let digest = hasher.finalize();
-    /// ```
-    #[inline]
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T) {
         self._update(input)
     }
 
-    /// Finalizes the hash computation and returns the 48‑byte digest.
-    ///
-    /// Consumes the hasher and returns the SHA‑384 hash of all absorbed data.
-    ///
-    /// # Returns
-    ///
-    /// A `[u8; 48]` array containing the digest.
-    ///
-    /// # Example
-    /// ```
-    /// use libvctrl_sha512::sha384::Hash;
-    /// let digest = Hash::new().finalize(); // hash of empty input
-    /// assert_eq!(digest.len(), 48);
-    /// ```
-    #[inline]
     pub fn finalize(self) -> [u8; 48] {
         let mut out = [0u8; 48];
         out.copy_from_slice(&self.0.finalize()[..48]);
         out
     }
 
-    /// One‑shot SHA‑384 hash of the given input.
-    ///
-    /// This is a convenience function that creates a new hasher, updates it with
-    /// the input, and finalizes it in one step.
-    ///
-    /// # Arguments
-    ///
-    /// * `input` – The data to hash (any `AsRef<[u8]>`).
-    ///
-    /// # Returns
-    ///
-    /// The 48‑byte hash digest.
-    ///
-    /// # Example
-    /// ```
-    /// use libvctrl_sha512::sha384::Hash;
-    /// let digest = Hash::hash(b"hello");
-    /// assert_eq!(digest.len(), 48);
-    /// ```
-    #[inline]
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 48] {
         let mut h = Self::new();
         h.update(input);
@@ -235,74 +53,29 @@ impl Hash {
 }
 
 impl Default for Hash {
-    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// HMAC‑SHA384 instance for incremental message authentication.
-///
-/// This is analogous to the HMAC‑SHA512 struct but produces 48‑byte outputs.
-/// It can be used to authenticate messages of arbitrary length in chunks.
-///
-/// # Example
-/// ```
-/// use libvctrl_sha512::sha384::HMAC;
-///
-/// let key = b"my-key";
-/// let mut hmac = HMAC::new(key);
-/// hmac.update(b"first part ");
-/// hmac.update(b"second part");
-/// let mac = hmac.finalize();
-/// assert_eq!(mac.len(), 48);
-/// ```
 pub struct HMAC {
     ih: Hash,
     padded: [u8; 128],
 }
 
+impl Drop for HMAC {
+    fn drop(&mut self) {
+        self.padded.fill(0);
+    }
+}
+
 impl HMAC {
-    /// Computes the HMAC‑SHA384 of a message in one shot.
-    ///
-    /// # Arguments
-    ///
-    /// * `input` – The message to authenticate.
-    /// * `k`     – The secret key.
-    ///
-    /// # Returns
-    ///
-    /// A 48‑byte MAC.
-    ///
-    /// # Example
-    /// ```
-    /// use libvctrl_sha512::sha384::HMAC;
-    /// let mac = HMAC::mac(b"message", b"key");
-    /// assert_eq!(mac.len(), 48);
-    /// ```
-    #[inline]
     pub fn mac<T: AsRef<[u8]>, U: AsRef<[u8]>>(input: T, k: U) -> [u8; 48] {
         let mut hmac = Self::new(k);
         hmac.update(input);
         hmac.finalize()
     }
 
-    /// Creates a new streaming HMAC‑SHA384 instance with the given key.
-    ///
-    /// Keys longer than the block size (128 bytes) are hashed first.
-    /// Keys shorter are zero‑padded.
-    ///
-    /// # Arguments
-    ///
-    /// * `k` – The secret key. Any `AsRef<[u8]>` is accepted.
-    ///
-    /// # Key Handling
-    ///
-    /// This follows the HMAC specification: if the key is longer than the
-    /// hash block size (128 bytes), it is first hashed using SHA‑384 (which
-    /// produces 48 bytes), then padded to 128 bytes. Otherwise, the key is
-    /// zero‑padded to the block size.
-    #[inline]
     pub fn new(k: impl AsRef<[u8]>) -> Self {
         let k = k.as_ref();
         let mut hk = [0u8; 48];
@@ -321,25 +94,10 @@ impl HMAC {
         HMAC { ih, padded }
     }
 
-    /// Absorbs more data into the HMAC state.
-    ///
-    /// # Arguments
-    ///
-    /// * `input` – The chunk of data to authenticate.
-    #[inline]
     pub fn update(&mut self, input: impl AsRef<[u8]>) {
         self.ih.update(input);
     }
 
-    /// Finalizes the HMAC computation and returns the 48‑byte MAC.
-    ///
-    /// This consumes the instance; after calling this, the HMAC cannot be
-    /// used further.
-    ///
-    /// # Returns
-    ///
-    /// A `[u8; 48]` array containing the HMAC‑SHA384.
-    #[inline]
     pub fn finalize(mut self) -> [u8; 48] {
         for p in self.padded.iter_mut() {
             *p ^= 0x6a;
@@ -350,116 +108,31 @@ impl HMAC {
         oh.finalize()
     }
 
-    /// Finalizes and verifies the computed MAC against an expected value.
-    ///
-    /// The comparison is performed in **constant time**, protecting against
-    /// timing side‑channel attacks.
-    ///
-    /// # Arguments
-    ///
-    /// * `expected` – The expected 48‑byte MAC.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the MAC matches, `false` otherwise.
-    #[inline]
     pub fn finalize_verify(self, expected: &[u8; 48]) -> bool {
         let out = self.finalize();
         verify(&out, expected)
     }
 
-    /// One‑shot verification of a message's HMAC.
-    ///
-    /// This is a convenience function that computes the MAC and compares it
-    /// to the expected value in constant time.
-    ///
-    /// # Arguments
-    ///
-    /// * `input`    – The message.
-    /// * `k`        – The key.
-    /// * `expected` – The expected MAC.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the MAC matches, `false` otherwise.
-    #[inline]
     pub fn verify<T: AsRef<[u8]>, U: AsRef<[u8]>>(input: T, k: U, expected: &[u8; 48]) -> bool {
         let mac = Self::mac(input, k);
         verify(&mac, expected)
     }
 }
 
-/// HKDF‑SHA384 implementation.
-///
-/// This provides the Extract‑and‑Expand functionality (RFC 5869) using SHA‑384.
-/// It produces a 48‑byte pseudorandom key (PRK) from the extract step and can
-/// generate arbitrary‑length output keying material (OKM) from the expand step.
-///
-/// # Example
-/// ```
-/// use libvctrl_sha512::sha384::HKDF;
-///
-/// let ikm = b"shared-secret";
-/// let salt = b"random-salt";
-/// let prk = HKDF::extract(salt, ikm);
-///
-/// let mut okm = [0u8; 32];
-/// HKDF::expand(&mut okm, prk, b"encryption");
-/// ```
 pub struct HKDF;
 
 impl HKDF {
-    /// HKDF‑Extract: produces a 48‑byte pseudorandom key from the input keying material.
-    ///
-    /// # Arguments
-    ///
-    /// * `salt` – Optional salt value (can be empty). A non‑secret random value
-    ///   is recommended for best security, but a static salt is acceptable if the
-    ///   IKM already has sufficient entropy.
-    /// * `ikm`  – Input keying material. This is the secret value to be
-    ///   derived (e.g., a shared secret from a key exchange).
-    ///
-    /// # Returns
-    ///
-    /// A 48‑byte pseudorandom key (PRK).
-    ///
-    /// # Security
-    ///
-    /// Use a random salt when possible to achieve maximum security. The salt
-    /// is not secret and can be stored alongside the ciphertext.
-    #[inline]
     pub fn extract(salt: impl AsRef<[u8]>, ikm: impl AsRef<[u8]>) -> [u8; 48] {
         HMAC::mac(ikm, salt)
     }
 
-    /// HKDF‑Expand: derives output keying material of the requested length.
-    ///
-    /// # Arguments
-    ///
-    /// * `out` – Mutable slice to fill with derived key material. The length
-    ///   of this slice determines how many bytes are produced.
-    /// * `prk` – Pseudorandom key (from the extract step). Must be 48 bytes
-    ///   when using SHA‑384.
-    /// * `info` – Optional context information (can be empty). This provides
-    ///   domain separation: use distinct `info` for different purposes.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the requested output length exceeds `255 * 48 = 12240` bytes,
-    /// as per RFC 5869.
-    ///
-    /// # Security
-    ///
-    /// Always use distinct `info` strings for different contexts to ensure
-    /// that keys are not reused across applications. The output is deterministic
-    /// given the same `prk`, `info`, and output length.
-    #[inline]
     pub fn expand(out: &mut [u8], prk: impl AsRef<[u8]>, info: impl AsRef<[u8]>) {
+        assert_eq!(prk.as_ref().len(), 48, "HKDF-SHA384 expects a 48‑byte PRK");
         let info = info.as_ref();
         let mut counter: u8 = 1;
         assert!(
             out.len() < 0xff * 48,
-            "Requested output length exceeds RFC 5869 limit (12240 bytes)"
+            "Requested output exceeds RFC 5869 limit"
         );
         let mut i = 0;
         while i < out.len() {

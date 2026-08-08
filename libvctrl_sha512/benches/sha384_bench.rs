@@ -1,5 +1,4 @@
 #![cfg(feature = "sha384")]
-#![no_std]
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use libvctrl_sha512::sha384;

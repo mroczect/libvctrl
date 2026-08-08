@@ -37,17 +37,17 @@ fn bench_hkdf(c: &mut Criterion) {
     let info = [0xf0u8; 10];
 
     c.bench_function("HKDF-SHA512/extract", |b| {
-        b.iter(|| HKDF::extract(core::hint::black_box(&salt), core::hint::black_box(&ikm)))
+        b.iter(|| HKDF::extract(core::hint::black_box(salt), core::hint::black_box(ikm)))
     });
 
-    let prk = HKDF::extract(salt, ikm); // tidak perlu borrow, AsRef cukup
+    let prk = HKDF::extract(salt, ikm); // tanpa &
     c.bench_function("HKDF-SHA512/expand_64_bytes", |b| {
         b.iter(|| {
             let mut out = [0u8; 64];
             HKDF::expand(
                 &mut out,
-                core::hint::black_box(&prk),
-                core::hint::black_box(&info),
+                core::hint::black_box(prk),  // tanpa &
+                core::hint::black_box(info), // tanpa &
             );
             out
         })
