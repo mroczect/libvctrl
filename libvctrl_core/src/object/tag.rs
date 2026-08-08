@@ -38,7 +38,7 @@
 //! - `VctrlError::InvalidName` if the name is empty or too long (delegated
 //!   to [`Tag::new`]).
 
-use libvctrl_handler::{Hash, Tag, UserID, VctrlError};
+use libvctrl_handler::{CommitMeta, Hash, Tag, UserID, VctrlError};
 
 /// Builder for [`Tag`] objects.
 ///
@@ -60,6 +60,7 @@ pub struct TagBuilder {
     target: Option<Hash>,
     tagger: Option<UserID>,
     message: Option<String>,
+    meta: Option<CommitMeta>,
 }
 
 impl TagBuilder {
@@ -71,6 +72,7 @@ impl TagBuilder {
             target: None,
             tagger: None,
             message: None,
+            meta: None,
         }
     }
 
@@ -102,6 +104,13 @@ impl TagBuilder {
         self
     }
 
+    /// Sets metadata (timestamp, timezone, encoding).
+    #[must_use]
+    pub fn meta(mut self, meta: CommitMeta) -> Self {
+        self.meta = Some(meta);
+        self
+    }
+
     /// Builds the tag, validating the name and required fields.
     ///
     /// # Errors
@@ -114,6 +123,17 @@ impl TagBuilder {
         let target = self
             .target
             .ok_or_else(|| VctrlError::Other("target is required".into()))?;
-        Tag::new(name, target, self.tagger, self.message.unwrap_or_default())
+
+        if let Some(meta) = self.meta {
+            Tag::with_meta(
+                name,
+                target,
+                self.tagger,
+                self.message.unwrap_or_default(),
+                meta,
+            )
+        } else {
+            Tag::new(name, target, self.tagger, self.message.unwrap_or_default())
+        }
     }
 }
