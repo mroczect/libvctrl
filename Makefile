@@ -2,7 +2,7 @@ SHELL = /bin/bash
 .SHELLFLAGS = -euo pipefail -c
 
 CARGO   = cargo
-MEMBERS = libvctrl_handler libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl
+MEMBERS = libvctrl_handler libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl libvctrl_sha512
 
 .PHONY: all
 all: build
