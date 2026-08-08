@@ -1,6 +1,3 @@
-//! fields (`tree`, `author`, `committer`, `message`) must be set before
-//! Commits can have many parents, and the author and committer may be
-//! let user = UserID::new("Alice".into(), "alice@example.com".into()).unwrap();
 use libvctrl_handler::{Commit, CommitMeta, Hash, UserID, VctrlError};
 
 #[derive(Debug, Default)]
