@@ -1,7 +1,8 @@
 //! Binary decoder – reconstructs objects from the format emitted by [`BinaryEncoder`].
 
 use libvctrl_handler::{
-    Blob, Commit, Decoder, EntryKind, Hash, Tag, Tree, TreeEntry, UserID, VctrlError,
+    Blob, Commit, Decoder, EntryKind, Hash, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_TREE_ENTRIES,
+    Tag, Tree, TreeEntry, UserID, VctrlError,
 };
 use std::str;
 
@@ -9,7 +10,7 @@ use std::str;
 ///
 /// # Errors
 /// Every method returns [`VctrlError::CorruptedData`] if the input is
-/// truncated, malformed, or contains invalid UTF‑8.
+/// truncated, malformed, exceeds size limits, or contains invalid UTF‑8.
 pub struct BinaryDecoder;
 
 impl Decoder for BinaryDecoder {
@@ -22,6 +23,9 @@ impl Decoder for BinaryDecoder {
         let len_bytes: [u8; 8] = data[..8].try_into().unwrap();
         let data_len = usize::try_from(u64::from_le_bytes(len_bytes))
             .map_err(|_| VctrlError::CorruptedData("blob length out of range".into()))?;
+        if data_len > MAX_BLOB_SIZE {
+            return Err(VctrlError::CorruptedData("blob exceeds size limit".into()));
+        }
         if data.len() != 8 + data_len {
             return Err(VctrlError::CorruptedData("blob length mismatch".into()));
         }
@@ -34,6 +38,11 @@ impl Decoder for BinaryDecoder {
         }
         let count_bytes: [u8; 4] = data[..4].try_into().unwrap();
         let count = u32::from_le_bytes(count_bytes) as usize;
+        if count > MAX_TREE_ENTRIES {
+            return Err(VctrlError::CorruptedData(
+                "tree entry count exceeds limit".into(),
+            ));
+        }
         let mut pos = 4;
         let mut entries = Vec::with_capacity(count);
         for _ in 0..count {
@@ -146,6 +155,11 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
+        if msg_len > MAX_MESSAGE_LENGTH {
+            return Err(VctrlError::CorruptedData(
+                "commit message exceeds size limit".into(),
+            ));
+        }
         if pos + msg_len > data.len() {
             return Err(VctrlError::CorruptedData("message truncated".into()));
         }
@@ -215,6 +229,11 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
+        if msg_len > MAX_MESSAGE_LENGTH {
+            return Err(VctrlError::CorruptedData(
+                "tag message exceeds size limit".into(),
+            ));
+        }
         if pos + msg_len > data.len() {
             return Err(VctrlError::CorruptedData("message truncated".into()));
         }
