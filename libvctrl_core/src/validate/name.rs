@@ -27,10 +27,9 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
         return Err(VctrlError::InvalidName("name is empty".into()));
     }
     if name.len() > MAX_NAME_LENGTH {
-        // Cannot use format! in const fn, so we provide a static message
-        return Err(VctrlError::InvalidName(
-            "name exceeds maximum length".into(),
-        ));
+        return Err(VctrlError::InvalidName(format!(
+            "name exceeds maximum length {MAX_NAME_LENGTH}: '{name}'"
+        )));
     }
     Ok(())
 }
