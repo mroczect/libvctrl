@@ -1,6 +1,6 @@
 [package]
 name = "libvctrl_core"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 description = "Reference implementations of the libvctrl contracts (in-memory store, SHA-512 hasher, binary codec)"
 license = "MIT"
@@ -12,7 +12,7 @@ categories = ["development-tools"]
 
 [dependencies]
 libvctrl_handler = {path = "../libvctrl_handler", version = "1.0.2" }
-sha2 = "0.11.0"
+libvctrl_sha512 = { path = "../libvctrl_sha512", version = "0.2.0" }
 
 [lints.rust]
 unsafe_code = "forbid"
