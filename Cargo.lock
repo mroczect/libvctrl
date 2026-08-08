@@ -201,7 +201,7 @@ version = "1.0.0"
 
 [[package]]
 name = "libvctrl_core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "libvctrl_handler",
  "libvctrl_sha512",
