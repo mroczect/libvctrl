@@ -56,13 +56,23 @@
 //! let digest = hasher.finalize();
 //! ```
 //!
-//! ### Verification
+//! ### Verification (constant‑time)
 //! ```
 //! use libvctrl_sha512::Hash;
-//! let digest = Hash::hash(b"data");
-//! // Recompute later...
-//! let computed = Hash::hash(b"data");
-//! assert!(computed.verify(&digest));
+//!
+//! // Compute a digest
+//! let mut hasher = Hash::new();
+//! hasher.update(b"data");
+//! let digest = hasher.finalize();
+//!
+//! // Later, verify against a new hasher
+//! let mut verifier = Hash::new();
+//! verifier.update(b"data");
+//! assert!(verifier.verify(&digest));
+//!
+//! // Tampering detection
+//! let wrong = [0u8; 64];
+//! assert!(!Hash::new().verify(&wrong)); // empty hash != wrong
 //! ```
 //!
 //! ## Performance
@@ -96,6 +106,14 @@ pub(crate) struct State(pub(crate) [u64; 8]);
 
 impl W {
     /// Creates a new message schedule from a 128‑byte input block.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` – A 128‑byte slice representing a message block.
+    ///
+    /// # Returns
+    ///
+    /// A `W` instance containing the initial 16 64‑bit words (big‑endian).
     #[inline]
     fn new(input: &[u8]) -> Self {
         let mut w = [0u64; 16];
@@ -106,36 +124,48 @@ impl W {
     }
 
     /// SHA‑512 `Ch` function: choose bits from y or z based on x.
+    ///
+    /// Defined as: `(x & y) ^ (!x & z)`
     #[inline(always)]
     fn Ch(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (!x & z)
     }
 
     /// SHA‑512 `Maj` function: majority of three inputs.
+    ///
+    /// Defined as: `(x & y) ^ (x & z) ^ (y & z)`
     #[inline(always)]
     fn Maj(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (x & z) ^ (y & z)
     }
 
     /// SHA‑512 Σ₀ (uppercase sigma zero): rotate and xor.
+    ///
+    /// Defined as: `ROTR⁺²⁸(x) ^ ROTR⁺³⁴(x) ^ ROTR⁺³⁹(x)`
     #[inline(always)]
     fn Sigma0(x: u64) -> u64 {
         x.rotate_right(28) ^ x.rotate_right(34) ^ x.rotate_right(39)
     }
 
     /// SHA‑512 Σ₁ (uppercase sigma one): rotate and xor.
+    ///
+    /// Defined as: `ROTR⁺¹⁴(x) ^ ROTR⁺¹⁸(x) ^ ROTR⁺⁴¹(x)`
     #[inline(always)]
     fn Sigma1(x: u64) -> u64 {
         x.rotate_right(14) ^ x.rotate_right(18) ^ x.rotate_right(41)
     }
 
     /// SHA‑512 σ₀ (lowercase sigma zero): rotate and shift.
+    ///
+    /// Defined as: `ROTR⁺¹(x) ^ ROTR⁺⁸(x) ^ SHR⁺⁷(x)`
     #[inline(always)]
     fn sigma0(x: u64) -> u64 {
         x.rotate_right(1) ^ x.rotate_right(8) ^ (x >> 7)
     }
 
     /// SHA‑512 σ₁ (lowercase sigma one): rotate and shift.
+    ///
+    /// Defined as: `ROTR⁺¹⁹(x) ^ ROTR⁺⁶¹(x) ^ SHR⁺⁶(x)`
     #[inline(always)]
     fn sigma1(x: u64) -> u64 {
         x.rotate_right(19) ^ x.rotate_right(61) ^ (x >> 6)
@@ -143,8 +173,15 @@ impl W {
 
     /// Message expansion: combine four existing words to produce a new one.
     ///
-    /// `a` = index of the word to update.
-    /// `b, c, d` = indices of words used in the formula.
+    /// This implements the SHA‑512 message schedule recurrence:
+    /// `Wt = σ₁(Wt-2) + Wt-7 + σ₀(Wt-15) + Wt-16`
+    ///
+    /// # Arguments
+    ///
+    /// * `a` – index of the word to update (t).
+    /// * `b` – index of the word used as `t-2` for σ₁.
+    /// * `c` – index of the word used as `t-7`.
+    /// * `d` – index of the word used as `t-15` for σ₀.
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     fn M(&mut self, a: usize, b: usize, c: usize, d: usize) {
@@ -181,9 +218,14 @@ impl W {
 
     /// One round of the SHA‑512 compression function.
     ///
-    /// `state` – the current hash state (a..h).
-    /// `i`     – round index (0..15) used to pick which state word to update.
-    /// `k`     – round constant.
+    /// This updates the hash state (a..h) using the current message word (from
+    /// the schedule) and a round constant.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` – The current hash state (8 64‑bit words).
+    /// * `i`     – Round index (0..15) used to select which state word to update.
+    /// * `k`     – The round constant.
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     fn F(&mut self, state: &mut State, i: usize, k: u64) {
@@ -210,35 +252,94 @@ impl W {
     /// Applies 16 rounds of the compression function for a given group.
     ///
     /// Each group corresponds to 16 rounds; there are 5 groups total (80 rounds).
+    ///
+    /// # Arguments
+    ///
+    /// * `state` – The current hash state.
+    /// * `s`     – Group index (0..4), used to select the starting point in the
+    ///   round constant array.
     fn G(&mut self, state: &mut State, s: usize) {
         const ROUND_CONSTANTS: [u64; 80] = [
-            0x428a2f98d728ae22, 0x7137449123ef65cd, 0xb5c0fbcfec4d3b2f,
-            0xe9b5dba58189dbbc, 0x3956c25bf348b538, 0x59f111f1b605d019,
-            0x923f82a4af194f9b, 0xab1c5ed5da6d8118, 0xd807aa98a3030242,
-            0x12835b0145706fbe, 0x243185be4ee4b28c, 0x550c7dc3d5ffb4e2,
-            0x72be5d74f27b896f, 0x80deb1fe3b1696b1, 0x9bdc06a725c71235,
-            0xc19bf174cf692694, 0xe49b69c19ef14ad2, 0xefbe4786384f25e3,
-            0x0fc19dc68b8cd5b5, 0x240ca1cc77ac9c65, 0x2de92c6f592b0275,
-            0x4a7484aa6ea6e483, 0x5cb0a9dcbd41fbd4, 0x76f988da831153b5,
-            0x983e5152ee66dfab, 0xa831c66d2db43210, 0xb00327c898fb213f,
-            0xbf597fc7beef0ee4, 0xc6e00bf33da88fc2, 0xd5a79147930aa725,
-            0x06ca6351e003826f, 0x142929670a0e6e70, 0x27b70a8546d22ffc,
-            0x2e1b21385c26c926, 0x4d2c6dfc5ac42aed, 0x53380d139d95b3df,
-            0x650a73548baf63de, 0x766a0abb3c77b2a8, 0x81c2c92e47edaee6,
-            0x92722c851482353b, 0xa2bfe8a14cf10364, 0xa81a664bbc423001,
-            0xc24b8b70d0f89791, 0xc76c51a30654be30, 0xd192e819d6ef5218,
-            0xd69906245565a910, 0xf40e35855771202a, 0x106aa07032bbd1b8,
-            0x19a4c116b8d2d0c8, 0x1e376c085141ab53, 0x2748774cdf8eeb99,
-            0x34b0bcb5e19b48a8, 0x391c0cb3c5c95a63, 0x4ed8aa4ae3418acb,
-            0x5b9cca4f7763e373, 0x682e6ff3d6b2b8a3, 0x748f82ee5defb2fc,
-            0x78a5636f43172f60, 0x84c87814a1f0ab72, 0x8cc702081a6439ec,
-            0x90befffa23631e28, 0xa4506cebde82bde9, 0xbef9a3f7b2c67915,
-            0xc67178f2e372532b, 0xca273eceea26619c, 0xd186b8c721c0c207,
-            0xeada7dd6cde0eb1e, 0xf57d4f7fee6ed178, 0x06f067aa72176fba,
-            0x0a637dc5a2c898a6, 0x113f9804bef90dae, 0x1b710b35131c471b,
-            0x28db77f523047d84, 0x32caab7b40c72493, 0x3c9ebe0a15c9bebc,
-            0x431d67c49c100d4c, 0x4cc5d4becb3e42b6, 0x597f299cfc657e2a,
-            0x5fcb6fab3ad6faec, 0x6c44198c4a475817,
+            0x428a2f98d728ae22,
+            0x7137449123ef65cd,
+            0xb5c0fbcfec4d3b2f,
+            0xe9b5dba58189dbbc,
+            0x3956c25bf348b538,
+            0x59f111f1b605d019,
+            0x923f82a4af194f9b,
+            0xab1c5ed5da6d8118,
+            0xd807aa98a3030242,
+            0x12835b0145706fbe,
+            0x243185be4ee4b28c,
+            0x550c7dc3d5ffb4e2,
+            0x72be5d74f27b896f,
+            0x80deb1fe3b1696b1,
+            0x9bdc06a725c71235,
+            0xc19bf174cf692694,
+            0xe49b69c19ef14ad2,
+            0xefbe4786384f25e3,
+            0x0fc19dc68b8cd5b5,
+            0x240ca1cc77ac9c65,
+            0x2de92c6f592b0275,
+            0x4a7484aa6ea6e483,
+            0x5cb0a9dcbd41fbd4,
+            0x76f988da831153b5,
+            0x983e5152ee66dfab,
+            0xa831c66d2db43210,
+            0xb00327c898fb213f,
+            0xbf597fc7beef0ee4,
+            0xc6e00bf33da88fc2,
+            0xd5a79147930aa725,
+            0x06ca6351e003826f,
+            0x142929670a0e6e70,
+            0x27b70a8546d22ffc,
+            0x2e1b21385c26c926,
+            0x4d2c6dfc5ac42aed,
+            0x53380d139d95b3df,
+            0x650a73548baf63de,
+            0x766a0abb3c77b2a8,
+            0x81c2c92e47edaee6,
+            0x92722c851482353b,
+            0xa2bfe8a14cf10364,
+            0xa81a664bbc423001,
+            0xc24b8b70d0f89791,
+            0xc76c51a30654be30,
+            0xd192e819d6ef5218,
+            0xd69906245565a910,
+            0xf40e35855771202a,
+            0x106aa07032bbd1b8,
+            0x19a4c116b8d2d0c8,
+            0x1e376c085141ab53,
+            0x2748774cdf8eeb99,
+            0x34b0bcb5e19b48a8,
+            0x391c0cb3c5c95a63,
+            0x4ed8aa4ae3418acb,
+            0x5b9cca4f7763e373,
+            0x682e6ff3d6b2b8a3,
+            0x748f82ee5defb2fc,
+            0x78a5636f43172f60,
+            0x84c87814a1f0ab72,
+            0x8cc702081a6439ec,
+            0x90befffa23631e28,
+            0xa4506cebde82bde9,
+            0xbef9a3f7b2c67915,
+            0xc67178f2e372532b,
+            0xca273eceea26619c,
+            0xd186b8c721c0c207,
+            0xeada7dd6cde0eb1e,
+            0xf57d4f7fee6ed178,
+            0x06f067aa72176fba,
+            0x0a637dc5a2c898a6,
+            0x113f9804bef90dae,
+            0x1b710b35131c471b,
+            0x28db77f523047d84,
+            0x32caab7b40c72493,
+            0x3c9ebe0a15c9bebc,
+            0x431d67c49c100d4c,
+            0x4cc5d4becb3e42b6,
+            0x597f299cfc657e2a,
+            0x5fcb6fab3ad6faec,
+            0x6c44198c4a475817,
         ];
         let rc = &ROUND_CONSTANTS[s * 16..];
         self.F(state, 0, rc[0]);
@@ -262,15 +363,14 @@ impl W {
 
 impl State {
     /// Creates a new SHA‑512 state with the standard initial vector (IV).
+    ///
+    /// The IV is defined in FIPS 180‑4.
     pub(crate) fn new() -> Self {
         const IV: [u8; 64] = [
-            0x6a, 0x09, 0xe6, 0x67, 0xf3, 0xbc, 0xc9, 0x08,
-            0xbb, 0x67, 0xae, 0x85, 0x84, 0xca, 0xa7, 0x3b,
-            0x3c, 0x6e, 0xf3, 0x72, 0xfe, 0x94, 0xf8, 0x2b,
-            0xa5, 0x4f, 0xf5, 0x3a, 0x5f, 0x1d, 0x36, 0xf1,
-            0x51, 0x0e, 0x52, 0x7f, 0xad, 0xe6, 0x82, 0xd1,
-            0x9b, 0x05, 0x68, 0x8c, 0x2b, 0x3e, 0x6c, 0x1f,
-            0x1f, 0x83, 0xd9, 0xab, 0xfb, 0x41, 0xbd, 0x6b,
+            0x6a, 0x09, 0xe6, 0x67, 0xf3, 0xbc, 0xc9, 0x08, 0xbb, 0x67, 0xae, 0x85, 0x84, 0xca,
+            0xa7, 0x3b, 0x3c, 0x6e, 0xf3, 0x72, 0xfe, 0x94, 0xf8, 0x2b, 0xa5, 0x4f, 0xf5, 0x3a,
+            0x5f, 0x1d, 0x36, 0xf1, 0x51, 0x0e, 0x52, 0x7f, 0xad, 0xe6, 0x82, 0xd1, 0x9b, 0x05,
+            0x68, 0x8c, 0x2b, 0x3e, 0x6c, 0x1f, 0x1f, 0x83, 0xd9, 0xab, 0xfb, 0x41, 0xbd, 0x6b,
             0x5b, 0xe0, 0xcd, 0x19, 0x13, 0x7e, 0x21, 0x79,
         ];
         let mut t = [0u64; 8];
@@ -281,6 +381,8 @@ impl State {
     }
 
     /// Adds two states together (mod 2^64) – used after processing a block.
+    ///
+    /// This implements the final addition step after processing each block.
     #[inline(always)]
     pub(crate) fn add(&mut self, x: &State) {
         let sx = &mut self.0;
@@ -296,6 +398,14 @@ impl State {
     }
 
     /// Stores the state as big‑endian bytes in the output slice.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` – A mutable slice of at least 64 bytes.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if `out` is too short.
     pub(crate) fn store(&self, out: &mut [u8]) {
         for (i, &e) in self.0.iter().enumerate() {
             store_be(out, i * 8, e);
@@ -306,6 +416,14 @@ impl State {
     ///
     /// Returns the number of bytes that were **not** processed (i.e., the
     /// remainder) because the input wasn't a multiple of the block size.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` – A byte slice containing data to process.
+    ///
+    /// # Returns
+    ///
+    /// The number of unprocessed bytes (less than 128).
     pub(crate) fn blocks(&mut self, mut input: &[u8]) -> usize {
         let mut t = *self;
         let mut inlen = input.len();
@@ -373,6 +491,8 @@ impl Hash {
     }
 
     /// Internal update function used by the digest trait.
+    ///
+    /// This is not intended for direct public use; use `update` instead.
     #[doc(hidden)]
     pub(crate) fn _update<T: AsRef<[u8]>>(&mut self, input: T) {
         let input = input.as_ref();
@@ -402,6 +522,7 @@ impl Hash {
     /// This method can be called multiple times to process a message in chunks.
     ///
     /// # Arguments
+    ///
     /// * `input` – The chunk of data to hash (any `AsRef<[u8]>`).
     ///
     /// # Example
@@ -423,6 +544,7 @@ impl Hash {
     /// be reused. The padding and length bits are appended automatically.
     ///
     /// # Returns
+    ///
     /// A `[u8; 64]` array containing the SHA‑512 hash.
     ///
     /// # Example
@@ -453,9 +575,11 @@ impl Hash {
     /// the input, and finalizes it in one step.
     ///
     /// # Arguments
-    /// * `input` – The data to hash.
+    ///
+    /// * `input` – The data to hash (any `AsRef<[u8]>`).
     ///
     /// # Returns
+    ///
     /// The 64‑byte hash digest.
     ///
     /// # Example
@@ -478,21 +602,29 @@ impl Hash {
     /// timing side‑channel attacks.
     ///
     /// # Arguments
+    ///
     /// * `expected` – The expected 64‑byte digest.
     ///
     /// # Returns
+    ///
     /// `true` if the digests match, `false` otherwise.
     ///
     /// # Example
     /// ```
     /// use libvctrl_sha512::Hash;
-    /// let digest = Hash::hash(b"data");
-    /// // Later...
-    /// let recomputed = Hash::hash(b"data");
-    /// assert!(recomputed.verify(&digest));
-    /// // Tampering:
+    ///
+    /// let mut hasher = Hash::new();
+    /// hasher.update(b"data");
+    /// let digest = hasher.finalize();
+    ///
+    /// // Later, verify using a new hasher
+    /// let mut verifier = Hash::new();
+    /// verifier.update(b"data");
+    /// assert!(verifier.verify(&digest));
+    ///
+    /// // Tampering detection
     /// let wrong = [0u8; 64];
-    /// assert!(!recomputed.verify(&wrong));
+    /// assert!(!Hash::new().verify(&wrong));
     /// ```
     #[inline]
     pub fn verify(self, expected: &[u8; 64]) -> bool {
