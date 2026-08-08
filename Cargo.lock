@@ -73,7 +73,7 @@ version = "1.0.0"
 
 [[package]]
 name = "libvctrl_core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libvctrl_handler",
  "sha2",
