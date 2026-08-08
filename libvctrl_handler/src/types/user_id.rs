@@ -2,10 +2,6 @@ use crate::errors::VctrlError;
 
 use super::validate_name;
 
-/// Identity of a user (author or committer).
-/// let user = UserID::new("Alice".into(), "alice@example.com".into())
-///     .expect("valid user");
-/// assert_eq!(user.email(), "alice@example.com");
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UserID {
     name: String,
