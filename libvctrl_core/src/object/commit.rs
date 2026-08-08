@@ -39,7 +39,7 @@
 //! user identities – those are already guaranteed to be valid by their
 //! own constructors in `libvctrl_handler`.
 
-use libvctrl_handler::{Commit, Hash, UserID, VctrlError};
+use libvctrl_handler::{Commit, CommitMeta, Hash, UserID, VctrlError};
 
 /// Builder for [`Commit`] objects.
 ///
@@ -71,6 +71,7 @@ pub struct CommitBuilder {
     author: Option<UserID>,
     committer: Option<UserID>,
     message: Option<String>,
+    meta: Option<CommitMeta>,
 }
 
 impl CommitBuilder {
@@ -83,6 +84,7 @@ impl CommitBuilder {
             author: None,
             committer: None,
             message: None,
+            meta: None,
         }
     }
 
@@ -121,6 +123,13 @@ impl CommitBuilder {
         self
     }
 
+    /// Sets metadata (timestamp, timezone, encoding).
+    #[must_use]
+    pub fn meta(mut self, meta: CommitMeta) -> Self {
+        self.meta = Some(meta);
+        self
+    }
+
     /// Builds the commit.
     ///
     /// # Errors
@@ -138,6 +147,18 @@ impl CommitBuilder {
         let message = self
             .message
             .ok_or_else(|| VctrlError::Other("message is required".into()))?;
-        Ok(Commit::new(tree, self.parents, author, committer, message))
+
+        if let Some(meta) = self.meta {
+            Ok(Commit::with_meta(
+                tree,
+                self.parents,
+                author,
+                committer,
+                message,
+                meta,
+            ))
+        } else {
+            Ok(Commit::new(tree, self.parents, author, committer, message))
+        }
     }
 }
