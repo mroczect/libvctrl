@@ -132,3 +132,77 @@ impl RefStore for MemoryRefStore {
         Ok(self.refs.keys().cloned().collect())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libvctrl_handler::HASH_LENGTH;
+
+    fn dummy_hash() -> Hash {
+        Hash::from_bytes(&[0xAB; HASH_LENGTH]).unwrap()
+    }
+
+    #[test]
+    fn set_and_get_ref() {
+        let mut store = MemoryRefStore::new();
+        let hash = dummy_hash();
+        store.set_ref("HEAD", &hash).unwrap();
+        assert_eq!(store.get_ref("HEAD").unwrap(), hash);
+    }
+
+    #[test]
+    fn get_non_existent_ref() {
+        let store = MemoryRefStore::new();
+        assert!(store.get_ref("HEAD").is_err());
+    }
+
+    #[test]
+    fn delete_ref() {
+        let mut store = MemoryRefStore::new();
+        store.set_ref("refs/heads/main", &dummy_hash()).unwrap();
+        store.delete_ref("refs/heads/main").unwrap();
+        assert!(store.get_ref("refs/heads/main").is_err());
+    }
+
+    #[test]
+    fn delete_non_existent_is_noop() {
+        let mut store = MemoryRefStore::new();
+        assert!(store.delete_ref("nope").is_ok());
+    }
+
+    #[test]
+    fn set_ref_with_empty_name_fails() {
+        let mut store = MemoryRefStore::new();
+        assert!(store.set_ref("", &dummy_hash()).is_err());
+    }
+
+    #[test]
+    fn set_ref_with_too_long_name_fails() {
+        let mut store = MemoryRefStore::new();
+        let long_name = "a".repeat(MAX_NAME_LENGTH + 1);
+        assert!(store.set_ref(&long_name, &dummy_hash()).is_err());
+    }
+
+    #[test]
+    fn list_refs() {
+        let mut store = MemoryRefStore::new();
+        store.set_ref("a", &dummy_hash()).unwrap();
+        store.set_ref("b", &dummy_hash()).unwrap();
+        let list = store.list_refs().unwrap();
+        assert_eq!(list.len(), 2);
+        assert!(list.contains(&"a".to_string()));
+        assert!(list.contains(&"b".to_string()));
+    }
+
+    #[test]
+    fn overwrite_ref() {
+        let mut store = MemoryRefStore::new();
+        let hash1 = dummy_hash();
+        let mut hash2_arr = [0xCD; HASH_LENGTH];
+        hash2_arr[0] = 0xCD;
+        let hash2 = Hash::from_bytes(&hash2_arr).unwrap();
+        store.set_ref("HEAD", &hash1).unwrap();
+        store.set_ref("HEAD", &hash2).unwrap();
+        assert_eq!(store.get_ref("HEAD").unwrap(), hash2);
+    }
+}
