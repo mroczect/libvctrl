@@ -1,94 +1,9 @@
-//! Binary encoder – serializes objects into the deterministic binary format.
-//!
-//! This module provides [`BinaryEncoder`], which implements the [`Encoder`]
-//! trait. The format is designed to be simple, predictable, and easy to
-//! implement in any language.
-
 use libvctrl_handler::{
     Blob, Commit, Encoder, EntryKind, MAX_MESSAGE_LENGTH, Tag, Tree, VctrlError,
 };
 
-/// Current binary format version.
-///
-/// This byte is written as the very first byte of every encoded object.
-/// When the format evolves, this version number will be incremented,
-/// allowing decoders to maintain backward compatibility or reject
-/// unsupported versions.
 pub const VERSION: u8 = 2;
 
-/// Encodes objects into a deterministic binary format.
-///
-/// # Format specification (version 0x02)
-///
-/// Every encoded object starts with a **version byte** (`0x02`),
-/// followed by type‑specific payload as described below.
-/// The payload can be parsed by [`BinaryDecoder`](super::binary_decoder::BinaryDecoder).
-/// Every multi‑byte integer is encoded as little‑endian.
-///
-/// ## Blob
-/// ```text
-/// [ 1 byte version | 8 bytes data_length | data_bytes... ]
-/// ```
-///
-/// ## Tree
-/// ```text
-/// [ 1 byte version | 4 bytes entry_count ]
-/// for each entry:
-///     [ 1 byte name_length | name_bytes... | 1 byte kind | 64 bytes hash ]
-/// ```
-/// where `kind` is `0` for Blob and `1` for Tree.
-///
-/// ## Commit
-/// ```text
-/// [ 1 byte version | 64 bytes tree_hash ]
-/// [ 1 byte parent_count ]
-/// [ for each parent: 64 bytes parent_hash ]
-/// [ 1 byte author_name_length | author_name_bytes... ]
-/// [ 1 byte author_email_length | author_email_bytes... ]
-/// [ 1 byte committer_name_length | committer_name_bytes... ]
-/// [ 1 byte committer_email_length | committer_email_bytes... ]
-/// [ 4 bytes message_length | message_bytes... ]
-/// [ 8 bytes timestamp (i64 LE) ]
-/// [ 2 bytes timezone_offset (i16 LE) ]
-/// [ 1 byte encoding_length | encoding_bytes... ]   (0x00 if None)
-/// ```
-///
-/// ## Tag
-/// ```text
-/// [ 1 byte version | 1 byte name_length | name_bytes... ]
-/// [ 64 bytes target_hash ]
-/// [ 1 byte has_tagger ]
-/// if has_tagger == 1:
-///     [ 1 byte tagger_name_length | tagger_name_bytes... ]
-///     [ 1 byte tagger_email_length | tagger_email_bytes... ]
-/// [ 4 bytes message_length | message_bytes... ]
-/// [ 8 bytes timestamp (i64 LE) ]
-/// [ 2 bytes timezone_offset (i16 LE) ]
-/// [ 1 byte encoding_length | encoding_bytes... ]   (0x00 if None)
-/// ```
-///
-/// # Error handling
-///
-/// All methods return [`VctrlError::SerializationError`] if a field exceeds
-/// the maximum allowed size (e.g., a name longer than 255 bytes). This is
-/// a safety measure to ensure the encoding remains valid.
-///
-/// # Round‑trip guarantee
-///
-/// When paired with [`BinaryDecoder`](super::binary_decoder::BinaryDecoder),
-/// encoding and then decoding any valid object must yield the original object.
-///
-/// # Example
-///
-/// ```rust
-/// use libvctrl_core::codec::BinaryEncoder;
-/// use libvctrl_handler::{Blob, Encoder};
-///
-/// let encoder = BinaryEncoder;
-/// let blob = Blob::new(b"example".to_vec());
-/// let encoded = encoder.encode_blob(&blob).expect("encode should succeed");
-/// // encoded starts with version byte 0x02
-/// ```
 pub struct BinaryEncoder;
 
 impl Encoder for BinaryEncoder {
@@ -133,7 +48,6 @@ impl Encoder for BinaryEncoder {
         for p in parents {
             out.extend_from_slice(p.as_bytes());
         }
-        // Author
         let author_name_len = u8::try_from(commit.author().name().len())
             .map_err(|_| VctrlError::SerializationError("author name too long".into()))?;
         out.push(author_name_len);
@@ -142,7 +56,6 @@ impl Encoder for BinaryEncoder {
             .map_err(|_| VctrlError::SerializationError("author email too long".into()))?;
         out.push(author_email_len);
         out.extend_from_slice(commit.author().email().as_bytes());
-        // Committer
         let committer_name_len = u8::try_from(commit.committer().name().len())
             .map_err(|_| VctrlError::SerializationError("committer name too long".into()))?;
         out.push(committer_name_len);
@@ -151,7 +64,6 @@ impl Encoder for BinaryEncoder {
             .map_err(|_| VctrlError::SerializationError("committer email too long".into()))?;
         out.push(committer_email_len);
         out.extend_from_slice(commit.committer().email().as_bytes());
-        // Message
         let msg = commit.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
@@ -162,10 +74,8 @@ impl Encoder for BinaryEncoder {
         }
         out.extend_from_slice(&msg_len.to_le_bytes());
         out.extend_from_slice(msg.as_bytes());
-        // Timestamp & timezone
         out.extend_from_slice(&commit.timestamp().to_le_bytes());
         out.extend_from_slice(&commit.timezone_offset().to_le_bytes());
-        // Encoding
         match commit.encoding() {
             Some(enc) => {
                 let len = u8::try_from(enc.len())
@@ -204,10 +114,8 @@ impl Encoder for BinaryEncoder {
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
         out.extend_from_slice(&msg_len.to_le_bytes());
         out.extend_from_slice(msg.as_bytes());
-        // Timestamp & timezone
         out.extend_from_slice(&tag.timestamp().to_le_bytes());
         out.extend_from_slice(&tag.timezone_offset().to_le_bytes());
-        // Encoding
         match tag.encoding() {
             Some(enc) => {
                 let len = u8::try_from(enc.len())

@@ -1,123 +1,12 @@
-//! # SHA‑512 (FIPS 180‑4)
-//!
-//! This module implements the **SHA‑512** cryptographic hash function as defined
-//! in [FIPS 180‑4](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf).
-//! It is the backbone of the entire `libvctrl_sha512` crate and also serves as
-//! the underlying primitive for [`HMAC`](crate::HMAC) and [`HKDF`](crate::HKDF).
-//!
-//! ## Overview
-//!
-//! SHA‑512 takes an arbitrary‑length message and produces a **64‑byte**
-//! (512‑bit) digest. It belongs to the SHA‑2 family and is designed for
-//! environments where 256 bits of security are required. Common use‑cases
-//! include:
-//!
-//! - File / data integrity verification
-//! - Digital signatures (with RSASSA‑PSS or ECDSA)
-//! - Password hashing (when combined with a salt, e.g., in PBKDF2)
-//! - Building MACs (HMAC‑SHA‑512) and KDFs (HKDF‑SHA‑512)
-//!
-//! ## Implementation details
-//!
-//! This implementation is:
-//!
-//! - **FIPS 180‑4 compliant** – message padding uses a 128‑bit big‑endian
-//!   length field, as required by the standard.
 //! - **Zero‑dependency** – it relies only on `core` and is `#![no_std]`
-//!   compatible.
-//! - **Audited** – the code has undergone a security audit (v0.2.0) and
-//!   all findings have been addressed.
-//! - **Configurable code size** – enable the `opt_size` feature to trade
-//!   a small amount of speed for a significantly smaller binary.
-//!
-//! ## Internal architecture
-//!
-//! SHA‑512 operates on 1024‑bit (128‑byte) message blocks. The hashing
-//! state consists of:
-//!
-//! - Eight 64‑bit working variables (`a`–`h`) stored in [`State`].
-//! - A message schedule of 16 × 64‑bit words stored in [`W`].
-//! - An input buffer, a read pointer, and a total message length counter
-//!   kept in the [`Hash`] struct.
-//!
-//! The compression function performs 80 rounds of bitwise operations
-//! (Σ, Maj, Ch, etc.) using round‑specific constants.
-//!
-//! ## Core types
-//!
-//! The primary public type is [`Hash`]. It provides three usage patterns:
-//!
-//! 1. **One‑shot** – [`Hash::hash`] computes the digest in a single call.
-//! 2. **Streaming** – [`Hash::new`] creates a state, [`update`](Hash::update)
-//!    feeds data incrementally, and [`finalize`](Hash::finalize) produces
-//!    the digest (consuming the state).
-//! 3. **Constant‑time verification** – [`Hash::verify`] checks a digest
-//!    against an expected value using a timing‑side‑channel‑resistant
-//!    comparison.
-//!
-//! ## Examples
-//!
-//! ### One‑shot hashing
-//!
-//! ```rust
-//! use libvctrl_sha512::Hash;
-//!
-//! let digest = Hash::hash(b"hello world");
-//! assert_eq!(digest.len(), 64);
-//! ```
-//!
-//! ### Streaming hashing
-//!
-//! ```rust
-//! use libvctrl_sha512::Hash;
-//!
-//! let mut hasher = Hash::new();
-//! hasher.update(b"hello ");
-//! hasher.update(b"world");
-//! let d = hasher.finalize();
-//! assert_eq!(d, Hash::hash(b"hello world"));
-//! ```
-//!
-//! ### Constant‑time verification
-//!
-//! ```rust
-//! use libvctrl_sha512::Hash;
-//!
-//! let expected = Hash::hash(b"secret");
-//! let mut verifier = Hash::new();
-//! verifier.update(b"secret");
-//! assert!(verifier.verify(&expected));
-//! assert!(!verifier.verify(&[0u8; 64]));
-//! ```
-//!
-//! ## Internals (for contributors)
-//!
-//! The module also exposes two `pub(crate)` helpers:
-//!
-//! - [`State`] – the eight 64‑bit working variables of SHA‑512.
-//! - [`W`] – the message schedule array.
-//!
-//! These are used by the [`sha384`](crate::sha384) module to reuse the
-//! compression function.
-
 use crate::utils::{load_be, store_be, verify};
 
-/// Message schedule – 16 × 64‑bit words used during compression.
-///
-/// This struct wraps the 16 working variables `W_0` … `W_15` from the
-/// SHA‑512 specification.  It handles message expansion and the main
-/// compression loop (round functions).
 struct W([u64; 16]);
 
-/// SHA‑512 working state (eight 64‑bit registers `a`–`h`).
-///
-/// This is `pub(crate)` because SHA‑384 reuses the same compression
-/// function; it is not part of the public API.
 #[derive(Copy, Clone)]
 pub(crate) struct State(pub(crate) [u64; 8]);
 
 impl W {
-    /// Load the first 128 bytes of a message block as sixteen big‑endian `u64`s.
     fn new(input: &[u8]) -> Self {
         let mut w = [0u64; 16];
         for (i, e) in w.iter_mut().enumerate() {
@@ -126,39 +15,31 @@ impl W {
         W(w)
     }
 
-    // ----- SHA‑512 logical functions -----
-    /// The `Ch` function: `(x & y) ^ (!x & z)`.
     #[inline(always)]
     fn Ch(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (!x & z)
     }
-    /// The `Maj` function: `(x & y) ^ (x & z) ^ (y & z)`.
     #[inline(always)]
     fn Maj(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (x & z) ^ (y & z)
     }
-    /// The `Σ0` function for the hash computation.
     #[inline(always)]
     fn Sigma0(x: u64) -> u64 {
         x.rotate_right(28) ^ x.rotate_right(34) ^ x.rotate_right(39)
     }
-    /// The `Σ1` function for the hash computation.
     #[inline(always)]
     fn Sigma1(x: u64) -> u64 {
         x.rotate_right(14) ^ x.rotate_right(18) ^ x.rotate_right(41)
     }
-    /// The `σ0` function for message schedule expansion.
     #[inline(always)]
     fn sigma0(x: u64) -> u64 {
         x.rotate_right(1) ^ x.rotate_right(8) ^ (x >> 7)
     }
-    /// The `σ1` function for message schedule expansion.
     #[inline(always)]
     fn sigma1(x: u64) -> u64 {
         x.rotate_right(19) ^ x.rotate_right(61) ^ (x >> 6)
     }
 
-    /// Message expansion helper: `w[a] += σ1(w[b]) + w[c] + σ0(w[d])`.
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     fn M(&mut self, a: usize, b: usize, c: usize, d: usize) {
@@ -169,15 +50,8 @@ impl W {
             .wrapping_add(Self::sigma0(w[d]));
     }
 
-    /// Expand the 16‑word message schedule into 80 words.
-    ///
-    /// This method generates the full 80‑word message schedule required
-    /// for the SHA‑512 compression function. It applies the message
-    /// schedule recurrence to compute new words from previous ones.
     #[inline]
     fn expand(&mut self) {
-        // Each call updates one word of the schedule using the circular
-        // queue pattern (index modulo 16).
         self.M(0, (0 + 14) & 15, (0 + 9) & 15, (0 + 1) & 15);
         self.M(1, (1 + 14) & 15, (1 + 9) & 15, (1 + 1) & 15);
         self.M(2, (2 + 14) & 15, (2 + 9) & 15, (2 + 1) & 15);
@@ -196,16 +70,10 @@ impl W {
         self.M(15, (15 + 14) & 15, (15 + 9) & 15, (15 + 1) & 15);
     }
 
-    /// Perform one SHA‑512 round (`F` function) on the working state.
-    ///
-    /// `i` is the round index (0..=79), `k` is the round constant.
-    /// This method updates the eight working variables according to
-    /// the SHA‑512 round operation.
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     fn F(&mut self, state: &mut State, i: usize, k: u64) {
         let t = &mut state.0;
-        // T1 = h + Σ1(e) + Ch(e, f, g) + K[i] + W[i]
         t[(16 - i + 7) & 7] = t[(16 - i + 7) & 7]
             .wrapping_add(Self::Sigma1(t[(16 - i + 4) & 7]))
             .wrapping_add(Self::Ch(
@@ -215,9 +83,7 @@ impl W {
             ))
             .wrapping_add(k)
             .wrapping_add(self.0[i]);
-        // d = d + T1
         t[(16 - i + 3) & 7] = t[(16 - i + 3) & 7].wrapping_add(t[(16 - i + 7) & 7]);
-        // T2 = Σ0(a) + Maj(a, b, c);  h = T1 + T2
         t[(16 - i + 7) & 7] = t[(16 - i + 7) & 7]
             .wrapping_add(Self::Sigma0(t[(16 - i + 0) & 7]))
             .wrapping_add(Self::Maj(
@@ -227,10 +93,6 @@ impl W {
             ));
     }
 
-    /// Run 16 consecutive rounds starting at offset `s` (0‑4).
-    ///
-    /// Each call processes 16 rounds (out of the total 80 rounds).
-    /// The four rounds are interleaved with message expansion operations.
     fn G(&mut self, state: &mut State, s: usize) {
         const ROUND_CONSTANTS: [u64; 80] = [
             0x428a2f98d728ae22,
@@ -335,10 +197,6 @@ impl W {
 }
 
 impl State {
-    /// Initialise the working state with the SHA‑512 initial vector (IV).
-    ///
-    /// Returns a new `State` with the eight 64‑bit words set to the
-    /// standard initial hash values of SHA‑512.
     pub(crate) fn new() -> Self {
         const IV: [u8; 64] = [
             0x6a, 0x09, 0xe6, 0x67, 0xf3, 0xbc, 0xc9, 0x08, 0xbb, 0x67, 0xae, 0x85, 0x84, 0xca,
@@ -354,10 +212,6 @@ impl State {
         State(t)
     }
 
-    /// Add another `State` to this one (word‑wise wrapping addition).
-    ///
-    /// This is used after processing a message block to add the result
-    /// to the initial state of the block.
     #[inline(always)]
     pub(crate) fn add(&mut self, x: &State) {
         let sx = &mut self.0;
@@ -372,23 +226,12 @@ impl State {
         sx[7] = sx[7].wrapping_add(ex[7]);
     }
 
-    /// Serialise the state into 64 bytes of big‑endian output.
-    ///
-    /// Each 64‑bit word is converted to 8 bytes in big‑endian order.
     pub(crate) fn store(&self, out: &mut [u8]) {
         for (i, &e) in self.0.iter().enumerate() {
             store_be(out, i * 8, e);
         }
     }
 
-    /// Process as many complete 128‑byte blocks as possible from `input`.
-    ///
-    /// Returns the number of unprocessed bytes (0..127).
-    ///
-    /// # Algorithm
-    /// For each complete 128‑byte block, it creates a message schedule,
-    /// performs 80 rounds of compression (in groups of 16), and adds the
-    /// result to the current state.
     pub(crate) fn blocks(&mut self, mut input: &[u8]) -> usize {
         let mut t = *self;
         let mut inlen = input.len();
@@ -412,22 +255,6 @@ impl State {
     }
 }
 
-/// SHA‑512 hash state.
-///
-/// `Hash` allows incremental digestion of data through a builder‑like API.
-/// It implements `Copy` and `Clone`, and its `Default` is equivalent to
-/// `Hash::new()`.
-///
-/// # Examples
-///
-/// ```rust
-/// use libvctrl_sha512::Hash;
-///
-/// let mut h = Hash::new();
-/// h.update(b"some data");
-/// let digest = h.finalize();
-/// assert_eq!(digest.len(), 64);
-/// ```
 #[derive(Copy, Clone)]
 pub struct Hash {
     pub(crate) state: State,
@@ -437,18 +264,6 @@ pub struct Hash {
 }
 
 impl Hash {
-    /// Create a new SHA‑512 hasher.
-    ///
-    /// The initial state is set to the standard SHA‑512 IV. The internal
-    /// buffer and length counter are zeroed.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let hasher = Hash::new();
-    /// ```
     pub fn new() -> Self {
         Hash {
             state: State::new(),
@@ -458,10 +273,6 @@ impl Hash {
         }
     }
 
-    /// Feed additional data into the hasher (crate‑internal).
-    ///
-    /// This is equivalent to [`update`](Hash::update) but is `pub(crate)`
-    /// so that the `sha384` module can reuse the same logic.
     pub(crate) fn _update<T: AsRef<[u8]>>(&mut self, input: T) {
         let input = input.as_ref();
         let mut n = input.len();
@@ -485,48 +296,15 @@ impl Hash {
         }
     }
 
-    /// Feed additional data into the hasher.
-    ///
-    /// This method can be called any number of times before finalisation.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let mut h = Hash::new();
-    /// h.update(b"hello ");
-    /// h.update(b"world");
-    /// ```
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T) {
         self._update(input)
     }
 
-    /// Finalize the hash and produce the 64‑byte SHA‑512 digest.
-    ///
-    /// This method consumes the `Hash` instance.  Message padding is applied
-    /// according to FIPS 180‑4: a `1` bit, zero or more `0` bits, and a
-    /// 128‑bit big‑endian length field (with the upper 64 bits set to zero).
-    ///
-    /// # Security
-    ///
-    /// After finalisation, the internal state is consumed.  No further
-    /// updates are possible, and the digest is returned as a `[u8; 64]`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let digest = Hash::new().finalize();
-    /// assert_eq!(digest.len(), 64);
-    /// ```
     pub fn finalize(mut self) -> [u8; 64] {
         let mut padded = [0u8; 256];
         padded[..self.r].copy_from_slice(&self.w[..self.r]);
         padded[self.r] = 0x80;
         let r = if self.r < 112 { 128 } else { 256 };
-        // 128‑bit length representation (high 8 bytes are zero)
         let low_bits = (self.len as u64).wrapping_mul(8);
         padded[r - 16..r - 8].fill(0);
         store_be(&mut padded, r - 8, low_bits);
@@ -537,45 +315,12 @@ impl Hash {
         out
     }
 
-    /// One‑shot hashing: compute the SHA‑512 digest of `input`.
-    ///
-    /// This is equivalent to creating a fresh `Hash`, calling
-    /// [`update`](Hash::update) once, and then [`finalize`](Hash::finalize).
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let digest = Hash::hash(b"hello world");
-    /// ```
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 64] {
         let mut h = Self::new();
         h.update(input);
         h.finalize()
     }
 
-    /// Finalize and verify the digest against `expected` in constant time.
-    ///
-    /// This method consumes the hasher, computes the final digest, and
-    /// compares it byte‑by‑byte with `expected` using a timing‑attack
-    /// resistant comparison.  The comparison is performed via
-    /// [`utils::verify`](crate::utils::verify).
-    ///
-    /// # Returns
-    ///
-    /// `true` if the computed digest matches `expected`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let expected = Hash::hash(b"secret");
-    /// let mut h = Hash::new();
-    /// h.update(b"secret");
-    /// assert!(h.verify(&expected));
-    /// ```
     pub fn verify(self, expected: &[u8; 64]) -> bool {
         let out = self.finalize();
         verify(&out, expected)
@@ -583,7 +328,6 @@ impl Hash {
 }
 
 impl Default for Hash {
-    /// Returns a new `Hash` instance with the standard SHA‑512 IV.
     fn default() -> Self {
         Self::new()
     }

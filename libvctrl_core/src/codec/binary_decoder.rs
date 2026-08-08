@@ -1,68 +1,14 @@
-//! Binary decoder – reconstructs objects from the format emitted by [`BinaryEncoder`].
-//!
-//! This module provides [`BinaryDecoder`], which implements the [`Decoder`] trait.
-//! It carefully validates every aspect of the input to prevent panics and to
-//! reject malicious or corrupted data.
-
 use libvctrl_handler::{
     Blob, Commit, CommitMeta, Decoder, EntryKind, Hash, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH,
     MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID, VctrlError,
 };
 use std::str;
 
-/// Expected version byte for the current binary format (v2).
-///
-/// Version 2 added:
-/// - `timestamp` (i64 LE)
-/// - `timezone_offset` (i16 LE)
-/// - `encoding` (length‑prefixed optional UTF‑8 string)
 const EXPECTED_VERSION: u8 = 2;
 
-/// Decodes objects from the binary format produced by [`BinaryEncoder`](super::binary_encoder::BinaryEncoder).
-///
-/// # Safety and validation
-///
-/// The decoder is the **first line of defence** against corrupted or malicious
-/// data. It performs strict checks on every field:
-/// - The first byte must match the expected version (`0x02`).
-/// - Length prefixes must match the actual data length.
-/// - Names must be valid UTF‑8 and within the allowed length.
-/// - Entry kinds must be known values.
-/// - The number of tree entries, blob size, and message length must not exceed
-///   the limits defined in `libvctrl_handler::constants`.
-/// - Hashes must be exactly 64 bytes.
-///
-/// If any check fails, [`VctrlError::CorruptedData`] is returned immediately.
-/// This ensures that invalid data is never silently accepted.
-///
-/// # Error handling
-///
-/// All methods return a `Result`. The only error variant used is
-/// [`VctrlError::CorruptedData`] (and occasionally [`VctrlError::InvalidName`]
-/// from constructors), because every problem at this level is a sign of
-/// corrupted or malicious input.
-///
-/// # Example
-///
-/// ```rust
-/// use libvctrl_core::codec::BinaryDecoder;
-/// use libvctrl_handler::{Blob, Decoder};
-///
-/// let decoder = BinaryDecoder;
-/// // A valid blob encoding: version byte 2, length 5, data "hello"
-/// let valid_input = [2, 5, 0, 0, 0, 0, 0, 0, 0, b'h', b'e', b'l', b'l', b'o'];
-/// let blob = decoder.decode_blob(&valid_input).expect("valid blob");
-/// assert_eq!(blob.data(), b"hello");
-///
-/// // Truncated input (missing version byte)
-/// let no_version = [5, 0, 0, 0, 0, 0, 0, 0, b'h'];
-/// assert!(decoder.decode_blob(&no_version).is_err());
-/// ```
 pub struct BinaryDecoder;
 
 impl BinaryDecoder {
-    /// Check that the input starts with the expected version byte,
-    /// returning the slice without that byte.
     fn check_version(data: &[u8]) -> Result<&[u8], VctrlError> {
         if data.is_empty() {
             return Err(VctrlError::CorruptedData("missing version byte".into()));
@@ -160,7 +106,6 @@ impl Decoder for BinaryDecoder {
             parents.push(Hash::from_bytes(&data[pos..pos + 64])?);
             pos += 64;
         }
-        // Author name
         if pos >= data.len() {
             return Err(VctrlError::CorruptedData("missing author name".into()));
         }
@@ -173,7 +118,6 @@ impl Decoder for BinaryDecoder {
             .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in author name".into()))?
             .to_string();
         pos += author_name_len;
-        // Author email
         if pos >= data.len() {
             return Err(VctrlError::CorruptedData("missing author email".into()));
         }
@@ -187,7 +131,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += author_email_len;
         let author = UserID::new(author_name, author_email)?;
-        // Committer name
         if pos >= data.len() {
             return Err(VctrlError::CorruptedData("missing committer name".into()));
         }
@@ -200,7 +143,6 @@ impl Decoder for BinaryDecoder {
             .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in committer name".into()))?
             .to_string();
         pos += committer_name_len;
-        // Committer email
         if pos >= data.len() {
             return Err(VctrlError::CorruptedData("missing committer email".into()));
         }
@@ -216,7 +158,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += committer_email_len;
         let committer = UserID::new(committer_name, committer_email)?;
-        // Message
         if pos + 4 > data.len() {
             return Err(VctrlError::CorruptedData("missing message length".into()));
         }
@@ -234,21 +175,18 @@ impl Decoder for BinaryDecoder {
         let message = str::from_utf8(&data[pos..pos + msg_len])
             .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in message".into()))?
             .to_string();
-        pos += msg_len; // <- PERBAIKAN: majukan pos sebesar panjang pesan
+        pos += msg_len;
 
-        // Timestamp
         if pos + 8 > data.len() {
             return Err(VctrlError::CorruptedData("missing timestamp".into()));
         }
         let timestamp = i64::from_le_bytes(data[pos..pos + 8].try_into().unwrap());
         pos += 8;
-        // Timezone offset
         if pos + 2 > data.len() {
             return Err(VctrlError::CorruptedData("missing timezone offset".into()));
         }
         let timezone_offset = i16::from_le_bytes(data[pos..pos + 2].try_into().unwrap());
         pos += 2;
-        // Encoding
         if pos >= data.len() {
             return Err(VctrlError::CorruptedData("missing encoding length".into()));
         }
@@ -356,21 +294,18 @@ impl Decoder for BinaryDecoder {
         let message = str::from_utf8(&data[pos..pos + msg_len])
             .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in message".into()))?
             .to_string();
-        pos += msg_len; // <- PERBAIKAN: majukan pos sebesar panjang pesan
+        pos += msg_len;
 
-        // Timestamp
         if pos + 8 > data.len() {
             return Err(VctrlError::CorruptedData("missing timestamp".into()));
         }
         let timestamp = i64::from_le_bytes(data[pos..pos + 8].try_into().unwrap());
         pos += 8;
-        // Timezone offset
         if pos + 2 > data.len() {
             return Err(VctrlError::CorruptedData("missing timezone offset".into()));
         }
         let timezone_offset = i16::from_le_bytes(data[pos..pos + 2].try_into().unwrap());
         pos += 2;
-        // Encoding
         if pos >= data.len() {
             return Err(VctrlError::CorruptedData("missing encoding length".into()));
         }

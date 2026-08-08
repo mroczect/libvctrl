@@ -1,6 +1,6 @@
 [package]
 name = "libvctrl_sha512"
-version = "0.4.0"
+version = "1.0.0"
 edition = "2024"
 description = "Zero-dependency SHA512, HMAC-SHA512, HKDF-SHA512, and optional SHA384"
 license = "ISC"

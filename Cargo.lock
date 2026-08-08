@@ -267,7 +267,7 @@ version = "1.0.0"
 
 [[package]]
 name = "libvctrl_core"
-version = "0.5.0"
+version = "1.0.0"
 dependencies = [
  "libvctrl_handler",
  "libvctrl_sha512",
@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "libvctrl_handler"
-version = "2.0.0"
+version = "3.0.0"
 
 [[package]]
 name = "libvctrl_plumbing"
@@ -288,7 +288,7 @@ version = "0.1.0"
 
 [[package]]
 name = "libvctrl_sha512"
-version = "0.4.0"
+version = "1.0.0"
 dependencies = [
  "criterion",
 ]
