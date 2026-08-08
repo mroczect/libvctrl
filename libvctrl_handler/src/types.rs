@@ -1,8 +1,65 @@
 //! Fundamental data types that serve as the building blocks of a version control system.
 //!
-//! These types now enforce their invariants at construction time.
+//! These types enforce their invariants at construction time.
 //! Fields are private and can only be set through validated constructors.
-//! Once created, an instance is guaranteed to be valid.
+//! Once created, an instance is **guaranteed** to be valid.
+//!
+//! # Design
+//!
+//! Every type is immutable after construction. If you need to change a value,
+//! you must create a new instance (e.g., a new commit with different parents).
+//! This immutability is a cornerstone of content‑addressable storage and
+//! cryptographic integrity.
+//!
+//! All types implement `Debug`, `Clone`, and `PartialEq` + `Eq` for easy
+//! comparison and display. Hashes also implement `Ord`, `Copy`, and `Hash`
+//! so they can be used as keys in collections.
+//!
+//! # Validation at construction
+//!
+//! Constructors that accept strings (names, emails) validate their inputs:
+//! - Names must not be empty.
+//! - Names must not exceed [`MAX_NAME_LENGTH`](crate::constants::MAX_NAME_LENGTH).
+//! - Emails must not be empty (for `UserID`).
+//!
+//! If validation fails, an [`VctrlError`](crate::VctrlError) is returned.
+//! This ensures that invalid data never exists in your system.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use libvctrl_handler::*;
+//!
+//! // Build a valid hash from known bytes.
+//! let hash = Hash::from_bytes(&[0xAB; HASH_LENGTH]).unwrap();
+//!
+//! // Create a tree entry (a file named "README.md").
+//! let entry = TreeEntry::new("README.md".into(), EntryKind::Blob, hash)
+//!     .expect("valid entry");
+//!
+//! // Build a tree containing that entry.
+//! let tree = Tree::new(vec![entry]).expect("entries are sorted");
+//!
+//! // Create an author identity.
+//! let alice = UserID::new("Alice".into(), "alice@example.com".into())
+//!     .expect("valid user");
+//!
+//! // Make a commit (no parents – initial commit).
+//! let commit = Commit::new(
+//!     hash,         // tree
+//!     vec![],       // no parents
+//!     alice.clone(),// author
+//!     alice,        // committer
+//!     "Initial import".into(),
+//! );
+//!
+//! // Create an annotated tag.
+//! let tag = Tag::new("v0.1.0".into(), hash, None, "First release".into())
+//!     .expect("valid tag name");
+//!
+//! assert_eq!(commit.message(), "Initial import");
+//! assert_eq!(tag.name(), "v0.1.0");
+//! ```
 
 use crate::constants::{HASH_LENGTH, MAX_NAME_LENGTH};
 use crate::enums::EntryKind;
@@ -11,14 +68,38 @@ use std::fmt;
 
 /// A content hash – a fixed‑size array of 64 bytes (SHA‑512).
 ///
+/// This is the fundamental identifier for all objects in the system.
+/// A `Hash` is **always** 64 bytes; any attempt to create one with
+/// a different length will fail with [`VctrlError::InvalidHashLength`].
+///
 /// # Construction
-/// Use [`Hash::from_bytes`] to create a hash from a byte slice.
-/// It will return [`VctrlError::InvalidHashLength`] if the slice length
-/// is not exactly [`HASH_LENGTH`].
+///
+/// Use [`Hash::from_bytes`] to convert a byte slice. This function validates
+/// the length and returns `Err` if it does not match [`HASH_LENGTH`].
+///
+/// ```rust
+/// use libvctrl_handler::{Hash, HASH_LENGTH};
+///
+/// // Correct length → succeeds.
+/// let h = Hash::from_bytes(&[0x00; HASH_LENGTH]).unwrap();
+///
+/// // Wrong length → fails.
+/// assert!(Hash::from_bytes(&[0; 10]).is_err());
+/// ```
 ///
 /// # Display and Debug
-/// The [`Display`](std::fmt::Display) implementation prints the full hexadecimal representation.
-/// The [`Debug`](std::fmt::Debug) implementation prints only the first 8 bytes for readability.
+///
+/// - [`Display`] prints the full 64‑byte hex string (128 characters).
+/// - [`Debug`] prints only the first 8 bytes followed by `…` for brevity.
+///
+/// ```rust
+/// use libvctrl_handler::{Hash, HASH_LENGTH};
+///
+/// let h = Hash::from_bytes(&[0xAB; HASH_LENGTH]).unwrap();
+///
+/// // Display: "abababababababababab..."
+/// // Debug:  "Hash(abababababababab…)"
+/// ```
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Hash([u8; HASH_LENGTH]);
 
@@ -26,7 +107,16 @@ impl Hash {
     /// Creates a `Hash` from a byte slice.
     ///
     /// # Errors
-    /// Returns [`VctrlError::InvalidHashLength`] if `bytes.len() != HASH_LENGTH`.
+    /// Returns [`VctrlError::InvalidHashLength`] if `bytes.len()` ≠ [`HASH_LENGTH`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use libvctrl_handler::*;
+    /// let data = [0xAA; HASH_LENGTH];
+    /// let hash = Hash::from_bytes(&data).unwrap();
+    /// assert_eq!(hash.as_bytes(), &data);
+    /// ```
     pub const fn from_bytes(bytes: &[u8]) -> Result<Self, VctrlError> {
         if bytes.len() != HASH_LENGTH {
             return Err(VctrlError::InvalidHashLength(bytes.len()));
@@ -41,6 +131,13 @@ impl Hash {
     }
 
     /// Returns a reference to the underlying 64‑byte array.
+    ///
+    /// ```rust
+    /// # use libvctrl_handler::*;
+    /// let hash = Hash::from_bytes(&[0xCC; HASH_LENGTH]).unwrap();
+    /// let bytes = hash.as_bytes();
+    /// assert_eq!(bytes.len(), HASH_LENGTH);
+    /// ```
     #[must_use]
     pub const fn as_bytes(&self) -> &[u8; HASH_LENGTH] {
         &self.0
@@ -86,10 +183,30 @@ fn validate_name(name: &str) -> Result<(), VctrlError> {
 // ---------------------------------------------------------------------------
 /// A single entry inside a [`Tree`].
 ///
-/// Each entry associates a name, a kind ([`EntryKind`]), and a hash
-/// pointing to the actual content ([`Blob`] or another [`Tree`]).
+/// An entry is the basic building block of a directory listing. It pairs
+/// a **name** with a **kind** (blob or subtree) and a **hash** that points to
+/// the actual content.
 ///
-/// The name is guaranteed to be non‑empty and ≤ [`MAX_NAME_LENGTH`].
+/// # Validation
+/// The name must be non‑empty and ≤ [`MAX_NAME_LENGTH`](crate::constants::MAX_NAME_LENGTH).
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_handler::{Hash, TreeEntry, EntryKind};
+///
+/// let hash = Hash::from_bytes(&[0x11; 64]).unwrap();
+///
+/// // A file entry.
+/// let file = TreeEntry::new("src/main.rs".into(), EntryKind::Blob, hash)
+///     .expect("valid entry");
+/// assert_eq!(file.name(), "src/main.rs");
+/// assert_eq!(file.kind(), EntryKind::Blob);
+/// assert_eq!(file.hash().as_bytes().len(), 64);
+///
+/// // An empty name is rejected.
+/// assert!(TreeEntry::new("".into(), EntryKind::Blob, hash).is_err());
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TreeEntry {
     name: String,
@@ -113,13 +230,13 @@ impl TreeEntry {
         &self.name
     }
 
-    /// Returns the kind of the entry.
+    /// Returns the kind of the entry (blob or tree).
     #[must_use]
     pub const fn kind(&self) -> EntryKind {
         self.kind
     }
 
-    /// Returns the hash of the entry.
+    /// Returns the hash of the entry (points to a [`Blob`] or another [`Tree`]).
     #[must_use]
     pub const fn hash(&self) -> &Hash {
         &self.hash
@@ -128,13 +245,22 @@ impl TreeEntry {
 
 /// A blob object – raw, uninterpreted data.
 ///
-/// It represents the contents of a file.
-/// No encoding or metadata is stored here; that is the responsibility
-/// of higher‑level components (e.g., encoders).
+/// Represents the contents of a file. No encoding, compression, or metadata
+/// is stored – just the raw bytes.
 ///
 /// # Empty blobs
-/// Empty blobs are **valid** and represent empty files.
-/// `Blob::new(vec![])` will succeed without error.
+/// An empty blob (`Blob::new(vec![])`) is perfectly valid and represents
+/// an empty file.
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_handler::Blob;
+///
+/// let data = b"Hello, world!".to_vec();
+/// let blob = Blob::new(data.clone());
+/// assert_eq!(blob.data(), b"Hello, world!");
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Blob {
     data: Vec<u8>,
@@ -143,12 +269,11 @@ pub struct Blob {
 impl Blob {
     /// Creates a new `Blob` with the given data.
     #[must_use]
-    #[allow(clippy::missing_const_for_fn)] // Vec::new is not const
-    pub fn new(data: Vec<u8>) -> Self {
+    pub const fn new(data: Vec<u8>) -> Self {
         Self { data }
     }
 
-    /// Returns a reference to the blob's data.
+    /// Returns a reference to the blob's raw data.
     #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
@@ -160,9 +285,35 @@ impl Blob {
 // ---------------------------------------------------------------------------
 /// A tree object – a virtual directory listing.
 ///
-/// It contains a sorted (by name) list of [`TreeEntry`] items,
-/// each pointing to a blob or another tree. The entries are guaranteed
-/// to be sorted lexicographically by name and contain no duplicates.
+/// A tree contains a **sorted** list of [`TreeEntry`] items. Entries are
+/// ordered lexicographically by name, and duplicate names are forbidden.
+/// These invariants are enforced at construction time.
+///
+/// # Errors
+/// [`Tree::new`] will return an error if:
+/// - Entries are not in sorted order.
+/// - Two entries share the same name.
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_handler::{Hash, Tree, TreeEntry, EntryKind};
+///
+/// let hash = Hash::from_bytes(&[0x22; 64]).unwrap();
+///
+/// // Create sorted entries.
+/// let file = TreeEntry::new("a.txt".into(), EntryKind::Blob, hash).unwrap();
+/// let dir  = TreeEntry::new("sub".into(), EntryKind::Tree, hash).unwrap();
+///
+/// // Build the tree – entries must be in order.
+/// let tree = Tree::new(vec![file, dir]).expect("sorted entries");
+/// assert_eq!(tree.entries().len(), 2);
+///
+/// // Duplicate names are rejected.
+/// let dup1 = TreeEntry::new("x".into(), EntryKind::Blob, hash).unwrap();
+/// let dup2 = TreeEntry::new("x".into(), EntryKind::Blob, hash).unwrap();
+/// assert!(Tree::new(vec![dup1, dup2]).is_err());
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tree {
     entries: Vec<TreeEntry>,
@@ -173,9 +324,7 @@ impl Tree {
     ///
     /// # Errors
     /// Returns an error if entries are not sorted by name or if duplicate names exist.
-    /// Each entry must also be valid (already guaranteed by `TreeEntry` construction).
     pub fn new(entries: Vec<TreeEntry>) -> Result<Self, VctrlError> {
-        // Check duplicates and ordering
         for i in 1..entries.len() {
             if entries[i - 1].name() >= entries[i].name() {
                 return Err(VctrlError::InvalidName(format!(
@@ -199,6 +348,24 @@ impl Tree {
 // UserID
 // ---------------------------------------------------------------------------
 /// Identity of a user (author or committer).
+///
+/// Contains a **name** and an **email**. Both are required to be non‑empty.
+/// The name is also validated against [`MAX_NAME_LENGTH`].
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_handler::UserID;
+///
+/// let user = UserID::new("Alice".into(), "alice@example.com".into())
+///     .expect("valid user");
+/// assert_eq!(user.name(), "Alice");
+/// assert_eq!(user.email(), "alice@example.com");
+///
+/// // Empty fields are rejected.
+/// assert!(UserID::new("".into(), "x@y".into()).is_err());
+/// assert!(UserID::new("Alice".into(), "".into()).is_err());
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UserID {
     name: String,
@@ -208,16 +375,15 @@ pub struct UserID {
 impl UserID {
     /// Creates a new `UserID` after validating name and email.
     ///
-    /// Both name and email must be non‑empty. Name must not exceed `MAX_NAME_LENGTH`.
-    ///
     /// # Errors
-    /// Returns [`VctrlError::InvalidName`] if validation fails.
+    /// Returns [`VctrlError::InvalidName`] if:
+    /// - `name` is empty or too long.
+    /// - `email` is empty.
     pub fn new(name: String, email: String) -> Result<Self, VctrlError> {
         validate_name(&name)?;
         if email.is_empty() {
             return Err(VctrlError::InvalidName("email is empty".into()));
         }
-        // We do not enforce MAX_NAME_LENGTH on email deliberately.
         Ok(Self { name, email })
     }
 
@@ -239,9 +405,42 @@ impl UserID {
 // ---------------------------------------------------------------------------
 /// A commit object – a snapshot of the repository at a point in time.
 ///
-/// It records the root tree, parent commit(s), author, committer, and
+/// Records the root tree, parent commit(s), author, committer, and
 /// a human‑readable message. Timestamps are deliberately omitted;
 /// they can be added later by an implementor if needed.
+///
+/// # Example (single‑parent commit)
+///
+/// ```rust
+/// use libvctrl_handler::{Commit, Hash, UserID, HASH_LENGTH};
+///
+/// let tree_hash = Hash::from_bytes(&[0x33; HASH_LENGTH]).unwrap();
+/// let parent_hash = Hash::from_bytes(&[0x44; HASH_LENGTH]).unwrap();
+/// let author = UserID::new("Bob".into(), "bob@example.com".into()).unwrap();
+///
+/// let commit = Commit::new(
+///     tree_hash,
+///     vec![parent_hash], // one parent
+///     author.clone(),
+///     author,
+///     "Fix bug #42".into(),
+/// );
+///
+/// assert_eq!(commit.message(), "Fix bug #42");
+/// assert_eq!(commit.parents().len(), 1);
+/// assert_eq!(*commit.tree(), tree_hash);
+/// ```
+///
+/// # Example (initial commit)
+///
+/// ```rust
+/// # use libvctrl_handler::*;
+/// let tree = Hash::from_bytes(&[0x55; 64]).unwrap();
+/// let user = UserID::new("Alice".into(), "alice@e.com".into()).unwrap();
+///
+/// let initial = Commit::new(tree, vec![], user.clone(), user, "init".into());
+/// assert!(initial.parents().is_empty());
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Commit {
     tree: Hash,
@@ -254,11 +453,10 @@ pub struct Commit {
 impl Commit {
     /// Creates a new `Commit`.
     ///
-    /// All fields are assumed to be valid (hashes are valid by construction,
-    /// `UserID`s are valid).
+    /// All parameters are assumed to be valid (hashes come from a trusted
+    /// source, `UserID`s are already validated). No further checks are performed.
     #[must_use]
-    #[allow(clippy::missing_const_for_fn)] // not const because of String/Vec moving
-    pub fn new(
+    pub const fn new(
         tree: Hash,
         parents: Vec<Hash>,
         author: UserID,
@@ -311,6 +509,35 @@ impl Commit {
 /// A tag object – a named pointer to another object, usually a commit.
 ///
 /// Tags are often used to mark releases or important points in history.
+/// A tag can optionally include a **tagger** identity and a message.
+///
+/// # Example (annotated tag)
+///
+/// ```rust
+/// use libvctrl_handler::{Hash, Tag, UserID};
+///
+/// let commit_hash = Hash::from_bytes(&[0x66; 64]).unwrap();
+/// let tagger = UserID::new("Release Bot".into(), "release@example.com".into()).unwrap();
+///
+/// let tag = Tag::new(
+///     "v1.0.0".into(),
+///     commit_hash,
+///     Some(tagger),
+///     "Stable release".into(),
+/// ).expect("valid tag name");
+///
+/// assert_eq!(tag.name(), "v1.0.0");
+/// assert!(tag.tagger().is_some());
+/// ```
+///
+/// # Example (lightweight tag)
+///
+/// ```rust
+/// # use libvctrl_handler::*;
+/// let hash = Hash::from_bytes(&[0x77; 64]).unwrap();
+/// let tag = Tag::new("temp".into(), hash, None, "".into()).unwrap();
+/// assert!(tag.tagger().is_none());
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tag {
     name: String,
@@ -345,7 +572,7 @@ impl Tag {
         &self.name
     }
 
-    /// Returns the target hash.
+    /// Returns the target hash (usually a commit).
     #[must_use]
     pub const fn target(&self) -> &Hash {
         &self.target
