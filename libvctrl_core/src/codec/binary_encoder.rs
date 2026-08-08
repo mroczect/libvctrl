@@ -1,28 +1,76 @@
-//! Binary encoder – serializes objects into a deterministic byte format.
+//! Binary encoder – serializes objects into the deterministic binary format.
+//!
+//! This module provides [`BinaryEncoder`], which implements the [`Encoder`]
+//! trait. The format is designed to be simple, predictable, and easy to
+//! implement in any language.
 
 use libvctrl_handler::{Blob, Commit, Encoder, EntryKind, Tag, Tree, VctrlError};
 
 /// Encodes objects into a deterministic binary format.
 ///
-/// # Format (informal)
-/// - **Blob**: 8‑byte little‑endian length prefix, followed by the raw data.
-/// - **Tree**: 4‑byte little‑endian entry count, then for each entry:
-///     - 1‑byte name length
-///     - name bytes (UTF‑8)
-///     - 1‑byte kind (`0` = Blob, `1` = Tree)
-///     - 64‑byte hash
-/// - **Commit**: tree hash (64), parent count (1), each parent (64), author
-///   name length (1) + bytes, author email length (1) + bytes, committer
-///   name length (1) + bytes, committer email length (1) + bytes, message
-///   length (4 little‑endian) + UTF‑8 bytes.
-/// - **Tag**: name length (1) + bytes, target hash (64), tagger presence flag
-///   (1, `0` or `1`), optionally tagger name/email, message length (4) + UTF‑8.
+/// # Format specification
+///
+/// The encoder produces a byte sequence that can be parsed by
+/// [`BinaryDecoder`](super::binary_decoder::BinaryDecoder). Every multi‑byte
+/// integer is encoded as little‑endian.
+///
+/// ## Blob
+/// ```text
+/// [ 8 bytes data_length | data_bytes... ]
+/// ```
+///
+/// ## Tree
+/// ```text
+/// [ 4 bytes entry_count ]
+/// for each entry:
+///     [ 1 byte name_length | name_bytes... | 1 byte kind | 64 bytes hash ]
+/// ```
+/// where `kind` is `0` for Blob and `1` for Tree.
+///
+/// ## Commit
+/// ```text
+/// [ 64 bytes tree_hash ]
+/// [ 1 byte parent_count ]
+/// [ for each parent: 64 bytes parent_hash ]
+/// [ 1 byte author_name_length | author_name_bytes... ]
+/// [ 1 byte author_email_length | author_email_bytes... ]
+/// [ 1 byte committer_name_length | committer_name_bytes... ]
+/// [ 1 byte committer_email_length | committer_email_bytes... ]
+/// [ 4 bytes message_length | message_bytes... ]
+/// ```
+///
+/// ## Tag
+/// ```text
+/// [ 1 byte name_length | name_bytes... ]
+/// [ 64 bytes target_hash ]
+/// [ 1 byte has_tagger ]
+/// if has_tagger == 1:
+///     [ 1 byte tagger_name_length | tagger_name_bytes... ]
+///     [ 1 byte tagger_email_length | tagger_email_bytes... ]
+/// [ 4 bytes message_length | message_bytes... ]
+/// ```
+///
+/// # Error handling
+///
+/// All methods return [`VctrlError::SerializationError`] if a field exceeds
+/// the maximum allowed size (e.g., a name longer than 255 bytes). This is
+/// a safety measure to ensure the encoding remains valid.
 ///
 /// # Round‑trip guarantee
+///
 /// When paired with [`BinaryDecoder`](super::binary_decoder::BinaryDecoder),
-/// the following must hold for any valid object:
-/// ```text
-/// decode(encode(obj)) == obj
+/// encoding and then decoding any valid object must yield the original object.
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_core::codec::BinaryEncoder;
+/// use libvctrl_handler::{Blob, Encoder};
+///
+/// let encoder = BinaryEncoder;
+/// let blob = Blob::new(b"example".to_vec());
+/// let encoded = encoder.encode_blob(&blob).expect("encode should succeed");
+/// // encoded is now a Vec<u8> ready for storage.
 /// ```
 pub struct BinaryEncoder;
 
