@@ -3,12 +3,12 @@ name: Publish to crates.io
 on:
   push:
     tags:
-      - "libvctrl[0-9]*"
-      - "libvctrl_core[0-9]*"
-      - "libvctrl_handler[0-9]*"
-      - "libvctrl_plumbing[0-9]*"
-      - "libvctrl_porcelain[0-9]*"
-      - "libvctrl_sha512[0-9]*"
+      - "libvctrl@*"
+      - "libvctrl_core@*"
+      - "libvctrl_handler@*"
+      - "libvctrl_plumbing@*"
+      - "libvctrl_porcelain@*"
+      - "libvctrl_sha512@*"
 
 jobs:
   publish:
@@ -21,20 +21,24 @@ jobs:
         id: parse
         run: |
           TAG="${{ github.ref_name }}"
-          POS=$(echo "$TAG" | grep -b -o '[0-9]' | head -1 | cut -d: -f1)
-          if [ -z "$POS" ]; then
-            echo "Error: could not find version in tag '$TAG'"
+          CRATE_NAME=$(echo "$TAG" | cut -d'@' -f1)
+          VERSION=$(echo "$TAG" | cut -d'@' -f2)
+          if [ -z "$CRATE_NAME" ] || [ -z "$VERSION" ]; then
+            echo "Error: tag must be in format 'crate@version' (e.g., libvctrl_sha512@0.1.0)"
             exit 1
           fi
-          CRATE_NAME="${TAG:0:$POS}"
-          VERSION="${TAG:$POS}"
           echo "crate_name=$CRATE_NAME" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION"      >> "$GITHUB_OUTPUT"
           echo "Detected crate: $CRATE_NAME, version: $VERSION"
 
       - name: Verify version matches Cargo.toml
         run: |
-          cd "${{ steps.parse.outputs.crate_name }}"
+          CRATE="${{ steps.parse.outputs.crate_name }}"
+          if [ ! -d "$CRATE" ]; then
+            echo "Error: directory '$CRATE' does not exist"
+            exit 1
+          fi
+          cd "$CRATE"
           MANIFEST_VERSION=$(cargo pkgid | cut -d'#' -f2 | cut -d: -f1)
           TAG_VERSION="${{ steps.parse.outputs.version }}"
           if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
