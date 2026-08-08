@@ -14,17 +14,21 @@
 //!
 //! # Format overview
 //!
-//! Every object is encoded as a sequence of bytes with no framing other than
-//! length prefixes. The format is **not self-describing**; you must know the
-//! object type before decoding. This is consistent with content‑addressed
-//! storage, where the hash identifies both the object and (implicitly) its
-//! type.
+//! Every object is encoded as a sequence of bytes with **no framing other than
+//! length prefixes and a leading version byte**. The format is **not
+//! self-describing**; you must know the object type before decoding. This is
+//! consistent with content‑addressed storage, where the hash identifies both
+//! the object and (implicitly) its type.
+//!
+//! **Current version byte:** `0x01`
 //!
 //! ## Blob
+//! - 1‑byte version (`0x01`)
 //! - 8‑byte little‑endian data length
 //! - raw data bytes
 //!
 //! ## Tree
+//! - 1‑byte version
 //! - 4‑byte little‑endian entry count
 //! - for each entry:
 //!     - 1‑byte name length
@@ -33,6 +37,7 @@
 //!     - 64‑byte hash
 //!
 //! ## Commit
+//! - 1‑byte version
 //! - 64‑byte tree hash
 //! - 1‑byte parent count
 //! - for each parent: 64‑byte hash
@@ -43,6 +48,7 @@
 //! - 4‑byte little‑endian message length + message bytes (UTF‑8)
 //!
 //! ## Tag
+//! - 1‑byte version
 //! - 1‑byte name length + name bytes (UTF‑8)
 //! - 64‑byte target hash
 //! - 1‑byte tagger presence flag (`0` or `1`)
@@ -67,8 +73,9 @@
 //!
 //! The binary format described here is a **reference format** and is **not**
 //! covered by semantic versioning guarantees. It may change between minor
-//! releases. For production use, either pin to a specific version of this
-//! crate or implement your own encoder/decoder pair that meets your stability
+//! releases. The version byte allows decoders to detect incompatible changes.
+//! For production use, either pin to a specific version of this crate or
+//! implement your own encoder/decoder pair that meets your stability
 //! requirements.
 //!
 //! # Usage
