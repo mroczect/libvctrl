@@ -71,7 +71,9 @@ pub trait ObjectStore {
     /// The store **does not** verify that `hash` is the actual hash of `data`.
     /// The caller must ensure the integrity of this relationship.
     /// Failing to do so may cause objects to become irretrievable or incorrectly
-    /// addressable.
+    /// addressable. **This is a deliberate design choice** to keep the trait
+    /// simple and flexible; verifiable stores can be built on top as wrapper
+    /// implementations.
     ///
     /// # Errors
     /// Returns an error if the write operation fails.
@@ -429,12 +431,17 @@ pub trait Verifier {
 ///     }
 /// }
 /// ```
+/// Object transport between repositories (fetch/push).
 pub trait Transport {
     /// Fetch the raw bytes of an object identified by `hash` from a remote.
     ///
+    /// This method takes `&self` to allow concurrent fetches from multiple
+    /// threads. Implementations must manage any internal mutable state
+    /// (e.g., connection pools) using synchronization primitives if needed.
+    ///
     /// # Errors
-    /// Returns an error if the fetch operation fails (network, missing object, etc.).
-    fn fetch_object(&mut self, hash: &Hash) -> Result<Vec<u8>, VctrlError>;
+    /// Returns an error if the fetch operation fails.
+    fn fetch_object(&self, hash: &Hash) -> Result<Vec<u8>, VctrlError>;
 
     /// Push raw bytes of an object to a remote.
     ///

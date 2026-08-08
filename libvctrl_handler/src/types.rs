@@ -126,14 +126,15 @@ impl TreeEntry {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Blob
-// ---------------------------------------------------------------------------
 /// A blob object – raw, uninterpreted data.
 ///
 /// It represents the contents of a file.
 /// No encoding or metadata is stored here; that is the responsibility
 /// of higher‑level components (e.g., encoders).
+///
+/// # Empty blobs
+/// Empty blobs are **valid** and represent empty files.
+/// `Blob::new(vec![])` will succeed without error.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Blob {
     data: Vec<u8>,
