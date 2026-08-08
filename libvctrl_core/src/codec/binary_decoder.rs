@@ -1,4 +1,8 @@
 //! Binary decoder – reconstructs objects from the format emitted by [`BinaryEncoder`].
+//!
+//! This module provides [`BinaryDecoder`], which implements the [`Decoder`] trait.
+//! It carefully validates every aspect of the input to prevent panics and to
+//! reject malicious or corrupted data.
 
 use libvctrl_handler::{
     Blob, Commit, Decoder, EntryKind, Hash, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_TREE_ENTRIES,
@@ -8,9 +12,43 @@ use std::str;
 
 /// Decodes objects from the binary format produced by [`BinaryEncoder`](super::binary_encoder::BinaryEncoder).
 ///
-/// # Errors
-/// Every method returns [`VctrlError::CorruptedData`] if the input is
-/// truncated, malformed, exceeds size limits, or contains invalid UTF‑8.
+/// # Safety and validation
+///
+/// The decoder is the **first line of defence** against corrupted or malicious
+/// data. It performs strict checks on every field:
+/// - Length prefixes must match the actual data length.
+/// - Names must be valid UTF‑8 and within the allowed length.
+/// - Entry kinds must be known values.
+/// - The number of tree entries, blob size, and message length must not exceed
+///   the limits defined in `libvctrl_handler::constants`.
+/// - Hashes must be exactly 64 bytes.
+///
+/// If any check fails, [`VctrlError::CorruptedData`] is returned immediately.
+/// This ensures that invalid data is never silently accepted.
+///
+/// # Error handling
+///
+/// All methods return a `Result`. The only error variant used is
+/// [`VctrlError::CorruptedData`] (and occasionally [`VctrlError::InvalidName`]
+/// from constructors), because every problem at this level is a sign of
+/// corrupted or malicious input.
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_core::codec::BinaryDecoder;
+/// use libvctrl_handler::{Blob, Decoder};
+///
+/// let decoder = BinaryDecoder;
+/// // A valid blob encoding: length 5, data "hello"
+/// let valid_input = [5, 0, 0, 0, 0, 0, 0, 0, b'h', b'e', b'l', b'l', b'o'];
+/// let blob = decoder.decode_blob(&valid_input).expect("valid blob");
+/// assert_eq!(blob.data(), b"hello");
+///
+/// // Truncated input
+/// let short_input = [5, 0, 0, 0, 0, 0, 0, 0, b'h'];
+/// assert!(decoder.decode_blob(&short_input).is_err());
+/// ```
 pub struct BinaryDecoder;
 
 impl Decoder for BinaryDecoder {
