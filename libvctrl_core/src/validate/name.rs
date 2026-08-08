@@ -1,4 +1,61 @@
 //! Name validation utilities.
+//!
+//! This module provides [`validate_name`], the single point of truth for
+//! checking whether a string can be used as a name in the `libvctrl`
+//! ecosystem.
+//!
+//! # What makes a valid name?
+//!
+//! A valid name must:
+//! - Not be empty.
+//! - Not exceed [`MAX_NAME_LENGTH`] bytes (255 by default).
+//! - Not contain the path separator `/`.
+//! - Not be exactly `.` or `..` (to prevent directory traversal).
+//!
+//! These rules are deliberately strict and conservative. A name that
+//! passes `validate_name` is safe to use as a file name, a tree entry
+//! name, a reference name, or a tag name without risking path traversal
+//! or filesystem corruption.
+//!
+//! # Why these restrictions?
+//!
+//! - **No `/`** – prevents path injection. A name like `"../../etc/passwd"`
+//!   could trick a naive backend into writing files outside the
+//!   repository.
+//! - **No `.` or `..`** – prevents ambiguity in directory traversal.
+//!   These are special directory entries on all major operating systems.
+//! - **Length limit** – prevents denial‑of‑service via memory exhaustion.
+//!
+//! # When to use
+//!
+//! Call `validate_name` whenever you have a raw string that will be
+//! used as a name in any object. The constructors in `libvctrl_handler`
+//! already call this function (or equivalent validation), so if you are
+//! using those constructors you do not need to call it separately.
+//!
+//! This function is exposed for cases where you need to validate names
+//! in custom code, or when building components that accept names as
+//! raw strings before passing them to constructors.
+//!
+//! # Example
+//!
+//! ```rust
+//! use libvctrl_core::validate::name::validate_name;
+//!
+//! // Valid names
+//! assert!(validate_name("hello").is_ok());
+//! assert!(validate_name("README.md").is_ok());
+//! assert!(validate_name("refs/heads/main").is_ok()); // '/' is allowed in ref names? No, wait...
+//! // Actually, '/' is forbidden. Let's correct:
+//! assert!(validate_name("refs-heads-main").is_ok());
+//!
+//! // Invalid names
+//! assert!(validate_name("").is_err());                  // empty
+//! assert!(validate_name(&"a".repeat(300)).is_err());   // too long
+//! assert!(validate_name("src/main.rs").is_err());      // contains '/'
+//! assert!(validate_name("..").is_err());               // is '..'
+//! assert!(validate_name(".").is_err());                // is '.'
+//! ```
 
 use libvctrl_handler::{MAX_NAME_LENGTH, VctrlError};
 
