@@ -1,4 +1,3 @@
-//! let user = UserID::new("Alice".into(), "alice@example.com".into()).unwrap();
 pub mod blob;
 pub mod commit;
 pub mod tag;
