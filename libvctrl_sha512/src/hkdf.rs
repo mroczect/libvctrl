@@ -63,7 +63,7 @@
 //!   `255 * HashLen` bytes (i.e., 16 320 bytes for SHA-512). This module
 //!   enforces that limit with a panic.
 //!
-//! ## Input Validation
+//! ## Input Validation & Panic Policy
 //!
 //! To prevent silent misuse, this implementation **validates** the length of
 //! the PRK in `expand`:
@@ -75,7 +75,25 @@
 //!
 //! While panicking on invalid input is not always idiomatic for general
 //! libraries, in the context of a cryptographic library a clear panic is
-//! preferable to silently producing weak or incorrect output.
+//! preferable to silently producing weak or incorrect output. These checks
+//! are programmer errors that should be caught during development and testing;
+//! they are not expected to occur in production with correct usage.
+//!
+//! ## Performance
+//!
+//! Each call to `expand` requires one HMAC-SHA512 computation per 64-byte
+//! output block. The `extract` step performs a single HMAC-SHA512 operation.
+//! For typical key lengths (e.g., 32 bytes) the overhead is negligible.
+//!
+//! ## Design Decisions
+//!
+//! - **Zero-sized struct**: `HKDF` is a stateless marker struct. This avoids
+//!   any allocation and makes the API clean (no need to instantiate anything).
+//! - **`impl AsRef<[u8]>` parameters**: allows passing `&[u8]`, `Vec<u8>`,
+//!   arrays, or string literals, making the API flexible and ergonomic.
+//! - **Panics instead of `Result`**: we deliberately panic on invalid PRK
+//!   length or output length because these are unrecoverable programming errors.
+//!   A cryptographic library must never silently produce weak keys.
 //!
 //! ## Examples
 //!
@@ -120,12 +138,6 @@
 //! let mut okm = [0u8; 16];
 //! HKDF::expand(&mut okm, prk, []);
 //! ```
-//!
-//! ## Performance
-//!
-//! Each call to `expand` requires one HMAC-SHA512 computation per 64-byte
-//! output block. The `extract` step performs a single HMAC-SHA512 operation.
-//! For typical key lengths (e.g., 32 bytes) the overhead is negligible.
 
 use crate::hmac::HMAC;
 
@@ -133,7 +145,18 @@ use crate::hmac::HMAC;
 ///
 /// This is a zero-sized struct whose methods implement the HKDF operations.
 /// Because it holds no state, all methods are stateless and can be called
-/// freely.
+/// freely. You never need to instantiate `HKDF`; just call `HKDF::extract(...)`
+/// and `HKDF::expand(...)` directly.
+///
+/// # Example
+///
+/// ```rust
+/// use libvctrl_sha512::HKDF;
+///
+/// let prk = HKDF::extract(b"salt", b"secret");
+/// let mut key = [0u8; 32];
+/// HKDF::expand(&mut key, prk, b"my-app-info");
+/// ```
 pub struct HKDF;
 
 impl HKDF {
