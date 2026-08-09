@@ -1,114 +1,188 @@
 # libvctrl_sha512
 
-**A zero-dependency, `no_std` Rust implementation of SHA‑512, HMAC‑SHA‑512, HKDF‑SHA‑512, and optional SHA‑384, HMAC‑SHA‑384, HKDF‑SHA‑384.**
-
-[![Crates.io](https://img.shields.io/crates/v/libvctrl_sha512.svg)](https://crates.io/crates/libvctrl_sha512)
-[![Documentation](https://docs.rs/libvctrl_sha512/badge.svg)](https://docs.rs/libvctrl_sha512)
-[![License](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Features](#features)
-3. [Installation](#installation)
-4. [Usage Examples](#usage-examples)
-   - [SHA‑512](#sha‑512)
-   - [HMAC‑SHA‑512](#hmac‑sha‑512)
-   - [HKDF‑SHA‑512](#hkdf‑sha‑512)
-   - [SHA‑384 & friends](#sha‑384--friends)
-5. [API Reference](#api-reference)
-   - [Root re‑exports](#root‑re‑exports)
-   - [`utils`](#module-utils)
-   - [`sha512`](#module-sha512)
-   - [`hmac`](#module-hmac)
-   - [`hkdf`](#module-hkdf)
-   - [`sha384` (feature‑gated)](#module-sha384-feature‑gated)
-6. [Security Considerations](#security-considerations)
-7. [Performance & Benchmarks](#performance--benchmarks)
-8. [Feature Flags](#feature-flags)
-9. [License](#license)
-10. [Acknowledgements](#acknowledgements)
-
----
-
 ## Overview
 
-`libvctrl_sha512` is a pure‑Rust cryptographic library that implements the **SHA‑512** hash function, **HMAC‑SHA‑512** message authentication code, and **HKDF‑SHA‑512** key derivation function as specified in:
+`libvctrl_sha512` is a **zero‑dependency**, **`#![no_std]`** Rust crate that provides a complete, production‑ready implementation of the following cryptographic primitives:
 
-- **FIPS 180‑4** – Secure Hash Standard
-- **RFC 2104** – HMAC: Keyed‑Hashing for Message Authentication
-- **RFC 5869** – HMAC‑based Extract‑and‑Expand Key Derivation Function (HKDF)
+- **SHA‑512** – FIPS 180‑4 compliant hash function (streaming and one‑shot).
+- **HMAC‑SHA‑512** – Keyed‑hash message authentication (RFC 2104).
+- **HKDF‑SHA‑512** – HMAC‑based key derivation (RFC 5869).
+- **SHA‑384** (optional, enabled by default) – A truncated variant of SHA‑512 with a different initialisation vector, together with its HMAC and HKDF counterparts.
 
-Optionally, with the `sha384` feature (enabled by default), the library also provides **SHA‑384**, **HMAC‑SHA‑384**, and **HKDF‑SHA‑384**, which share the same compression function but with a different initial vector and a truncated output of 48 bytes.
-
-The crate is:
-
-- **`#![no_std]`** – runs without the standard library, ideal for embedded systems, kernels, and WebAssembly.
-- **Zero external dependencies** – only the `core` crate is used, minimising supply‑chain risks.
-- **Audited and corrected** – previous audit findings (v0.2.0) have been resolved; FIPS 180‑4 padding is now fully compliant.
-- **Constant‑time** – all verification operations use a data‑independent comparison routine, preventing timing side‑channel leakage.
-- **Streaming and one‑shot** – both incremental and one‑shot APIs are provided for hashing, HMAC, and HKDF.
-
-The code is a modularised fork of Frank Denis’s excellent [hmac‑sha512](https://github.com/jedisct1/rust-hmac-sha512) crate. The core cryptographic logic remains unchanged; this version adds thorough documentation, feature flags, and a cleaner module structure.
+All modules are built on a shared, highly optimised SHA‑512 compression function. The crate is designed for use in embedded systems, WebAssembly, kernels, and any environment where a minimal, auditable, and high‑performance cryptographic library is required. It is a member of the larger `libvctrl` workspace but has no dependencies on other workspace crates and is fully self‑contained.
 
 ---
 
-## Features
+## Architecture
 
-- **SHA‑512** – one‑shot, streaming, and constant‑time verification.
-- **HMAC‑SHA‑512** – one‑shot, streaming, and constant‑time verification with automatic key hashing for keys longer than the block size (128 bytes).
-- **HKDF‑SHA‑512** – extract‑then‑expand key derivation; extracts a 64‑byte PRK, expands to any length ≤ 255 × 64 bytes.
-- **SHA‑384 / HMAC‑SHA‑384 / HKDF‑SHA‑384** – activated by the `sha384` feature (default). Uses the same compression function as SHA‑512 but with a different IV and 48‑byte output.
-- **`opt_size` feature** – trades some speed for a roughly 75% reduction in code size.
-- **Memory zeroisation** – temporary key material is zeroed after use; `Drop` implementation clears padded keys.
-- **No unsafe code** except for a single, necessary `core::ptr::read_volatile` in the constant‑time comparison (explained in [Security Considerations](#security-considerations)).
-- **Fully documented** – every public item has a doc‑comment, and all examples are tested as part of `cargo test`.
+The library’s design separates the core SHA‑512 engine from the HMAC and HKDF constructions via a macro‑based instantiation pattern. The diagram below illustrates the dependency graph between the public modules and the macro layer.
+
+```mermaid
+graph TD
+    SHA512[sha512::Hash<br/>Core compression,<br/>padding, digest]
+    HMAC[hmac::HMAC<br/>generated by impl_hmac!]
+    HKDF[hkdf::HKDF<br/>generated by impl_hkdf!]
+    SHA384[sha384::Hash<br/>wraps sha512::Hash<br/>with SHA‑384 IV]
+    HMAC384[sha384::HMAC<br/>impl_hmac! for SHA‑384]
+    HKDF384[sha384::HKDF<br/>impl_hkdf! for SHA‑384]
+
+    SHA512 --> HMAC
+    HMAC --> HKDF
+    SHA512 --> SHA384
+    SHA384 --> HMAC384
+    HMAC384 --> HKDF384
+    SHA512 -->|load_be, store_be, verify| UTILS[utils]
+    style SHA512 fill:#e8e8e8,stroke:#333
+    style HMAC fill:#d4e6f1,stroke:#333
+    style HKDF fill:#d4e6f1,stroke:#333
+```
+
+**Key architectural decisions:**
+
+- **Macro‑based code generation** – The `impl_hmac!` and `impl_hkdf!` macros accept any hash type (`sha512::Hash` or `sha384::Hash`) and produce a fully functional `HMAC`/`HKDF` struct. This eliminates code duplication and ensures identical behaviour across the two hash sizes.
+- **SHA‑384 as a thin wrapper** – `sha384::Hash` internally uses the full SHA‑512 `State` and compression logic, overriding only the initialisation vector and truncating the final 64‑byte digest to 48 bytes. This guarantees that SHA‑384 outputs are exactly the leftmost 384 bits of a SHA‑512 computation performed with the SHA‑384 IV.
+- **`no_std` compliance** – The entire crate relies only on `core`, making it suitable for bare‑metal and WebAssembly targets. No heap allocations are performed; all buffers are stack‑allocated with fixed sizes.
+- **Side‑channel resistance** – All verification operations (hash comparison, HMAC tag verification) use a non‑branching, XOR‑accumulation‑based comparison (`utils::verify`) that does not leak timing information. A volatile read forces the compiler to emit the comparison as written, preventing dead‑code elimination or short‑circuiting.
+
+### SHA‑512 Compression Flow
+
+The following sequence outlines the Merkle‑Damgard construction used for a single message block.
+
+```mermaid
+sequenceDiagram
+    participant Input as Message block (128 bytes)
+    participant W as Schedule W (16×u64)
+    participant State as Working state (8×u64)
+    participant Out as Digest state (8×u64)
+    Input->>W: load_be into 16 words
+    W->>State: copy current digest state
+    loop 80 rounds (4×20)
+        W->>State: f(i, K[i]) with message schedule expansion
+    end
+    State->>Out: add working state to digest state (word-wise wrap)
+    Out-->>Input: ready for next block
+```
+
+After all full blocks are processed, the final incomplete block is padded with a `1` bit, zeros, and a 128‑bit big‑endian message length, then processed similarly.
+
+### HMAC Construction
+
+```mermaid
+flowchart LR
+    K[Key] --> P1[Pad to 128 bytes<br/>or hash if longer]
+    P1 --> I[ipad XOR padded key]
+    P1 --> O[opad XOR padded key]
+    I --> H1[SHA‑512(ipad || message)]
+    H1 --> H2[SHA‑512(opad || H1)]
+    H2 --> MAC[64‑byte tag]
+```
+
+### HKDF Two‑Step Derivation
+
+```mermaid
+flowchart LR
+    IKM[Input Key Material] --> EXT(HKDF‑Extract<br/>HMAC‑SHA‑512 with salt as key)
+    SALT[Optional Salt] --> EXT
+    EXT --> PRK[64‑byte PRK]
+    PRK --> EXP(HKDF‑Expand<br/>iterative HMAC with info & counter)
+    INFO[Info String] --> EXP
+    EXP --> OKM[Output Key Material]
+```
 
 ---
 
-## Installation
+## Core Features
 
-Add `libvctrl_sha512` to your `Cargo.toml`:
+- **SHA‑512 (FIPS 180‑4)** – Streaming and one‑shot hashing; constant‑time digest verification.
+- **HMAC‑SHA‑512 (RFC 2104)** – One‑shot and incremental MAC generation; automatic key hashing for keys > 128 bytes; constant‑time tag verification.
+- **HKDF‑SHA‑512 (RFC 5869)** – Extract‑then‑expand key derivation; supports arbitrary output lengths up to 16 320 bytes.
+- **SHA‑384 support** – Feature‑gated (`sha384`); provides `sha384::Hash`, `sha384::HMAC`, and `sha384::HKDF` with 48‑byte outputs.
+- **Zero external dependencies** – Only the `core` crate; no `alloc`, no `std`, no third‑party libraries.
+- **`no_std` compatible** – Works on bare‑metal, kernels, and WebAssembly.
+- **Constant‑time comparison** – `utils::verify` prevents timing side‑channel leakage during all verification operations.
+- **Memory zeroisation** – HMAC contexts zero the padded key on drop; hash state can be explicitly cleared with `zeroize()`.
+- **Feature flags** – Optional SHA‑384 inclusion (`sha384`) and code‑size optimisation (`opt_size`).
+- **Fully documented** – Every public item has doc‑comments; all examples are tested as doctests.
 
-```toml
-[dependencies]
-libvctrl_sha512 = "0.1.0"
-```
+---
 
-### Enabling / disabling SHA‑384
+## Technology Stack
 
-The `sha384` feature is **enabled by default**. If you do not need SHA‑384 and want a smaller binary or shorter compile times, disable default features:
+- **Language:** Rust (edition 2024)
+- **Frameworks/Libraries:** None (pure Rust, core only)
+- **License:** ISC
+- **Repository:** [https://github.com/mroczect/libvctrl](https://github.com/mroczect/libvctrl)
 
-```toml
-[dependencies]
-libvctrl_sha512 = { version = "0.1.0", default-features = false }
-```
+---
 
-You can also enable the `opt_size` feature for a size‑optimised build:
+## Project Structure
 
-```toml
-[dependencies]
-libvctrl_sha512 = { version = "0.1.0", features = ["opt_size"] }
+```text
+libvctrl_sha512/
+├── Cargo.toml
+├── README.md
+├── src/
+│   ├── lib.rs          # Crate root, macro definitions, public re‑exports
+│   ├── sha512.rs       # SHA‑512 hasher, state, and block compression
+│   ├── sha384.rs       # SHA‑384 wrapper (only with feature "sha384")
+│   ├── hmac.rs         # HMAC‑SHA‑512 instantiated via impl_hmac!
+│   ├── hkdf.rs         # HKDF‑SHA‑512 instantiated via impl_hkdf!
+│   └── utils.rs        # Endian helpers, constant‑time verify, constants
+├── benches/
+│   ├── sha512_bench.rs
+│   └── sha384_bench.rs (requires "sha384" feature)
+└── tests/              # (integration tests can be placed here)
 ```
 
 ---
 
-## Usage Examples
+## Getting Started
 
-All examples below are tested as doctests. You can run them with `cargo test --doc`.
+### Prerequisites
 
-### SHA‑512
+- Rust toolchain (stable) version **1.85** or later (edition 2024).
+- No external libraries or system dependencies.
+
+### Installation
+
+Add the crate to your `Cargo.toml`:
+
+```toml
+[dependencies]
+libvctrl_sha512 = "2.0.0"
+```
+
+#### Feature Flags
+
+| Flag       | Default | Description                                     |
+| ---------- | ------- | ----------------------------------------------- |
+| `sha384`   | Yes     | Enable SHA‑384, HMAC‑SHA‑384, and HKDF‑SHA‑384. |
+| `opt_size` | No      | Prioritise smaller binary size over raw speed.  |
+
+Example with default features disabled:
+
+```toml
+libvctrl_sha512 = { version = "2.0.0", default-features = false }
+```
+
+### Configuration
+
+No environment variables or configuration files are needed. The crate compiles with `#![no_std]`; it does not require an allocator.
+
+---
+
+## Usage
+
+### SHA‑512 Hashing
 
 ```rust
 use libvctrl_sha512::Hash;
 
-// One‑shot hashing
+// One‑shot
 let digest = Hash::hash(b"hello world");
 assert_eq!(digest.len(), 64);
 
-// Streaming hashing
+// Streaming
 let mut hasher = Hash::new();
 hasher.update(b"hello ");
 hasher.update(b"world");
@@ -125,19 +199,19 @@ assert!(verifier.verify(&digest));
 ```rust
 use libvctrl_sha512::HMAC;
 
-// One‑shot MAC
-let key = b"my-secret-key";
-let msg = b"important message";
-let mac = HMAC::mac(msg, key);
-assert_eq!(mac.len(), 64);
+let key = b"super secret";
+let msg = b"important data";
 
-// Streaming MAC
+// One‑shot
+let mac = HMAC::mac(msg, key);
+
+// Streaming
 let mut hmac = HMAC::new(key);
-hmac.update(b"important ");
-hmac.update(b"message");
+hmac.update(&msg[..10]);
+hmac.update(&msg[10..]);
 assert_eq!(hmac.finalize(), mac);
 
-// Constant‑time verification
+// Verify in constant time
 assert!(HMAC::verify(msg, key, &mac));
 ```
 
@@ -146,113 +220,97 @@ assert!(HMAC::verify(msg, key, &mac));
 ```rust
 use libvctrl_sha512::HKDF;
 
-let ikm = b"shared-secret";
-let salt = b"random-salt";
-let info = b"encryption-key";
+let ikm = b"input key material";
+let salt = b"random salt";
+let info = b"encryption key";
 
-// Extract phase – produce a 64‑byte pseudorandom key
+// Extract
 let prk = HKDF::extract(salt, ikm);
+assert_eq!(prk.len(), 64);
 
-// Expand phase – derive a 32‑byte AES key
+// Expand
 let mut aes_key = [0u8; 32];
 HKDF::expand(&mut aes_key, prk, info);
 ```
 
-Deriving multiple keys from the same PRK:
+### SHA‑384 & Friends
 
-```rust
-let prk = HKDF::extract(b"master-salt", b"master-ikm");
-
-let mut enc_key = [0u8; 32];
-let mut mac_key = [0u8; 64];
-HKDF::expand(&mut enc_key, prk, b"encryption");
-HKDF::expand(&mut mac_key, prk, b"authentication");
-```
-
-### SHA‑384 & friends
-
-When the `sha384` feature is active (default), import from `sha384`:
+Enable the `sha384` feature (on by default) and import from the `sha384` module:
 
 ```rust
 use libvctrl_sha512::sha384::{Hash, HMAC, HKDF};
 
-// SHA‑384 hashing
-let d = Hash::hash(b"data");
-assert_eq!(d.len(), 48);
+let digest = Hash::hash(b"abc");
+assert_eq!(digest.len(), 48);
 
-// HMAC‑SHA‑384
-let mac = HMAC::mac(b"msg", b"key");
+let mac = HMAC::mac(b"message", b"key");
 assert_eq!(mac.len(), 48);
 
-// HKDF‑SHA‑384
 let prk = HKDF::extract(b"salt", b"ikm");
-let mut okm = [0u8; 42];
-HKDF::expand(&mut okm, prk, b"info");
+assert_eq!(prk.len(), 48);
 ```
 
 ---
 
-## API Reference
+## API Reference / Core Modules
 
-### Root re‑exports
+### Crate Root
 
-The crate root re‑exports the most commonly used types:
+The crate re‑exports the most frequently used types and constants:
 
-```rust
-pub use sha512::Hash;   // SHA‑512 hasher
-pub use hmac::HMAC;     // HMAC‑SHA‑512
-pub use hkdf::HKDF;     // HKDF‑SHA‑512
-pub use utils::{BLOCKBYTES, BYTES};
-```
+| Item         | Description                     |
+| ------------ | ------------------------------- |
+| `Hash`       | SHA‑512 hasher (`sha512::Hash`) |
+| `HMAC`       | HMAC‑SHA‑512 (`hmac::HMAC`)     |
+| `HKDF`       | HKDF‑SHA‑512 (`hkdf::HKDF`)     |
+| `BLOCKBYTES` | SHA‑512 block size (128)        |
+| `BYTES`      | SHA‑512 output size (64)        |
 
-Thus you can write `use libvctrl_sha512::Hash;` directly.
+### `utils` Module
 
-### Module `utils`
+Low‑level helpers exposed for advanced use cases.
 
-Internal helpers, exposed for completeness.
+| Function / Constant            | Description                                                 |
+| ------------------------------ | ----------------------------------------------------------- |
+| `BLOCKBYTES: usize = 128`      | SHA‑512 block size.                                         |
+| `BYTES: usize = 64`            | SHA‑512 output length.                                      |
+| `load_be(base, offset) -> u64` | Load a big‑endian u64 from a byte slice.                    |
+| `store_be(base, offset, x)`    | Store a u64 as big‑endian bytes.                            |
+| `verify(x, y) -> bool`         | Constant‑time slice comparison; returns `true` if `x == y`. |
 
-| Item                                                  | Description                                |
-| ----------------------------------------------------- | ------------------------------------------ |
-| `BLOCKBYTES: usize = 128`                             | SHA‑512 block size.                        |
-| `BYTES: usize = 64`                                   | SHA‑512 output size.                       |
-| `fn load_be(base: &[u8], offset: usize) -> u64`       | Load a big‑endian `u64` from a byte slice. |
-| `fn store_be(base: &mut [u8], offset: usize, x: u64)` | Store a `u64` as big‑endian bytes.         |
-| `fn verify(x: &[u8], y: &[u8]) -> bool`               | Constant‑time slice comparison.            |
+### `sha512` Module – SHA‑512 Hasher
 
-### Module `sha512`
-
-The SHA‑512 hash function.
-
-#### `Hash`
+**`Hash` struct**
 
 ```rust
 pub struct Hash { /* fields hidden */ }
+
 impl Hash {
     pub fn new() -> Self;
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T);
     pub fn finalize(self) -> [u8; 64];
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 64];
     pub fn verify(self, expected: &[u8; 64]) -> bool;
+    pub fn zeroize(&mut self);
 }
-impl Default for Hash { ... }
-impl Copy for Hash { ... }
-impl Clone for Hash { ... }
+impl Default for Hash;
+impl Clone for Hash;
 ```
 
-- **`new()`** – Creates a new SHA‑512 hasher with the standard initialisation vector.
-- **`update()`** – Feeds data into the hasher; can be called multiple times.
-- **`finalize()`** – Consumes the hasher and returns the 64‑byte digest. Message padding is applied according to FIPS 180‑4 (128‑bit big‑endian length, upper 64 bits zero).
-- **`hash()`** – Convenience method for one‑shot hashing.
-- **`verify()`** – Finalizes and compares the digest against `expected` in constant time. Returns `true` if they match.
+- **`new()`** – Creates a hasher with the standard SHA‑512 initial vector.
+- **`update()`** – Feeds arbitrary bytes; can be called any number of times.
+- **`finalize()`** – Pads the message according to FIPS 180‑4 and returns the 64‑byte digest. Consumes the hasher.
+- **`hash()`** – One‑shot convenience function.
+- **`verify()`** – Finalizes and compares the digest against `expected` using constant‑time comparison. Returns `true` on match.
+- **`zeroize()`** – Overwrites all internal state with zeros and inserts a compiler fence.
 
-### Module `hmac`
+### `hmac` Module – HMAC‑SHA‑512
 
-HMAC‑SHA‑512 (RFC 2104).
-
-#### `HMAC`
+**`HMAC` struct**
 
 ```rust
 pub struct HMAC { /* fields hidden */ }
+
 impl HMAC {
     pub fn mac<T: AsRef<[u8]>, U: AsRef<[u8]>>(input: T, k: U) -> [u8; 64];
     pub fn new(k: impl AsRef<[u8]>) -> Self;
@@ -261,41 +319,37 @@ impl HMAC {
     pub fn finalize_verify(self, expected: &[u8; 64]) -> bool;
     pub fn verify<T: AsRef<[u8]>, U: AsRef<[u8]>>(input: T, k: U, expected: &[u8; 64]) -> bool;
 }
-impl Drop for HMAC { ... }
+impl Drop for HMAC;
 ```
 
-- **`mac()`** – One‑shot HMAC‑SHA‑512 computation. Keys longer than 128 bytes are hashed first.
-- **`new()`** – Creates a streaming HMAC context. The key is processed immediately (hashed if necessary and XORed with the inner pad).
-- **`update()`** – Feeds additional data.
-- **`finalize()`** – Completes the HMAC and returns the 64‑byte tag. Consumes the context.
-- **`finalize_verify()`** – Finalizes and compares with `expected` in constant time.
-- **`verify()`** – One‑shot verification, equivalent to `mac` + constant‑time compare.
+- **`mac()`** – One‑shot HMAC computation. Keys longer than 128 bytes are hashed first.
+- **`new()`** – Creates a streaming context; the key is processed immediately.
+- **`update()`** – Incrementally feeds input data.
+- **`finalize()`** – Produces the 64‑byte authentication tag and consumes the context.
+- **`finalize_verify()`** – Finalizes and compares the tag in constant time.
+- **`verify()`** – One‑shot verification equivalent to `mac` + constant‑time comparison.
+- The `Drop` implementation zeroes the padded key buffer.
 
-The `Drop` implementation zeroises the padded key buffer.
+### `hkdf` Module – HKDF‑SHA‑512
 
-### Module `hkdf`
-
-HKDF‑SHA‑512 (RFC 5869). The `HKDF` struct is stateless (zero‑sized); all methods are static.
-
-#### `HKDF`
+**`HKDF` struct** (stateless, zero‑sized)
 
 ```rust
 pub struct HKDF;
+
 impl HKDF {
     pub fn extract(salt: impl AsRef<[u8]>, ikm: impl AsRef<[u8]>) -> [u8; 64];
     pub fn expand(out: &mut [u8], prk: impl AsRef<[u8]>, info: impl AsRef<[u8]>);
 }
 ```
 
-- **`extract()`** – Takes optional salt and input keying material, returns a 64‑byte PRK. This is a single HMAC‑SHA‑512 with the salt as the key and IKM as the message.
-- **`expand()`** – Expands the PRK into `out.len()` bytes of output keying material using the `info` string for domain separation.
-  - **Panics** if `prk.len()` ≠ 64 or if `out.len() > 255 * 64` (16 320 bytes).
+- **`extract()`** – Computes a 64‑byte pseudorandom key (PRK) from salt and input keying material.
+- **`expand()`** – Derives output keying material (OKM) of arbitrary length `out.len()`.
+  - **Panics** if `prk` is not exactly 64 bytes, or if `out.len() > 16 320` (the RFC 5869 maximum).
 
-### Module `sha384` (feature‑gated)
+### `sha384` Module (feature `sha384`)
 
-Enabled by default. Provides **SHA‑384**, **HMAC‑SHA‑384**, and **HKDF‑SHA‑384**.
-
-The API mirrors that of the SHA‑512 versions exactly, except all outputs are 48 bytes instead of 64.
+Provides SHA‑384, HMAC‑SHA‑384, and HKDF‑SHA‑384. The API is identical to the SHA‑512 counterparts, but all outputs are 48 bytes.
 
 | Type           | Analogue to    |
 | -------------- | -------------- |
@@ -303,88 +357,79 @@ The API mirrors that of the SHA‑512 versions exactly, except all outputs are 4
 | `sha384::HMAC` | `hmac::HMAC`   |
 | `sha384::HKDF` | `hkdf::HKDF`   |
 
-For example:
+Example:
 
 ```rust
-let d = sha384::Hash::hash(b"abc");               // [u8; 48]
-let mac = sha384::HMAC::mac(b"msg", b"key");       // [u8; 48]
-let prk = sha384::HKDF::extract(b"salt", b"ikm");  // [u8; 48]
+use libvctrl_sha512::sha384::Hash;
+
+let digest = Hash::hash(b"abc");
+assert_eq!(digest, [
+    0xcb, 0x00, 0x75, 0x3f, 0x45, 0xa3, 0x5e, 0x8b,
+    0xb5, 0xa0, 0x3d, 0x69, 0x9a, 0xc6, 0x50, 0x07,
+    0x27, 0x2c, 0x32, 0xab, 0x0e, 0xde, 0xd1, 0x63,
+    0x1a, 0x8b, 0x60, 0x5a, 0x43, 0xff, 0x5b, 0xed,
+    0x80, 0x86, 0x07, 0x2b, 0xa1, 0xe7, 0xcc, 0x23,
+    0x58, 0xba, 0xec, 0xa1, 0x34, 0xc8, 0x25, 0xa7,
+]);
 ```
 
-The `HKDF::expand` in SHA‑384 requires a 48‑byte PRK and limits the output to `255 * 48` bytes.
-
 ---
 
-## Security Considerations
+## Testing
 
-### Constant‑time verification
+### Unit Tests and Doctests
 
-All comparisons of digests or MACs are performed using the [`utils::verify`] function. It:
+Run the full test suite (including all doc examples) with:
 
-1. Compares lengths first (public information).
-2. XORs each byte pair into an accumulator, without branching on the result.
-3. On WASM targets, pre‑mixes bytes to avoid potential non‑constant‑time operations in the runtime.
-4. Uses a volatile read of the accumulator to prevent compiler optimisations from short‑circuiting the comparison.
+```bash
+cargo test --all-features
+```
 
-This ensures that the time taken by verification does not depend on the number of matching bytes, thus preventing timing side‑channel attacks.
+Doctests are guaranteed to be accurate; they are compiled and executed as part of the test run. The suite also covers internal edge cases such as HMAC with empty keys, long keys, and HKDF length limits.
 
-### HMAC key handling
+### Benchmarks
 
-- Keys longer than the block size (128 bytes) are hashed using SHA‑512 (or SHA‑384) before being used.
-- After use, temporary key‑derived buffers are zeroed. The `Drop` implementation of `HMAC` clears the padded key buffer.
-- Empty keys are allowed but not recommended.
-
-### HKDF recommendations
-
-- **Salt**: Should be random and can be public. Even a fixed salt is better than none.
-- **PRK length**: Must be exactly the output length of the underlying hash (64 for SHA‑512, 48 for SHA‑384). Passing an incorrect length panics.
-- **Info**: Use distinct `info` strings for different key purposes. The same PRK can safely be used with multiple `info` values.
-
-### `no_std` and unsafe
-
-The crate uses `#![no_std]` and does not allocate memory. The only `unsafe` block is the `core::ptr::read_volatile` in `utils::verify`, which is necessary to prevent the compiler from optimising away the constant‑time loop. The operation is safe in practice because the pointer is valid and the value is not used for memory access.
-
----
-
-## Performance & Benchmarks
-
-Benchmarks are provided in the `benches/` directory. To run them:
+Benchmarks are written using [Criterion](https://bheisler.github.io/criterion.rs/book/index.html). To execute them:
 
 ```bash
 cargo bench --all-features
 ```
 
-On a modern x86‑64 processor, hashing 1 KB of data takes a few microseconds. The `opt_size` feature reduces binary size by about 75% (by marking some functions as `inline(never)`) at a cost of roughly 16% lower throughput. For embedded targets with tight flash limits, `opt_size` is recommended.
+Two benchmark suites are included:
+
+- `sha512_bench` – Measures throughput for SHA‑512 and HMAC‑SHA‑512.
+- `sha384_bench` (requires `sha384` feature) – Same for SHA‑384.
+
+On a typical x86‑64 machine, the default build hashes tens of megabytes per second. Enabling `opt_size` trades approximately 16% of throughput for a roughly 75% reduction in code size, making it ideal for embedded targets with tight flash budgets.
 
 ---
 
-## Feature Flags
+## Versioning & Stability
 
-| Flag       | Description                                      | Default |
-| ---------- | ------------------------------------------------ | ------- |
-| `sha384`   | Enables SHA‑384, HMAC‑SHA‑384, and HKDF‑SHA‑384. | Yes     |
-| `opt_size` | Optimises for code size at the expense of speed. | No      |
+This project adheres to [Semantic Versioning 2.0.0](https://semver.org/).
 
-To disable SHA‑384:
+- The public API is considered stable. Any breaking change (removing an item, altering a method signature, changing constant values, or modifying the behaviour of a function in a non‑backward‑compatible way) will result in a major version bump.
+- New methods, new trait implementations, or additions to the `sha384` module (while keeping existing APIs unchanged) do not constitute breaking changes.
+- Feature flags (`sha384`, `opt_size`) are additive; removing a feature flag or changing its default status would be a breaking change and will be treated accordingly.
 
-```toml
-libvctrl_sha512 = { version = "0.1.0", default-features = false }
-```
+Consult the repository’s changelog for version‑specific notes before upgrading.
 
-To enable size optimisation:
+---
 
-```toml
-libvctrl_sha512 = { version = "0.1.0", features = ["opt_size"] }
-```
+## Contributing
+
+Contributions are welcome. Please open an issue or a pull request on the [GitHub repository](https://github.com/mroczect/libvctrl). By contributing, you agree that your work will be released under the same ISC license.
+
+For substantial changes, it is recommended to discuss the proposal via an issue first to ensure alignment with the project’s goals.
 
 ---
 
 ## License
 
-This project is distributed under the **ISC License**.
+This crate is distributed under the **ISC License**.
 
 ```
-Copyright (c) 2019–2026 Frank Denis
+Copyright (c) 2019-2026 Frank Denis
 Copyright (c) 2026 mroczect
 
 Permission to use, copy, modify, and/or distribute this software for any
@@ -404,13 +449,4 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ## Acknowledgements
 
-This crate is a fork of [hmac-sha512](https://github.com/jedisct1/rust-hmac-sha512) by Frank Denis. The original implementation was audited, high‑performance, and minimal. This version adds:
-
-- SHA‑384 support (feature‑gated)
-- HKDF (both SHA‑512 and SHA‑384)
-- FIPS 180‑4 compliant padding (full 128‑bit length field)
-- Comprehensive documentation and doctests
-- Criterion benchmarks
-- Memory zeroisation improvements
-
-All cryptographic logic is derived from the original work; the core security properties remain unchanged.
+This library is a fork of Frank Denis’s [rust-hmac-sha512](https://github.com/jedisct1/rust-hmac-sha512). The core cryptographic logic remains unchanged; this version adds SHA‑384 support, HKDF, FIPS‑compliant full‑length padding, comprehensive documentation, benchmarks, and a modular macro‑based structure.
