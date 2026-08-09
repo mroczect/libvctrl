@@ -1,7 +1,79 @@
+//! SHA-384 hash function implementation.
+//!
+//! This module provides the SHA-384 algorithm as defined in FIPS 180-4. SHA-384
+//! is structurally identical to SHA-512 but produces a 384-bit (48-byte) digest
+//! instead of 512 bits, and uses a different initial vector (IV). The algorithm
+//! operates on 1024-bit message blocks and uses the same 64-bit word operations
+//! as SHA-512.
+//!
+//! # Availability
+//!
+//! This module is only compiled when the `sha384` feature is enabled. It is part
+//! of the default feature set.
+//!
+//! # Design Rationale
+//!
+//! SHA-384 is implemented as a thin wrapper around the core SHA-512
+//! [`crate::sha512::Hash`] and [`crate::sha512::State`] types. This reuse avoids
+//! code duplication because the message schedule, compression function, and
+//! block processing are identical. The differences are:
+//!
+//! - A distinct initial vector (`new_state()`) replaces the SHA-512 IV.
+//! - The final digest is truncated to the first 48 bytes of the 64-byte SHA-512
+//!   output.
+//!
+//! This approach follows the official specification and guarantees that SHA-384
+//! results are exactly the leftmost 384 bits of the SHA-512 hash computed with
+//! the SHA-384 IV.
+//!
+//! The module also instantiates HMAC-SHA-384 and HKDF-SHA-384 via the crate’s
+//! [`impl_hmac!`] and [`impl_hkdf!`] macros, providing ready-to-use keyed-hash
+//! and key-derivation functions with 48-byte output and 128-byte block size.
+//!
+//! # Examples
+//!
+//! Computing a SHA-384 hash in one shot:
+//!
+//! ```
+//! # use libvctrl_sha512::sha384::Hash;
+//! let digest = Hash::hash(b"hello world");
+//! assert_eq!(digest.len(), 48);
+//! ```
+//!
+//! Verifying against a known test vector:
+//!
+//! ```
+//! # use libvctrl_sha512::sha384::Hash;
+//! let digest = Hash::hash(b"abc");
+//! let expected: [u8; 48] = [
+//!     0xcb, 0x00, 0x75, 0x3f, 0x45, 0xa3, 0x5e, 0x8b,
+//!     0xb5, 0xa0, 0x3d, 0x69, 0x9a, 0xc6, 0x50, 0x07,
+//!     0x27, 0x2c, 0x32, 0xab, 0x0e, 0xde, 0xd1, 0x63,
+//!     0x1a, 0x8b, 0x60, 0x5a, 0x43, 0xff, 0x5b, 0xed,
+//!     0x80, 0x86, 0x07, 0x2b, 0xa1, 0xe7, 0xcc, 0x23,
+//!     0x58, 0xba, 0xec, 0xa1, 0x34, 0xc8, 0x25, 0xa7,
+//! ];
+//! assert_eq!(digest, expected);
+//! ```
+
 use crate::sha512::{Hash as Sha512Hash, State};
 use crate::utils::load_be;
-use crate::utils::verify;
 
+/// Constructs the SHA-384 initial state vector as defined in FIPS 180-4.
+///
+/// This function builds the 8×64-bit IV by loading the constant big-endian bytes
+/// specified for SHA-384. The values are the first 64 bits of the fractional
+/// parts of the square roots of the 9th through 16th primes, which differ from
+/// those used for SHA-512.
+///
+/// The resulting [`State`] is then used to initialise the inner [`Sha512Hash`]
+/// when a new SHA-384 hasher is created.
+///
+/// # Rationale
+///
+/// Using a distinct IV is what makes SHA-384 a separate function from SHA-512
+/// while sharing the same compression logic. This design ensures the two
+/// algorithms produce unrelated outputs even for identical inputs.
 #[inline]
 fn new_state() -> State {
     const IV: [u8; 64] = [
@@ -18,12 +90,58 @@ fn new_state() -> State {
     State(t)
 }
 
-#[derive(Copy, Clone)]
+/// SHA-384 hasher.
+///
+/// Wraps the full SHA-512 hasher ([`Sha512Hash`]) but initialises it with the
+/// SHA-384 IV and truncates the final digest to 48 bytes. All update operations
+/// are delegated to the inner hasher, so the performance characteristics are
+/// identical to SHA-512.
+///
+/// # Examples
+///
+/// Incremental hashing:
+///
+/// ```
+/// # use libvctrl_sha512::sha384::Hash;
+/// let mut h = Hash::new();
+/// h.update(b"hello ");
+/// h.update(b"world");
+/// let result = h.finalize();
+/// assert_eq!(result.len(), 48);
+/// ```
+///
+/// One-shot hashing with a known answer:
+///
+/// ```
+/// # use libvctrl_sha512::sha384::Hash;
+/// let digest = Hash::hash(b"abc");
+/// assert_eq!(digest, [
+///     0xcb, 0x00, 0x75, 0x3f, 0x45, 0xa3, 0x5e, 0x8b,
+///     0xb5, 0xa0, 0x3d, 0x69, 0x9a, 0xc6, 0x50, 0x07,
+///     0x27, 0x2c, 0x32, 0xab, 0x0e, 0xde, 0xd1, 0x63,
+///     0x1a, 0x8b, 0x60, 0x5a, 0x43, 0xff, 0x5b, 0xed,
+///     0x80, 0x86, 0x07, 0x2b, 0xa1, 0xe7, 0xcc, 0x23,
+///     0x58, 0xba, 0xec, 0xa1, 0x34, 0xc8, 0x25, 0xa7,
+/// ]);
+/// ```
+#[derive(Clone)]
 pub struct Hash(Sha512Hash);
 
 impl Hash {
+    /// Creates a new SHA-384 hasher initialised with the SHA-384 IV.
+    ///
+    /// All internal buffers are zeroed and the message length is set to zero.
+    /// The resulting hasher is ready to accept data via [`update`](Hash::update).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use libvctrl_sha512::sha384::Hash;
+    /// let hasher = Hash::new();
+    /// ```
+    #[must_use]
     pub fn new() -> Self {
-        Hash(Sha512Hash {
+        Self(Sha512Hash {
             state: new_state(),
             r: 0,
             w: [0u8; 128],
@@ -31,125 +149,101 @@ impl Hash {
         })
     }
 
-    pub(crate) fn _update<T: AsRef<[u8]>>(&mut self, input: T) {
-        self.0.update(input)
+    /// Internal update function exposed to sibling modules.
+    ///
+    /// This is the same as [`update`](Hash::update) but with `pub(crate)`
+    /// visibility, allowing the crate’s HMAC and HKDF implementations to feed
+    /// data without calling through the public API.
+    pub(crate) fn update_inner<T: AsRef<[u8]>>(&mut self, input: T) {
+        self.0.update_inner(input);
     }
 
+    /// Feeds data into the SHA-384 hasher.
+    ///
+    /// Data is buffered in 128-byte blocks and compressed using the SHA-512
+    /// compression function. This method can be called any number of times
+    /// before finalising.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use libvctrl_sha512::sha384::Hash;
+    /// let mut h = Hash::new();
+    /// h.update(b"some data");
+    /// ```
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T) {
-        self._update(input)
+        self.update_inner(input);
     }
 
+    /// Finalises the hash and returns the 48-byte SHA-384 digest.
+    ///
+    /// Applies the SHA-512 padding (1 bit, zeros, 128-bit length) and
+    /// compression, then truncates the 64-byte intermediate result to the first
+    /// 48 bytes. This consumes the hasher.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use libvctrl_sha512::sha384::Hash;
+    /// let mut h = Hash::new();
+    /// h.update(b"data");
+    /// let digest = h.finalize();
+    /// assert_eq!(digest.len(), 48);
+    /// ```
+    #[must_use]
     pub fn finalize(self) -> [u8; 48] {
         let mut out = [0u8; 48];
         out.copy_from_slice(&self.0.finalize()[..48]);
         out
     }
 
+    /// One-shot SHA-384 hash computation.
+    ///
+    /// Creates a new hasher, feeds the entire input, and returns the final
+    /// 48-byte digest. This is a convenience shortcut.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// # use libvctrl_sha512::sha384::Hash;
+    /// let digest = Hash::hash(b"quick hash");
+    /// assert_eq!(digest.len(), 48);
+    /// ```
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 48] {
         let mut h = Self::new();
         h.update(input);
         h.finalize()
     }
+
+    /// Overwrites the internal state with zeros and inserts a compiler fence.
+    ///
+    /// Delegates to [`Sha512Hash::zeroize`] on the inner hasher. This is a
+    /// best-effort measure to clear sensitive intermediate data from memory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use libvctrl_sha512::sha384::Hash;
+    /// let mut h = Hash::new();
+    /// h.update(b"secret");
+    /// h.zeroize();
+    /// ```
+    pub fn zeroize(&mut self) {
+        self.0.zeroize();
+    }
 }
 
 impl Default for Hash {
+    /// Returns a new SHA-384 hasher, identical to [`Hash::new`].
     fn default() -> Self {
         Self::new()
     }
 }
 
-pub struct HMAC {
-    ih: Hash,
-    padded: [u8; 128],
-}
-
-impl Drop for HMAC {
-    fn drop(&mut self) {
-        self.padded.fill(0);
-    }
-}
-
-impl HMAC {
-    pub fn mac<T: AsRef<[u8]>, U: AsRef<[u8]>>(input: T, k: U) -> [u8; 48] {
-        let mut hmac = Self::new(k);
-        hmac.update(input);
-        hmac.finalize()
-    }
-
-    pub fn new(k: impl AsRef<[u8]>) -> Self {
-        let k = k.as_ref();
-        let mut hk = [0u8; 48];
-        let k2 = if k.len() > 128 {
-            hk.copy_from_slice(&Hash::hash(k));
-            &hk[..]
-        } else {
-            k
-        };
-        let mut padded = [0x36; 128];
-        for (p, &k) in padded.iter_mut().zip(k2.iter()) {
-            *p ^= k;
-        }
-        let mut ih = Hash::new();
-        ih.update(&padded[..]);
-        HMAC { ih, padded }
-    }
-
-    pub fn update(&mut self, input: impl AsRef<[u8]>) {
-        self.ih.update(input);
-    }
-
-    pub fn finalize(mut self) -> [u8; 48] {
-        for p in self.padded.iter_mut() {
-            *p ^= 0x6a;
-        }
-        let mut oh = Hash::new();
-        oh.update(&self.padded[..]);
-        oh.update(&self.ih.finalize()[..]);
-        oh.finalize()
-    }
-
-    #[inline]
-    pub fn finalize_verify(self, expected: &[u8; 48]) -> bool {
-        let out = self.finalize();
-        verify(&out, expected)
-    }
-
-    #[inline]
-    pub fn verify<T: AsRef<[u8]>, U: AsRef<[u8]>>(input: T, k: U, expected: &[u8; 48]) -> bool {
-        let mac = Self::mac(input, k);
-        verify(&mac, expected)
-    }
-}
-
-pub struct HKDF;
-
-impl HKDF {
-    #[inline]
-    pub fn extract(salt: impl AsRef<[u8]>, ikm: impl AsRef<[u8]>) -> [u8; 48] {
-        HMAC::mac(ikm, salt)
-    }
-
-    #[inline]
-    pub fn expand(out: &mut [u8], prk: impl AsRef<[u8]>, info: impl AsRef<[u8]>) {
-        assert_eq!(prk.as_ref().len(), 48, "HKDF-SHA384 expects a 48‑byte PRK");
-        let info = info.as_ref();
-        let mut counter: u8 = 1;
-        assert!(
-            out.len() < 0xff * 48,
-            "Requested output exceeds RFC 5869 limit"
-        );
-        let mut i = 0;
-        while i < out.len() {
-            let mut hmac = HMAC::new(&prk);
-            if i != 0 {
-                hmac.update(&out[i - 48..][..48]);
-            }
-            hmac.update(info);
-            hmac.update([counter]);
-            let left = core::cmp::min(48, out.len() - i);
-            out[i..][..left].copy_from_slice(&hmac.finalize()[..left]);
-            counter += 1;
-            i += 48;
-        }
-    }
-}
+// The following macro invocations generate HMAC-SHA-384 and HKDF-SHA-384
+// structures directly inside this module. See the crate-level documentation for
+// the `impl_hmac!` and `impl_hkdf!` macros for details on usage.
+impl_hmac!(Hash, 48, 128);
+impl_hkdf!(Hash, 48, 128);
