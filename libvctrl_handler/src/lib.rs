@@ -86,7 +86,7 @@ pub mod errors;
 ///
 /// ```
 /// use libvctrl_handler::VctrlError;
-/// use libvctrl_handler::macros::vctrl_error_other;
+/// use libvctrl_handler::vctrl_error_other;
 ///
 /// let err: VctrlError = vctrl_error_other!("code {}", 500);
 /// assert_eq!(err.to_string(), "code 500");
