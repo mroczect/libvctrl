@@ -1,6 +1,6 @@
 [package]
 name = "libvctrl_handler"
-version = "3.0.1"
+version = "3.1.0"
 edition = "2024"
 description = "Fundamental contracts for building a version control system – no implementations, only traits and types"
 license = "MIT"
@@ -11,3 +11,9 @@ repository = "https://github.com/mroczect/libvctrl"
 readme = "README.md"
 keywords = ["version-control", "vcs", "library", "traits"]
 categories = ["development-tools", "data-structures"]
+
+[lints.clippy]
+all = "deny"
+pedantic = "deny"
+nursery = "deny"
+cargo = "deny"
