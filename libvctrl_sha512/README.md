@@ -69,11 +69,11 @@ After all full blocks are processed, the final incomplete block is padded with a
 
 ```mermaid
 flowchart LR
-    K[Key] --> P1[Pad to 128 bytes<br/>or hash if longer]
+    K[Key] --> P1["Pad to 128 bytes<br/>or hash if longer"]
     P1 --> I[ipad XOR padded key]
     P1 --> O[opad XOR padded key]
-    I --> H1[SHA‑512(ipad || message)]
-    H1 --> H2[SHA‑512(opad || H1)]
+    I --> H1["SHA-512(ipad || message)"]
+    H1 --> H2["SHA-512(opad || H1)"]
     H2 --> MAC[64‑byte tag]
 ```
 
