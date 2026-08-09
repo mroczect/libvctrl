@@ -1,10 +1,11 @@
 use libvctrl_sha512::{HKDF, HMAC, Hash};
 
 // ============================================================================
+// SHA‑512
 // ============================================================================
 
 #[test]
-fn test_sha512_abc() {
+fn sha512_abc() {
     let expected: [u8; 64] = [
         0xdd, 0xaf, 0x35, 0xa1, 0x93, 0x61, 0x7a, 0xba, 0xcc, 0x41, 0x73, 0x49, 0xae, 0x20, 0x41,
         0x31, 0x12, 0xe6, 0xfa, 0x4e, 0x89, 0xa9, 0x7e, 0xa2, 0x0a, 0x9e, 0xee, 0xe6, 0x4b, 0x55,
@@ -12,12 +13,11 @@ fn test_sha512_abc() {
         0xfe, 0xeb, 0xbd, 0x45, 0x4d, 0x44, 0x23, 0x64, 0x3c, 0xe8, 0x0e, 0x2a, 0x9a, 0xc9, 0x4f,
         0xa5, 0x4c, 0xa4, 0x9f,
     ];
-    let result = Hash::hash(b"abc");
-    assert_eq!(result, expected);
+    assert_eq!(Hash::hash(b"abc"), expected);
 }
 
 #[test]
-fn test_sha512_empty() {
+fn sha512_empty() {
     let expected: [u8; 64] = [
         0xcf, 0x83, 0xe1, 0x35, 0x7e, 0xef, 0xb8, 0xbd, 0xf1, 0x54, 0x28, 0x50, 0xd6, 0x6d, 0x80,
         0x07, 0xd6, 0x20, 0xe4, 0x05, 0x0b, 0x57, 0x15, 0xdc, 0x83, 0xf4, 0xa9, 0x21, 0xd3, 0x6c,
@@ -25,25 +25,30 @@ fn test_sha512_empty() {
         0x7e, 0xec, 0x2f, 0x63, 0xb9, 0x31, 0xbd, 0x47, 0x41, 0x7a, 0x81, 0xa5, 0x38, 0x32, 0x7a,
         0xf9, 0x27, 0xda, 0x3e,
     ];
-    let result = Hash::hash(b"");
-    assert_eq!(result, expected);
+    assert_eq!(Hash::hash(b""), expected);
 }
 
 #[test]
-fn test_sha512_streaming() {
+fn sha512_streaming() {
     let expected = Hash::hash(b"hello world");
-
     let mut hasher = Hash::new();
     hasher.update(b"hello ");
     hasher.update(b"world");
-    let result = hasher.finalize();
 
+    // finalize() mengkonsumsi `self`, jadi kita clone dulu untuk mendapatkan hasil
+    let result = hasher.clone().finalize();
     assert_eq!(result, expected);
+
+    // hasher asli masih bisa dipakai untuk verify
     assert!(hasher.verify(&expected));
 }
 
+// ============================================================================
+// HMAC‑SHA‑512
+// ============================================================================
+
 #[test]
-fn test_hmac_rfc4231_1() {
+fn hmac_sha512_rfc4231_test1() {
     let key = [0x0b; 20];
     let data = b"Hi There";
     let expected: [u8; 64] = [
@@ -59,8 +64,8 @@ fn test_hmac_rfc4231_1() {
 }
 
 #[test]
-fn test_hmac_rfc4231_2() {
-    // NOTE: Nilai ini adalah output aktual dari implementasi.
+fn hmac_sha512_rfc4231_test2() {
+    // Nilai expected adalah output aktual dari implementasi.
     let key = b"Jefe";
     let data = b"what do ya want for nothing?";
     let expected: [u8; 64] = [
@@ -76,7 +81,37 @@ fn test_hmac_rfc4231_2() {
 }
 
 #[test]
-fn test_hkdf_vectors() {
+fn hmac_sha512_streaming() {
+    let key = b"secret key";
+    let message = b"Hello, World!";
+    let oneshot = HMAC::mac(message, key);
+
+    let mut streaming = HMAC::new(key);
+    streaming.update(b"Hello, ");
+    streaming.update(b"World!");
+    assert_eq!(streaming.finalize(), oneshot);
+
+    let mut streaming = HMAC::new(key);
+    streaming.update(message);
+    assert!(streaming.finalize_verify(&oneshot));
+}
+
+#[test]
+fn hmac_sha512_verify_wrong_mac() {
+    let key = b"secret";
+    let data = b"message";
+    let mac = HMAC::mac(data, key);
+    let mut wrong = mac;
+    wrong[0] ^= 0x01;
+    assert!(!HMAC::verify(data, key, &wrong));
+}
+
+// ============================================================================
+// HKDF‑SHA‑512
+// ============================================================================
+
+#[test]
+fn hkdf_sha512_with_salt() {
     let ikm = [0x0bu8; 22];
     let salt: [u8; 13] = [
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
@@ -87,14 +122,16 @@ fn test_hkdf_vectors() {
         0xe4, 0xc8, 0xe2, 0x6a, 0x1a, 0x16, 0xed, 0x34, 0xd9, 0xfc, 0x7f, 0xe9, 0x2c, 0x14, 0x81,
         0x57, 0x93, 0x38, 0xda, 0x36, 0x2c, 0xb8, 0xd9, 0xf9, 0x25, 0xd7, 0xcb,
     ];
-
     let prk = HKDF::extract(salt, ikm);
     let mut okm = [0u8; 42];
     HKDF::expand(&mut okm, prk, info);
     assert_eq!(okm, expected);
+}
 
+#[test]
+fn hkdf_sha512_empty_salt_info() {
     let ikm = [0x0bu8; 22];
-    let expected_empty: [u8; 42] = [
+    let expected: [u8; 42] = [
         0xf5, 0xfa, 0x02, 0xb1, 0x82, 0x98, 0xa7, 0x2a, 0x8c, 0x23, 0x89, 0x8a, 0x87, 0x03, 0x47,
         0x2c, 0x6e, 0xb1, 0x79, 0xdc, 0x20, 0x4c, 0x03, 0x42, 0x5c, 0x97, 0x0e, 0x3b, 0x16, 0x4b,
         0xf9, 0x0f, 0xff, 0x22, 0xd0, 0x48, 0x36, 0xd0, 0xe2, 0x34, 0x3b, 0xac,
@@ -102,68 +139,42 @@ fn test_hkdf_vectors() {
     let prk = HKDF::extract([], ikm);
     let mut okm = [0u8; 42];
     HKDF::expand(&mut okm, prk, []);
-    assert_eq!(okm, expected_empty);
+    assert_eq!(okm, expected);
 }
 
-#[test]
-fn test_hmac_streaming() {
-    let key = b"secret key";
-    let message = b"Hello, World!";
-
-    let oneshot = HMAC::mac(message, key);
-
-    let mut streaming = HMAC::new(key);
-    streaming.update(b"Hello, ");
-    streaming.update(b"World!");
-    let result = streaming.finalize();
-    assert_eq!(oneshot, result);
-
-    let mut streaming = HMAC::new(key);
-    streaming.update(message);
-    assert!(streaming.finalize_verify(&oneshot));
-}
-
-#[test]
-fn test_hmac_verify_fail() {
-    let key = b"secret";
-    let data = b"message";
-    let mac = HMAC::mac(data, key);
-    let mut wrong = mac;
-    wrong[0] ^= 0x01;
-    assert!(!HMAC::verify(data, key, &wrong));
-}
+// ============================================================================
+// SHA‑384, HMAC‑SHA‑384, HKDF‑SHA‑384 (hanya jika fitur sha384 aktif)
+// ============================================================================
 
 #[cfg(feature = "sha384")]
 mod sha384_tests {
     use libvctrl_sha512::sha384;
 
     #[test]
-    fn test_sha384_abc() {
+    fn sha384_abc() {
         let expected: [u8; 48] = [
             0xcb, 0x00, 0x75, 0x3f, 0x45, 0xa3, 0x5e, 0x8b, 0xb5, 0xa0, 0x3d, 0x69, 0x9a, 0xc6,
             0x50, 0x07, 0x27, 0x2c, 0x32, 0xab, 0x0e, 0xde, 0xd1, 0x63, 0x1a, 0x8b, 0x60, 0x5a,
             0x43, 0xff, 0x5b, 0xed, 0x80, 0x86, 0x07, 0x2b, 0xa1, 0xe7, 0xcc, 0x23, 0x58, 0xba,
             0xec, 0xa1, 0x34, 0xc8, 0x25, 0xa7,
         ];
-        let result = sha384::Hash::hash(b"abc");
-        assert_eq!(result, expected);
+        assert_eq!(sha384::Hash::hash(b"abc"), expected);
     }
 
     #[test]
-    fn test_sha384_empty() {
+    fn sha384_empty() {
         let expected: [u8; 48] = [
             0x38, 0xb0, 0x60, 0xa7, 0x51, 0xac, 0x96, 0x38, 0x4c, 0xd9, 0x32, 0x7e, 0xb1, 0xb1,
             0xe3, 0x6a, 0x21, 0xfd, 0xb7, 0x11, 0x14, 0xbe, 0x07, 0x43, 0x4c, 0x0c, 0xc7, 0xbf,
             0x63, 0xf6, 0xe1, 0xda, 0x27, 0x4e, 0xde, 0xbf, 0xe7, 0x6f, 0x65, 0xfb, 0xd5, 0x1a,
             0xd2, 0xf1, 0x48, 0x98, 0xb9, 0x5b,
         ];
-        let result = sha384::Hash::hash(b"");
-        assert_eq!(result, expected);
+        assert_eq!(sha384::Hash::hash(b""), expected);
     }
 
     #[test]
-    fn test_hmac_sha384_rfc4231() {
-        // NOTE: Nilai ini adalah output aktual dari implementasi.
+    fn hmac_sha384_rfc4231() {
+        // Nilai expected adalah output aktual dari implementasi.
         let key = [0x0b; 20];
         let data = b"Hi There";
         let expected: [u8; 48] = [
@@ -178,7 +189,7 @@ mod sha384_tests {
     }
 
     #[test]
-    fn test_hkdf_sha384_vectors() {
+    fn hkdf_sha384_with_salt() {
         let ikm = [0x0bu8; 22];
         let salt: [u8; 13] = [
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
@@ -193,8 +204,12 @@ mod sha384_tests {
         let mut okm = [0u8; 42];
         sha384::HKDF::expand(&mut okm, prk, info);
         assert_eq!(okm, expected);
+    }
 
-        let expected_empty: [u8; 42] = [
+    #[test]
+    fn hkdf_sha384_empty_salt_info() {
+        let ikm = [0x0bu8; 22];
+        let expected: [u8; 42] = [
             0xc8, 0xc9, 0x6e, 0x71, 0x0f, 0x89, 0xb0, 0xd7, 0x99, 0x0b, 0xca, 0x68, 0xbc, 0xde,
             0xc8, 0xcf, 0x85, 0x40, 0x62, 0xe5, 0x4c, 0x73, 0xa7, 0xab, 0xc7, 0x43, 0xfa, 0xde,
             0x9b, 0x24, 0x2d, 0xaa, 0xcc, 0x1c, 0xea, 0x56, 0x70, 0x41, 0x5b, 0x52, 0x84, 0x9c,
@@ -202,21 +217,19 @@ mod sha384_tests {
         let prk = sha384::HKDF::extract([], ikm);
         let mut okm = [0u8; 42];
         sha384::HKDF::expand(&mut okm, prk, []);
-        assert_eq!(okm, expected_empty);
+        assert_eq!(okm, expected);
     }
 
     #[test]
-    fn test_hmac_sha384_streaming() {
+    fn hmac_sha384_streaming() {
         let key = b"secret key";
         let message = b"Hello, World!";
-
         let oneshot = sha384::HMAC::mac(message, key);
 
         let mut streaming = sha384::HMAC::new(key);
         streaming.update(b"Hello, ");
         streaming.update(b"World!");
-        let result = streaming.finalize();
-        assert_eq!(oneshot, result);
+        assert_eq!(streaming.finalize(), oneshot);
 
         let mut streaming = sha384::HMAC::new(key);
         streaming.update(message);
