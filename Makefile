@@ -4,12 +4,15 @@ SHELL = /bin/bash
 CARGO   = cargo
 MEMBERS = libvctrl_handler libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl libvctrl_sha512
 
+# Default package jika ingin menjalankan CI untuk satu package
+PKG ?= libvctrl_handler
+
 .PHONY: all
 all: build
 
 .PHONY: help
 help:
-	@echo "Usage: make <target>"
+	@echo "Usage: make <target> [PKG=<package>]"
 	@echo ""
 	@echo "Targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -196,3 +199,80 @@ uninstall:
 
 .PHONY: rebuild
 rebuild: release install
+
+# ---------------------------------------------------------------------------
+# Package-specific targets (pkg=<name>)
+# ---------------------------------------------------------------------------
+.PHONY: build-pkg
+build-pkg:
+	$(CARGO) build -p $(PKG)
+
+.PHONY: release-pkg
+release-pkg:
+	$(CARGO) build --release -p $(PKG)
+
+.PHONY: check-pkg
+check-pkg:
+	$(CARGO) check -p $(PKG)
+
+.PHONY: test-pkg
+test-pkg:
+	$(CARGO) test -p $(PKG)
+
+.PHONY: test-verbose-pkg
+test-verbose-pkg:
+	RUST_BACKTRACE=1 $(CARGO) test -p $(PKG) -- --nocapture
+
+.PHONY: fmt-pkg
+fmt-pkg:
+	$(CARGO) fmt -p $(PKG)
+
+.PHONY: fmt-check-pkg
+fmt-check-pkg:
+	$(CARGO) fmt -p $(PKG) -- --check
+
+.PHONY: clippy-pkg
+clippy-pkg:
+	$(CARGO) clippy -p $(PKG) --all-targets --all-features -- -D warnings
+
+.PHONY: ci-pkg
+ci-pkg: fmt-check-pkg clippy-pkg test-verbose-pkg
+
+.PHONY: doc-pkg
+doc-pkg:
+	$(CARGO) doc -p $(PKG) --no-deps
+
+.PHONY: watch-test-pkg
+watch-test-pkg:
+	$(CARGO) watch -x 'test -p $(PKG)'
+
+.PHONY: watch-build-pkg
+watch-build-pkg:
+	$(CARGO) watch -x 'check -p $(PKG)'
+
+# ---------------------------------------------------------------------------
+# Convenience aliases for common packages
+# ---------------------------------------------------------------------------
+.PHONY: handler
+handler: PKG=libvctrl_handler
+handler: ci-pkg
+
+.PHONY: core
+core: PKG=libvctrl_core
+core: ci-pkg
+
+.PHONY: plumbing
+plumbing: PKG=libvctrl_plumbing
+plumbing: ci-pkg
+
+.PHONY: porcelain
+porcelain: PKG=libvctrl_porcelain
+porcelain: ci-pkg
+
+.PHONY: root-pkg
+root-pkg: PKG=libvctrl
+root-pkg: ci-pkg
+
+.PHONY: sha512
+sha512: PKG=libvctrl_sha512
+sha512: ci-pkg
