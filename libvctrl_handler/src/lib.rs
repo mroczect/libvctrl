@@ -1,27 +1,51 @@
 //! Fundamental contracts for building a version control system.
 //!
 //! # Purpose
+//!
 //! `libvctrl_handler` provides the core, pure-data types and behavior traits
 //! required to construct a version control system (VCS). It intentionally
 //! contains *no implementations*—only the abstract definitions of objects
 //! (blobs, trees, commits, tags) and the interfaces for storing, hashing,
 //! encoding, and transporting them.
 //!
-//! # Design rationale
+//! # Design Rationale
+//!
 //! The crate enforces a strict separation between data and behavior:
+//!
 //! - **Data** is represented by immutable structs in [`types`].
 //! - **Behavior** is defined by traits in [`traits`].
 //!
 //! This decoupling allows downstream applications to mix and match backends
 //! (e.g., an in-memory store with a binary encoder and Ed25519 signing) without
-//! altering the core domain logic. The crate is built with strict Clippy lints
-//! (`pedantic`, `nursery`) and forbids `unsafe` code to guarantee memory safety
-//! and high code quality.
+//! altering the core domain logic.
 //!
-//! # Internal mechanism
+//! ## Lint policy
+//!
+//! The crate uses a strict set of compiler and Clippy lints to ensure high
+//! code quality. However, `clippy::nursery` is configured as a **warning**
+//! rather than a **deny**, because nursery lints are unstable and can introduce
+//! new warnings with Rust toolchain updates. By using `#![warn(clippy::nursery)]`
+//! we keep the lints visible in CI output without breaking the build for
+//! contributors who use a slightly different compiler version. Individual
+//! nursery lints that are considered critical (e.g., `missing_const_for_fn`)
+//! can still be explicitly denied.
+//!
+//! # Internal Mechanism
+//!
 //! The crate exports all public types, traits, and constants at the root level
 //! for convenience. Consumers can simply `use libvctrl_handler::*;` to access
-//! the entire contract surface.
+//! the entire contract surface. The re-exports are organized to mirror the
+//! internal module structure:
+//!
+//! - Constants from [`constants`] are re-exported directly.
+//! - Enums from [`enums`] are re-exported as [`EntryKind`].
+//! - Error types from [`errors`] are re-exported as [`VctrlError`].
+//! - Traits from [`traits`] (e.g., [`Hasher`], [`ObjectStore`]) are re-exported.
+//! - Data types from [`types`] (e.g., [`Blob`], [`Commit`], [`Hash`]) are re-exported.
+//!
+//! This flat namespace is ideal for a contract crate, as it eliminates
+//! excessive qualification in downstream code while still allowing selective
+//! imports.
 //!
 //! # Examples
 //!
@@ -40,7 +64,6 @@
 #![deny(
     clippy::all,
     clippy::pedantic,
-    clippy::nursery,
     clippy::cargo,
     missing_docs,
     rust_2018_idioms,
@@ -48,8 +71,25 @@
     unused_crate_dependencies,
     unused_qualifications
 )]
+// Nursery lints are unstable; we only warn so that toolchain updates do not
+// suddenly break the build. See module-level documentation for rationale.
+#![warn(clippy::nursery)]
 
-/// System-wide constants and structural limits used across the version control system.
+/// System-wide constants and structural limits used across the version control
+/// system.
+///
+/// # Purpose
+///
+/// This module centralises all numeric constants (e.g., [`HASH_LENGTH`],
+/// [`MAX_NAME_LENGTH`]) so that they can be used consistently by every other
+/// module and by downstream crates. Changing a constant here automatically
+/// propagates to all dependent code.
+///
+/// # Why a separate module
+///
+/// Grouping constants in one module avoids circular dependencies and keeps
+/// the root namespace clean. It also makes it easy to document each constant
+/// with its own doc comment and doctest.
 ///
 /// # Examples
 ///
@@ -59,7 +99,20 @@
 /// ```
 pub mod constants;
 
-/// Logical object type enumerations, distinguishing between files and directories.
+/// Logical object type enumerations, distinguishing between files and
+/// directories.
+///
+/// # Purpose
+///
+/// The [`EntryKind`] enum is used throughout the system to differentiate
+/// between a file (blob) and a directory (tree). It is deliberately kept
+/// small to facilitate exhaustive matching.
+///
+/// # Design note
+///
+/// By using a C-like enum (no data attached), we ensure [`EntryKind`] is
+/// [`Copy`], lightweight, and easy to embed in other structures without
+/// lifetime concerns.
 ///
 /// # Examples
 ///
@@ -70,6 +123,12 @@ pub mod constants;
 pub mod enums;
 
 /// Unified error handling for all fallible operations within the crate.
+///
+/// # Purpose
+///
+/// The [`errors`] module exports the [`VctrlError`] enum, which is the single
+/// error type used by every trait method in this crate. This unification
+/// simplifies error propagation and pattern matching for consumers.
 ///
 /// # Examples
 ///
@@ -82,6 +141,12 @@ pub mod errors;
 
 /// Helper macros for ergonomic error construction.
 ///
+/// # Purpose
+///
+/// The [`vctrl_error_other!`] macro provides a concise way to create
+/// [`VctrlError::Other`] variants with formatted messages, mimicking the
+/// `format!` syntax.
+///
 /// # Examples
 ///
 /// ```
@@ -93,9 +158,33 @@ pub mod errors;
 /// ```
 pub mod macros;
 
-/// Core behavior contracts (traits) for storage, encoding, hashing, and transport.
+/// Core behavior contracts (traits) for storage, encoding, hashing, and
+/// transport.
+///
+/// # Purpose
+///
+/// This module defines the interfaces that any concrete backend must
+/// implement. By depending only on these traits, the core logic remains
+/// completely decoupled from specific storage engines, hash algorithms, or
+/// network transports.
+///
+/// # Design Rationale
+///
+/// Every trait follows the **single responsibility principle**:
+///
+/// - [`ObjectStore`] handles object retrieval and storage.
+/// - [`RefStore`] manages named references (branches, tags).
+/// - [`Hasher`] computes cryptographic hashes.
+/// - [`Encoder`] / [`Decoder`] serialise and deserialise objects.
+/// - [`Signer`] / [`Verifier`] handle digital signatures.
+/// - [`Transport`] abstracts the network layer.
+///
+/// This separation allows a user to swap, for example, the hash algorithm
+/// without touching any other component.
 ///
 /// # Examples
+///
+/// Implementing a dummy [`Hasher`]:
 ///
 /// ```
 /// use libvctrl_handler::traits::Hasher;
@@ -107,10 +196,21 @@ pub mod macros;
 ///         Hash::from_bytes(&[0u8; 64]).unwrap()
 ///     }
 /// }
+///
+/// let hasher = DummyHasher;
+/// let h = hasher.hash(b"hello");
+/// assert_eq!(h.as_bytes().len(), 64);
 /// ```
 pub mod traits;
 
 /// Core data structures representing version control objects.
+///
+/// # Purpose
+///
+/// The [`types`] module contains all the domain models: [`Blob`], [`Tree`],
+/// [`Commit`], [`Tag`], and supporting types like [`Hash`] and [`UserID`].
+/// These structs are intentionally immutable after construction to simplify
+/// reasoning about state and to guarantee thread safety.
 ///
 /// # Examples
 ///
@@ -121,7 +221,14 @@ pub mod traits;
 /// ```
 pub mod types;
 
-/// Re-exports of fundamental system constants like [`HASH_LENGTH`](crate::constants::HASH_LENGTH) and maximum size limits.
+/// Re-exports of fundamental system constants like [`HASH_LENGTH`] and
+/// maximum size limits.
+///
+/// # Purpose
+///
+/// These constants are used so frequently that they are re-exported at the
+/// crate root. This saves the caller from having to write
+/// `libvctrl_handler::constants::HASH_LENGTH` everywhere.
 ///
 /// # Examples
 ///
@@ -133,7 +240,10 @@ pub use constants::{
     HASH_LENGTH, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, MAX_TREE_ENTRIES,
 };
 
-/// Re-export of the [`EntryKind`](crate::enums::EntryKind) enum.
+/// Re-export of the [`EntryKind`] enum.
+///
+/// [`EntryKind`] is the only public enum in the crate, and re-exporting it
+/// at the root reinforces its role as a fundamental building block.
 ///
 /// # Examples
 ///
@@ -143,7 +253,13 @@ pub use constants::{
 /// ```
 pub use enums::EntryKind;
 
-/// Re-export of the unified [`VctrlError`](crate::errors::VctrlError) type.
+/// Re-export of the unified [`VctrlError`] type.
+///
+/// # Purpose
+///
+/// Every fallible operation in this crate returns `Result<_, VctrlError>`.
+/// Making [`VctrlError`] available at the crate root streamlines error
+/// handling for downstream code.
 ///
 /// # Examples
 ///
@@ -154,7 +270,16 @@ pub use enums::EntryKind;
 /// ```
 pub use errors::VctrlError;
 
-/// Re-exports of the core behavior traits (e.g., [`ObjectStore`](crate::traits::ObjectStore), [`Hasher`](crate::traits::Hasher)).
+/// Re-exports of the core behavior traits.
+///
+/// This includes:
+///
+/// - [`ObjectStore`]
+/// - [`RefStore`]
+/// - [`Hasher`]
+/// - [`Encoder`] / [`Decoder`]
+/// - [`Signer`] / [`Verifier`]
+/// - [`Transport`]
 ///
 /// # Examples
 ///
@@ -170,7 +295,11 @@ pub use errors::VctrlError;
 /// ```
 pub use traits::{Decoder, Encoder, Hasher, ObjectStore, RefStore, Signer, Transport, Verifier};
 
-/// Re-exports of the core data structures (e.g., [`Blob`](crate::types::Blob), [`Commit`](crate::types::Commit)).
+/// Re-exports of the core data structures.
+///
+/// All version-control objects ([`Blob`], [`Tree`], [`Commit`], [`Tag`]) and
+/// their supporting types ([`Hash`], [`UserID`], [`CommitMeta`],
+/// [`TreeEntry`]) are available directly from the crate root.
 ///
 /// # Examples
 ///
