@@ -24,7 +24,7 @@
 /// ```
 /// use libvctrl_handler::constants::HASH_LENGTH;
 ///
-/// assert_eq!(HASH_LENGTH, 64_u64);
+/// assert_eq!(HASH_LENGTH, 64);
 /// ```
 pub const HASH_LENGTH: usize = 64;
 
