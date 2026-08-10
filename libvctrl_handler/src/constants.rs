@@ -24,7 +24,7 @@
 /// ```
 /// use libvctrl_handler::constants::HASH_LENGTH;
 ///
-/// assert_eq!(HASH_LENGTH, 64);
+/// assert_eq!(HASH_LENGTH, 64_u64);
 /// ```
 pub const HASH_LENGTH: usize = 64;
 
@@ -40,9 +40,9 @@ pub const HASH_LENGTH: usize = 64;
 /// ```
 /// use libvctrl_handler::constants::MAX_NAME_LENGTH;
 ///
-/// assert_eq!(MAX_NAME_LENGTH, 255);
+/// assert_eq!(MAX_NAME_LENGTH, 255_u64);
 /// ```
-pub const MAX_NAME_LENGTH: usize = 255;
+pub const MAX_NAME_LENGTH: u64 = 255;
 
 /// The maximum allowed size in bytes for a single [`Blob`](crate::Blob).
 ///
@@ -56,9 +56,9 @@ pub const MAX_NAME_LENGTH: usize = 255;
 /// ```
 /// use libvctrl_handler::constants::MAX_BLOB_SIZE;
 ///
-/// assert_eq!(MAX_BLOB_SIZE, 100 * 1024 * 1024);
+/// assert_eq!(MAX_BLOB_SIZE, 100 * 1024 * 1024_u64);
 /// ```
-pub const MAX_BLOB_SIZE: usize = 100 * 1024 * 1024;
+pub const MAX_BLOB_SIZE: u64 = 100 * 1024 * 1024;
 
 /// The maximum number of entries allowed in a single [`Tree`](crate::Tree).
 ///
@@ -71,9 +71,9 @@ pub const MAX_BLOB_SIZE: usize = 100 * 1024 * 1024;
 /// ```
 /// use libvctrl_handler::constants::MAX_TREE_ENTRIES;
 ///
-/// assert_eq!(MAX_TREE_ENTRIES, 100_000);
+/// assert_eq!(MAX_TREE_ENTRIES, 100_000_u64);
 /// ```
-pub const MAX_TREE_ENTRIES: usize = 100_000;
+pub const MAX_TREE_ENTRIES: u64 = 100_000;
 
 /// The maximum allowed byte length for commit or tag messages.
 ///
@@ -86,9 +86,9 @@ pub const MAX_TREE_ENTRIES: usize = 100_000;
 /// ```
 /// use libvctrl_handler::constants::MAX_MESSAGE_LENGTH;
 ///
-/// assert_eq!(MAX_MESSAGE_LENGTH, 1024 * 1024);
+/// assert_eq!(MAX_MESSAGE_LENGTH, 1024 * 1024_u64);
 /// ```
-pub const MAX_MESSAGE_LENGTH: usize = 1024 * 1024;
+pub const MAX_MESSAGE_LENGTH: u64 = 1024 * 1024;
 
 /// Standard Unix filesystem mode bits used in the serialized tree format.
 ///
