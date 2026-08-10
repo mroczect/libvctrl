@@ -1,0 +1,44 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  libvctrl Docs — librawssg Configuration
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+site:
+  site_name: "libvctrl"
+  description: "A precision toolkit for building custom version control systems."
+  language: "en"
+  base_url: "https://mroczect.biz.id/"
+  author: "mroczect <mroczect@proton.me>"
+  repo_url: "https://github.com/mroczect/libvctrl"
+  license: "MIT"
+
+  navbar:
+    - label: "Home"
+      url: "/"
+    - label: "API"
+      url: "/api/index.html"
+    - label: "License"
+      url: "/license.html"
+
+  sidebar: []
+
+build:
+  content_dir: "content"
+  output_dir: "dist"
+  templates_dir: "templates"
+  static_dir: "static"
+
+content_types:
+  - name: "page"
+    pattern: "**/*.md"
+    template: "base.html"
+    list_enabled: false
+
+generators:
+  rss:
+    enabled: true
+    path: "rss.xml"
+    template: "rss.xml"
+  sitemap:
+    enabled: true
+    path: "sitemap.xml"
+    template: "sitemap.xml"
