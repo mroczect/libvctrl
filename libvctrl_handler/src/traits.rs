@@ -2,13 +2,16 @@
 //! system.
 //!
 //! # Purpose
+//!
 //! This module defines the abstract interfaces that concrete version control
 //! backends must implement. By defining these as traits, the core data types
 //! (in [`crate::types`]) remain completely decoupled from storage, networking,
 //! and serialization logic.
 //!
-//! # Design rationale
+//! # Design Rationale
+//!
 //! The traits are split by responsibility:
+//!
 //! - [`ObjectStore`] and [`RefStore`] handle persistence.
 //! - [`Encoder`] and [`Decoder`] handle serialization.
 //! - [`Hasher`] handles content addressing.
@@ -18,28 +21,67 @@
 //! This separation of concerns allows mixing and matching implementations
 //! (e.g., an in-memory store with a binary encoder) and vastly simplifies
 //! unit testing of individual components.
+//!
+//! ## Streaming and Memory Efficiency
+//!
+//! Starting from version 3.2, [`ObjectStore::get`] returns a
+//! [`Box<dyn Read>`] instead of a [`Vec<u8>`]. This change enables
+//! **streaming** of object data directly from the backing store (disk,
+//! network, etc.) without forcing the entire object into a contiguous
+//! allocation. This is critical for large objects (up to
+//! [`MAX_BLOB_SIZE`](crate::MAX_BLOB_SIZE) bytes), where a single `Vec<u8>`
+//! could cause out-of-memory errors even when free memory is available,
+//! due to fragmentation.
+//!
+//! Implementors of [`ObjectStore`] can now return any type that implements
+//! [`Read`], such as [`std::io::Cursor<Vec<u8>>`] for in-memory data,
+//! [`std::fs::File`] for on-disk storage, or a custom wrapper around a
+//! network socket. The lifetime bound `'_` ties the reader to the borrow
+//! of `&self`, ensuring the underlying storage cannot be mutated while a
+//! reader is alive.
 
 use crate::errors::VctrlError;
-use crate::types::{Blob, Commit, Hash, Tag, Tree};
+use crate::types::blob::Blob;
+use crate::types::commit::Commit;
+use crate::types::hash::Hash;
+use crate::types::tag::Tag;
+use crate::types::tree::Tree;
+use std::io::Read;
 
 /// Defines the interface for a content-addressable object database.
 ///
 /// # Purpose
+///
 /// An `ObjectStore` is responsible for storing and retrieving raw, serialized
 /// version control objects (blobs, trees, commits, tags) using their
 /// [`Hash`] as the primary key.
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// The trait uses `&Hash` for lookups rather than owned `Hash` values to
-/// avoid unnecessary stack copies (64 bytes per hash). The `put` and `get`
-/// methods deal with byte slices (`&[u8]` and `Vec<u8>`) rather than typed
-/// objects, keeping the store agnostic to the serialization format.
+/// avoid unnecessary stack copies (64 bytes per hash). The `put` method
+/// accepts a `&[u8]` slice, keeping the store agnostic to the serialization
+/// format. The `get` method returns a [`Box<dyn Read>`] instead of a
+/// concrete byte vector, enabling streaming and preventing large contiguous
+/// allocations.
+///
+/// # Streaming semantics (`get`)
+///
+/// Implementations of `get` should return a reader that yields the exact
+/// byte content of the stored object. The reader is borrowed from `&self`,
+/// so the store cannot be mutated (e.g., via `put` or `delete`) while a
+/// reader exists—this is enforced by Rust’s borrow checker. Callers must
+/// consume the reader (e.g., via [`Read::read_to_end`]) to obtain the raw
+/// bytes.
 ///
 /// # Examples
+///
+/// A complete in-memory implementation:
 ///
 /// ```
 /// use libvctrl_handler::{Hash, ObjectStore, VctrlError};
 /// use std::collections::HashMap;
+/// use std::io::Read;
 ///
 /// #[derive(Default)]
 /// struct InMemoryStore(HashMap<Hash, Vec<u8>>);
@@ -49,13 +91,20 @@ use crate::types::{Blob, Commit, Hash, Tag, Tree};
 ///         self.0.insert(*hash, data.to_vec());
 ///         Ok(())
 ///     }
-///     fn get(&self, hash: &Hash) -> Result<Vec<u8>, VctrlError> {
-///         self.0.get(hash).cloned().ok_or_else(|| VctrlError::ObjectNotFound(*hash))
+///
+///     fn get(&self, hash: &Hash) -> Result<Box<dyn Read + '_>, VctrlError> {
+///         self.0
+///             .get(hash)
+///             .cloned()
+///             .map(|v| Box::new(std::io::Cursor::new(v)) as Box<dyn Read>)
+///             .ok_or_else(|| VctrlError::ObjectNotFound(*hash))
 ///     }
+///
 ///     fn delete(&mut self, hash: &Hash) -> Result<(), VctrlError> {
 ///         self.0.remove(hash);
 ///         Ok(())
 ///     }
+///
 ///     fn exists(&self, hash: &Hash) -> Result<bool, VctrlError> {
 ///         Ok(self.0.contains_key(hash))
 ///     }
@@ -64,12 +113,18 @@ use crate::types::{Blob, Commit, Hash, Tag, Tree};
 /// let mut store = InMemoryStore::default();
 /// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
 /// store.put(&hash, b"data").unwrap();
-/// assert!(store.exists(&hash).unwrap());
+///
+/// // Read back the object using the streaming interface
+/// let mut reader = store.get(&hash).unwrap();
+/// let mut buf = Vec::new();
+/// reader.read_to_end(&mut buf).unwrap();
+/// assert_eq!(buf, b"data");
 /// ```
 pub trait ObjectStore {
     /// Stores a raw object in the database under the given hash.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::IoError`] if the underlying storage fails to write.
     /// Returns [`VctrlError::Other`] for implementation-specific failures.
     ///
@@ -81,8 +136,12 @@ pub trait ObjectStore {
     /// # #[derive(Default)]
     /// # struct Store(HashMap<Hash, Vec<u8>>);
     /// # impl ObjectStore for Store {
-    /// #     fn put(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> { self.0.insert(*h, d.to_vec()); Ok(()) }
-    /// #     fn get(&self, h: &Hash) -> Result<Vec<u8>, VctrlError> { self.0.get(h).cloned().ok_or_else(|| VctrlError::ObjectNotFound(*h)) }
+    /// #     fn put(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> {
+    /// #         self.0.insert(*h, d.to_vec()); Ok(())
+    /// #     }
+    /// #     fn get(&self, h: &Hash) -> Result<Box<dyn Read + '_>, VctrlError> {
+    /// #         self.0.get(h).cloned().map(|v| Box::new(std::io::Cursor::new(v)) as Box<dyn Read>).ok_or_else(|| VctrlError::ObjectNotFound(*h))
+    /// #     }
     /// #     fn delete(&mut self, h: &Hash) -> Result<(), VctrlError> { self.0.remove(h); Ok(()) }
     /// #     fn exists(&self, h: &Hash) -> Result<bool, VctrlError> { Ok(self.0.contains_key(h)) }
     /// # }
@@ -94,7 +153,12 @@ pub trait ObjectStore {
 
     /// Retrieves a raw object from the database by its hash.
     ///
+    /// The returned reader provides streaming access to the object bytes.
+    /// Use [`Read::read_to_end`] or other [`Read`] methods to consume the
+    /// data incrementally.
+    ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::ObjectNotFound`] if no object exists for the hash.
     /// Returns [`VctrlError::IoError`] if the underlying storage fails to read.
     ///
@@ -103,24 +167,34 @@ pub trait ObjectStore {
     /// ```
     /// # use libvctrl_handler::{Hash, ObjectStore, VctrlError};
     /// # use std::collections::HashMap;
+    /// # use std::io::Read;
     /// # #[derive(Default)]
     /// # struct Store(HashMap<Hash, Vec<u8>>);
     /// # impl ObjectStore for Store {
-    /// #     fn put(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> { self.0.insert(*h, d.to_vec()); Ok(()) }
-    /// #     fn get(&self, h: &Hash) -> Result<Vec<u8>, VctrlError> { self.0.get(h).cloned().ok_or_else(|| VctrlError::ObjectNotFound(*h)) }
+    /// #     fn put(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> {
+    /// #         self.0.insert(*h, d.to_vec()); Ok(())
+    /// #     }
+    /// #     fn get(&self, h: &Hash) -> Result<Box<dyn Read + '_>, VctrlError> {
+    /// #         self.0.get(h).cloned().map(|v| Box::new(std::io::Cursor::new(v)) as Box<dyn Read>).ok_or_else(|| VctrlError::ObjectNotFound(*h))
+    /// #     }
     /// #     fn delete(&mut self, h: &Hash) -> Result<(), VctrlError> { self.0.remove(h); Ok(()) }
     /// #     fn exists(&self, h: &Hash) -> Result<bool, VctrlError> { Ok(self.0.contains_key(h)) }
     /// # }
     /// let mut s = Store::default();
     /// let h = Hash::from_bytes(&[0u8; 64]).unwrap();
     /// s.put(&h, b"blob").unwrap();
-    /// assert_eq!(s.get(&h).unwrap(), b"blob");
+    ///
+    /// let mut reader = s.get(&h).unwrap();
+    /// let mut data = Vec::new();
+    /// reader.read_to_end(&mut data).unwrap();
+    /// assert_eq!(data, b"blob");
     /// ```
-    fn get(&self, hash: &Hash) -> Result<Vec<u8>, VctrlError>;
+    fn get(&self, hash: &Hash) -> Result<Box<dyn Read + '_>, VctrlError>;
 
     /// Deletes an object from the database by its hash.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::IoError`] if the underlying storage fails to delete.
     ///
     /// # Examples
@@ -131,8 +205,12 @@ pub trait ObjectStore {
     /// # #[derive(Default)]
     /// # struct Store(HashMap<Hash, Vec<u8>>);
     /// # impl ObjectStore for Store {
-    /// #     fn put(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> { self.0.insert(*h, d.to_vec()); Ok(()) }
-    /// #     fn get(&self, h: &Hash) -> Result<Vec<u8>, VctrlError> { self.0.get(h).cloned().ok_or_else(|| VctrlError::ObjectNotFound(*h)) }
+    /// #     fn put(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> {
+    /// #         self.0.insert(*h, d.to_vec()); Ok(())
+    /// #     }
+    /// #     fn get(&self, h: &Hash) -> Result<Box<dyn Read + '_>, VctrlError> {
+    /// #         self.0.get(h).cloned().map(|v| Box::new(std::io::Cursor::new(v)) as Box<dyn Read>).ok_or_else(|| VctrlError::ObjectNotFound(*h))
+    /// #     }
     /// #     fn delete(&mut self, h: &Hash) -> Result<(), VctrlError> { self.0.remove(h); Ok(()) }
     /// #     fn exists(&self, h: &Hash) -> Result<bool, VctrlError> { Ok(self.0.contains_key(h)) }
     /// # }
@@ -147,6 +225,7 @@ pub trait ObjectStore {
     /// Checks if an object exists in the database.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::IoError`] if the underlying storage fails to check.
     ///
     /// # Examples
@@ -157,8 +236,12 @@ pub trait ObjectStore {
     /// # #[derive(Default)]
     /// # struct Store(HashMap<Hash, Vec<u8>>);
     /// # impl ObjectStore for Store {
-    /// #     fn put(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> { self.0.insert(*h, d.to_vec()); Ok(()) }
-    /// #     fn get(&self, h: &Hash) -> Result<Vec<u8>, VctrlError> { self.0.get(h).cloned().ok_or_else(|| VctrlError::ObjectNotFound(*h)) }
+    /// #     fn put(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> {
+    /// #         self.0.insert(*h, d.to_vec()); Ok(())
+    /// #     }
+    /// #     fn get(&self, h: &Hash) -> Result<Box<dyn Read + '_>, VctrlError> {
+    /// #         self.0.get(h).cloned().map(|v| Box::new(std::io::Cursor::new(v)) as Box<dyn Read>).ok_or_else(|| VctrlError::ObjectNotFound(*h))
+    /// #     }
     /// #     fn delete(&mut self, h: &Hash) -> Result<(), VctrlError> { self.0.remove(h); Ok(()) }
     /// #     fn exists(&self, h: &Hash) -> Result<bool, VctrlError> { Ok(self.0.contains_key(h)) }
     /// # }
@@ -172,11 +255,13 @@ pub trait ObjectStore {
 /// Defines the interface for a named reference store.
 ///
 /// # Purpose
+///
 /// A `RefStore` maps human-readable names (e.g., "HEAD", "refs/heads/main")
 /// to specific [`Hash`]es. This allows tracking branches and tags without
 /// scanning the entire object database.
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// References are stored separately from the [`ObjectStore`] because they
 /// are mutable and frequently updated, whereas objects are immutable and
 /// content-addressed.
@@ -216,6 +301,7 @@ pub trait RefStore {
     /// Sets or updates a named reference to point to a specific hash.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::IoError`] if the underlying storage fails to write.
     ///
     /// # Examples
@@ -226,8 +312,12 @@ pub trait RefStore {
     /// # #[derive(Default)]
     /// # struct Refs(HashMap<String, Hash>);
     /// # impl RefStore for Refs {
-    /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> { self.0.insert(n.to_string(), *h); Ok(()) }
-    /// #     fn get_ref(&self, n: &str) -> Result<Hash, VctrlError> { self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string())) }
+    /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> {
+    /// #         self.0.insert(n.to_string(), *h); Ok(())
+    /// #     }
+    /// #     fn get_ref(&self, n: &str) -> Result<Hash, VctrlError> {
+    /// #         self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string()))
+    /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
     /// #     fn list_refs(&self) -> Result<Vec<String>, VctrlError> { Ok(self.0.keys().cloned().collect()) }
     /// # }
@@ -240,6 +330,7 @@ pub trait RefStore {
     /// Retrieves the hash a named reference points to.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::RefNotFound`] if the reference does not exist.
     ///
     /// # Examples
@@ -250,8 +341,12 @@ pub trait RefStore {
     /// # #[derive(Default)]
     /// # struct Refs(HashMap<String, Hash>);
     /// # impl RefStore for Refs {
-    /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> { self.0.insert(n.to_string(), *h); Ok(()) }
-    /// #     fn get_ref(&self, n: &str) -> Result<Hash, VctrlError> { self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string())) }
+    /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> {
+    /// #         self.0.insert(n.to_string(), *h); Ok(())
+    /// #     }
+    /// #     fn get_ref(&self, n: &str) -> Result<Hash, VctrlError> {
+    /// #         self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string()))
+    /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
     /// #     fn list_refs(&self) -> Result<Vec<String>, VctrlError> { Ok(self.0.keys().cloned().collect()) }
     /// # }
@@ -265,6 +360,7 @@ pub trait RefStore {
     /// Deletes a named reference.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::IoError`] if the underlying storage fails to delete.
     ///
     /// # Examples
@@ -275,8 +371,12 @@ pub trait RefStore {
     /// # #[derive(Default)]
     /// # struct Refs(HashMap<String, Hash>);
     /// # impl RefStore for Refs {
-    /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> { self.0.insert(n.to_string(), *h); Ok(()) }
-    /// #     fn get_ref(&self, n: &str) -> Result<Hash, VctrlError> { self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string())) }
+    /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> {
+    /// #         self.0.insert(n.to_string(), *h); Ok(())
+    /// #     }
+    /// #     fn get_ref(&self, n: &str) -> Result<Hash, VctrlError> {
+    /// #         self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string()))
+    /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
     /// #     fn list_refs(&self) -> Result<Vec<String>, VctrlError> { Ok(self.0.keys().cloned().collect()) }
     /// # }
@@ -291,6 +391,7 @@ pub trait RefStore {
     /// Lists all reference names currently stored.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::IoError`] if the underlying storage fails to read
     /// the list of references.
     ///
@@ -302,8 +403,12 @@ pub trait RefStore {
     /// # #[derive(Default)]
     /// # struct Refs(HashMap<String, Hash>);
     /// # impl RefStore for Refs {
-    /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> { self.0.insert(n.to_string(), *h); Ok(()) }
-    /// #     fn get_ref(&self, n: &str) -> Result<Hash, VctrlError> { self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string())) }
+    /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> {
+    /// #         self.0.insert(n.to_string(), *h); Ok(())
+    /// #     }
+    /// #     fn get_ref(&self, n: &str) -> Result<Hash, VctrlError> {
+    /// #         self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string()))
+    /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
     /// #     fn list_refs(&self) -> Result<Vec<String>, VctrlError> { Ok(self.0.keys().cloned().collect()) }
     /// # }
@@ -321,10 +426,12 @@ pub trait RefStore {
 /// Defines the interface for hashing raw data into a [`Hash`].
 ///
 /// # Purpose
+///
 /// A `Hasher` implements the specific content-addressing algorithm (e.g.,
 /// SHA-256, BLAKE3) used to identify objects in the system.
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// The `hash` method does not return a `Result` because hashing pure byte
 /// slices is an infallible operation. It takes `&self` to allow stateful
 /// hashers or those initialized with specific keys.
@@ -368,11 +475,13 @@ pub trait Hasher {
 /// Defines the interface for serializing version control objects.
 ///
 /// # Purpose
+///
 /// An `Encoder` translates in-memory data structures like [`Blob`] and
 /// [`Commit`] into byte vectors suitable for storage in an [`ObjectStore`]
 /// or transmission via a [`Transport`].
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// The trait provides separate methods for each object type rather than a
 /// generic `encode<T>(&self, obj: &T)` to avoid requiring objects to implement
 /// a shared trait, keeping the data structs pure and decoupled.
@@ -400,6 +509,7 @@ pub trait Encoder {
     /// Encodes a [`Blob`] into its serialized byte representation.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::SerializationError`] if the encoder fails to
     /// serialize the blob.
     ///
@@ -423,6 +533,7 @@ pub trait Encoder {
     /// Encodes a [`Tree`] into its serialized byte representation.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::SerializationError`] if the encoder fails to
     /// serialize the tree.
     ///
@@ -446,6 +557,7 @@ pub trait Encoder {
     /// Encodes a [`Commit`] into its serialized byte representation.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::SerializationError`] if the encoder fails to
     /// serialize the commit.
     ///
@@ -471,6 +583,7 @@ pub trait Encoder {
     /// Encodes a [`Tag`] into its serialized byte representation.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::SerializationError`] if the encoder fails to
     /// serialize the tag.
     ///
@@ -496,10 +609,12 @@ pub trait Encoder {
 /// Defines the interface for deserializing version control objects.
 ///
 /// # Purpose
+///
 /// A `Decoder` translates byte vectors back into in-memory data structures.
 /// It is the inverse of [`Encoder`].
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// Decoding can fail due to corrupted data, malformed inputs, or version
 /// mismatches, hence every method returns a `Result` with [`VctrlError`].
 ///
@@ -533,6 +648,7 @@ pub trait Decoder {
     /// Decodes a byte slice into a [`Blob`].
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::CorruptedData`] if the bytes are malformed.
     ///
     /// # Examples
@@ -555,6 +671,7 @@ pub trait Decoder {
     /// Decodes a byte slice into a [`Tree`].
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::CorruptedData`] if the bytes are malformed.
     ///
     /// # Examples
@@ -577,6 +694,7 @@ pub trait Decoder {
     /// Decodes a byte slice into a [`Commit`].
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::CorruptedData`] if the bytes are malformed.
     ///
     /// # Examples
@@ -599,6 +717,7 @@ pub trait Decoder {
     /// Decodes a byte slice into a [`Tag`].
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::CorruptedData`] if the bytes are malformed.
     ///
     /// # Examples
@@ -622,10 +741,12 @@ pub trait Decoder {
 /// Defines the interface for signing data cryptographically.
 ///
 /// # Purpose
+///
 /// A `Signer` produces a cryptographic signature over a byte slice, typically
 /// to attest to the authenticity of a [`Commit`] or [`Tag`].
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// The trait returns a `Vec<u8>` to remain agnostic to the underlying
 /// signature algorithm (e.g., Ed25519, RSA).
 ///
@@ -649,6 +770,7 @@ pub trait Signer {
     /// Signs the provided data, returning the signature as a byte vector.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::Other`] if the signing process fails (e.g.,
     /// missing private key).
     ///
@@ -670,10 +792,12 @@ pub trait Signer {
 /// Defines the interface for verifying cryptographic signatures.
 ///
 /// # Purpose
+///
 /// A `Verifier` checks whether a given byte slice and signature pair are valid
 /// according to a specific cryptographic key.
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// Returns `Result<bool, VctrlError>` rather than just `bool` to allow for
 /// verification failures that are not strictly boolean (e.g., malformed
 /// signature inputs or internal cryptographic errors).
@@ -698,6 +822,7 @@ pub trait Verifier {
     /// Verifies a signature against the provided data.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::Other`] if the verification process encounters
     /// an internal error (e.g., malformed signature).
     ///
@@ -719,11 +844,13 @@ pub trait Verifier {
 /// Defines the interface for synchronizing objects with a remote backend.
 ///
 /// # Purpose
+///
 /// A `Transport` abstracts the network or inter-process communication layer
 /// required to fetch and push version control objects between a local
 /// [`ObjectStore`] and a remote endpoint.
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// `fetch_object` takes a `&Hash` to avoid copying the 64-byte key, while
 /// `push_object` takes the raw bytes to be stored remotely. The trait is
 /// distinct from [`ObjectStore`] to allow the local store to be disk-based
@@ -757,6 +884,7 @@ pub trait Transport {
     /// Fetches an object from the remote backend.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::ObjectNotFound`] if the remote does not have the object.
     /// Returns [`VctrlError::IoError`] on network failures.
     ///
@@ -768,8 +896,12 @@ pub trait Transport {
     /// # #[derive(Default)]
     /// # struct TransportImpl(HashMap<Hash, Vec<u8>>);
     /// # impl Transport for TransportImpl {
-    /// #     fn fetch_object(&self, h: &Hash) -> Result<Vec<u8>, VctrlError> { self.0.get(h).cloned().ok_or_else(|| VctrlError::ObjectNotFound(*h)) }
-    /// #     fn push_object(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> { self.0.insert(*h, d.to_vec()); Ok(()) }
+    /// #     fn fetch_object(&self, h: &Hash) -> Result<Vec<u8>, VctrlError> {
+    /// #         self.0.get(h).cloned().ok_or_else(|| VctrlError::ObjectNotFound(*h))
+    /// #     }
+    /// #     fn push_object(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> {
+    /// #         self.0.insert(*h, d.to_vec()); Ok(())
+    /// #     }
     /// # }
     /// let mut t = TransportImpl::default();
     /// let h = Hash::from_bytes(&[0u8; 64]).unwrap();
@@ -781,6 +913,7 @@ pub trait Transport {
     /// Pushes an object to the remote backend.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::IoError`] on network failures or if the remote
     /// rejects the object.
     ///
@@ -792,8 +925,12 @@ pub trait Transport {
     /// # #[derive(Default)]
     /// # struct TransportImpl(HashMap<Hash, Vec<u8>>);
     /// # impl Transport for TransportImpl {
-    /// #     fn fetch_object(&self, h: &Hash) -> Result<Vec<u8>, VctrlError> { self.0.get(h).cloned().ok_or_else(|| VctrlError::ObjectNotFound(*h)) }
-    /// #     fn push_object(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> { self.0.insert(*h, d.to_vec()); Ok(()) }
+    /// #     fn fetch_object(&self, h: &Hash) -> Result<Vec<u8>, VctrlError> {
+    /// #         self.0.get(h).cloned().ok_or_else(|| VctrlError::ObjectNotFound(*h))
+    /// #     }
+    /// #     fn push_object(&mut self, h: &Hash, d: &[u8]) -> Result<(), VctrlError> {
+    /// #         self.0.insert(*h, d.to_vec()); Ok(())
+    /// #     }
     /// # }
     /// let mut t = TransportImpl::default();
     /// let h = Hash::from_bytes(&[0u8; 64]).unwrap();
