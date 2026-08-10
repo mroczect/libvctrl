@@ -215,6 +215,7 @@ The traits are designed to be implemented by concrete backends. Below is an in�
 
 ```rust
 use std::collections::HashMap;
+use std::io::Read;
 use libvctrl_handler::{ObjectStore, VctrlError, Hash};
 
 struct MemoryStore {
@@ -233,9 +234,10 @@ impl ObjectStore for MemoryStore {
         Ok(())
     }
 
-    fn get(&self, hash: &Hash) -> Result<Vec<u8>, VctrlError> {
+    fn get(&self, hash: &Hash) -> Result<Box<dyn Read + '_>, VctrlError> {
         self.objects.get(hash)
             .cloned()
+            .map(|v| Box::new(std::io::Cursor::new(v)) as Box<dyn Read>)
             .ok_or_else(|| VctrlError::ObjectNotFound(*hash))
     }
 
@@ -248,6 +250,16 @@ impl ObjectStore for MemoryStore {
         Ok(self.objects.contains_key(hash))
     }
 }
+
+// Read back an object using the streaming getter
+let mut store = MemoryStore::new();
+let hash = Hash::from_bytes(&[0xAB; 64]).unwrap();
+store.put(&hash, b"content").unwrap();
+
+let mut reader = store.get(&hash).unwrap();
+let mut buf = Vec::new();
+reader.read_to_end(&mut buf).unwrap();
+assert_eq!(buf, b"content");
 ```
 
 Any code that depends on `ObjectStore` can now use `MemoryStore` without modification.
@@ -260,22 +272,22 @@ Any code that depends on `ObjectStore` can now use `MemoryStore` without modific
 
 System‑wide limits and Unix‑style file mode bits.
 
-| Constant                 | Value       | Description                         |
-| ------------------------ | ----------- | ----------------------------------- |
-| `HASH_LENGTH`            | 64          | Length of a `Hash` in bytes.        |
-| `MAX_NAME_LENGTH`        | 255         | Maximum byte length for names.      |
-| `MAX_BLOB_SIZE`          | 100 MiB     | Maximum byte size of a single blob. |
-| `MAX_TREE_ENTRIES`       | 100,000     | Maximum entries in a tree.          |
-| `MAX_MESSAGE_LENGTH`     | 1 MiB       | Maximum commit/tag message length.  |
-| `entry_mode::BLOB`       | `0o100_644` | Regular file mode.                  |
-| `entry_mode::EXECUTABLE` | `0o100_755` | Executable file mode.               |
-| `entry_mode::SYMLINK`    | `0o120_000` | Symbolic link mode.                 |
-| `entry_mode::TREE`       | `0o040_000` | Sub‑directory mode.                 |
-| `entry_mode::SUBMODULE`  | `0o160_000` | Submodule mode.                     |
+| Constant                 | Type  | Value       | Description                         |
+| ------------------------ | ----- | ----------- | ----------------------------------- |
+| `HASH_LENGTH`            | usize | 64          | Length of a `Hash` in bytes.        |
+| `MAX_NAME_LENGTH`        | u64   | 255         | Maximum byte length for names.      |
+| `MAX_BLOB_SIZE`          | u64   | 100 MiB     | Maximum byte size of a single blob. |
+| `MAX_TREE_ENTRIES`       | u64   | 100,000     | Maximum entries in a tree.          |
+| `MAX_MESSAGE_LENGTH`     | u64   | 1 MiB       | Maximum commit/tag message length.  |
+| `entry_mode::BLOB`       | u32   | `0o100_644` | Regular file mode.                  |
+| `entry_mode::EXECUTABLE` | u32   | `0o100_755` | Executable file mode.               |
+| `entry_mode::SYMLINK`    | u32   | `0o120_000` | Symbolic link mode.                 |
+| `entry_mode::TREE`       | u32   | `0o040_000` | Sub‑directory mode.                 |
+| `entry_mode::SUBMODULE`  | u32   | `0o160_000` | Submodule mode.                     |
 
 ### `enums`
 
-- **`EntryKind`** – `Blob` or `Tree`. Marked `#[non_exhaustive]` and derives `Copy`, `Clone`, `Hash`, `Eq`.
+- **`EntryKind`** – `Blob`, `Executable`, `Symlink`, `Tree`, `Submodule`. Marked `#[non_exhaustive]` and derives `Copy`, `Clone`, `Hash`, `Eq`.
 
 ### `errors`
 
@@ -287,16 +299,16 @@ System‑wide limits and Unix‑style file mode bits.
 
 ### `traits`
 
-| Trait         | Purpose                                                      |
-| ------------- | ------------------------------------------------------------ |
-| `ObjectStore` | Content‑addressed object CRUD.                               |
-| `RefStore`    | Named reference management (branches, tags).                 |
-| `Hasher`      | Compute a `Hash` from arbitrary bytes.                       |
-| `Encoder`     | Serialise `Blob`, `Tree`, `Commit`, `Tag` into bytes.        |
-| `Decoder`     | Deserialise bytes back into `Blob`, `Tree`, `Commit`, `Tag`. |
-| `Signer`      | Produce a cryptographic signature for arbitrary data.        |
-| `Verifier`    | Verify a signature against data.                             |
-| `Transport`   | Fetch and push objects over a network or IPC.                |
+| Trait         | Purpose                                                                       |
+| ------------- | ----------------------------------------------------------------------------- |
+| `ObjectStore` | Content‑addressed object CRUD. `get` returns `Box<dyn Read>`.                 |
+| `RefStore`    | Named reference management (branches, tags). `list_refs` returns an iterator. |
+| `Hasher`      | Compute a `Hash` from arbitrary bytes.                                        |
+| `Encoder`     | Serialise `Blob`, `Tree`, `Commit`, `Tag` into bytes.                         |
+| `Decoder`     | Deserialise bytes back into `Blob`, `Tree`, `Commit`, `Tag`.                  |
+| `Signer`      | Produce a cryptographic signature for arbitrary data (uses `&mut self`).      |
+| `Verifier`    | Verify a signature against data.                                              |
+| `Transport`   | Fetch and push objects over a network or IPC.                                 |
 
 Each trait method is documented with its own `# Errors` and `# Examples` sections. See the source for full specifications.
 
