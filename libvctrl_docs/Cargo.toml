@@ -2,5 +2,16 @@
 name = "libvctrl_docs"
 version = "0.1.0"
 edition = "2024"
+description = "Documentation site for libvctrl, built with librawssg"
+publish = false
+
 
 [dependencies]
+librawssg = { version = "0.5.0", features = ["tera", "pulldown", "serve"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
