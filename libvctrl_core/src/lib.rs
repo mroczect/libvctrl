@@ -1,60 +1,91 @@
-//! Reference implementations for the `libvctrl_handler` version control contracts.
+//! # `libvctrl_core` – Batteries-Included Implementations for `libvctrl_handler`
 //!
-//! # Purpose
-//! `libvctrl_core` provides concrete, ready-to-use implementations of the
-//! abstract traits defined in [`libvctrl_handler`]. It acts as the
-//! "batteries-included" layer, offering standard backends for hashing,
-//! serialization, and storage, proving that the core contracts can be fully
-//! realized.
+//! **The reference implementation layer for building modular version control systems.**
 //!
-//! # Design rationale
-//! - **Contract Fulfillment**: The crate validates the design of
-//!   [`libvctrl_handler`] by building fully functional components against it.
-//!   If a trait is too difficult or impossible to implement correctly, the
-//!   design flaw is exposed here.
-//! - **Batteries Included**: By providing standard implementations (like
-//!   SHA-512 hashing and a binary wire format), downstream applications can
-//!   bootstrap a functional version control system immediately without
-//!   writing boilerplate logic.
-//! - **Strict Safety and Linting**: Just like the handler crate, this crate
-//!   forbids `unsafe` code and enforces strict Clippy lints (`pedantic`,
-//!   `nursery`). This guarantees that the reference implementations are of
-//!   the highest quality and serve as safe examples for future backend
-//!   developers.
+//! This crate provides production-ready, safe implementations of the
+//! abstract contracts defined in [`libvctrl_handler`]. It is the
+//! *first consumer* of those contracts, validating their design by
+//! building a complete, working VCS backend stack.
 //!
-//! # Internal mechanism
-//! The crate is divided by domain responsibility:
-//! - [`codec`]: Handles encoding and decoding objects to/from binary.
-//! - [`hash`]: Provides cryptographic hashing (SHA-512).
-//! - [`object`]: Offers ergonomic builder patterns for constructing objects.
-//! - [`store`]: Implements ephemeral in-memory storage for objects and refs.
-//! - [`validate`]: Supplies security and structural validation utilities.
+//! ## Why this crate exists
 //!
-//! # Examples
+//! - **Validation of contracts** – If a trait is too difficult to implement,
+//!   the problem is caught here before downstream users encounter it.
+//! - **Batteries included** – Get a working VCS core (hashing, storage,
+//!   encoding, validation) in seconds, without writing boilerplate.
+//! - **Quality exemplar** – All code is safe, strictly linted (`#![forbid(unsafe_code)]`,
+//!   `clippy::pedantic`, `clippy::nursery`), heavily tested, and documented
+//!   to serve as a model for custom backend implementations.
 //!
-//! Integrating multiple components to hash, encode, and store an object:
+//! ## Architecture & Modules
+//!
+//! The crate is structured by domain responsibility, mirroring the
+//! separations in `libvctrl_handler`:
+//!
+//! | Module | Purpose | Key types/traits implemented |
+//! |---|---|---|
+//! | [`codec`] | Binary serialization/deserialization | `Encoder`, `Decoder` (via `BinaryEncoder`, `BinaryDecoder`) |
+//! | [`hash`] | Cryptographic hashing | `Hasher` (via `Sha512Hasher`) |
+//! | [`object`] | Builder patterns for ergonomic construction | `BlobBuilder`, `CommitBuilder`, `TagBuilder`, `TreeBuilder` |
+//! | [`store`] | Ephemeral in-memory storage | `ObjectStore` (via `MemoryStore`), `RefStore` (via `MemoryRefStore`) |
+//! | [`validate`] | Security and structure validation | `validate_name`, `validate_hash_bytes` |
+//!
+//! ## Key Features
+//!
+//! - **Streaming object reads** – [`MemoryStore::get`] returns
+//!   [`Box<dyn std::io::Read>`][std::io::Read] for zero-copy, lazy access,
+//!   aligning with the `libvctrl_handler` v4.0.0 streaming contracts.
+//! - **Iterator-based ref listing** – [`MemoryRefStore::list_refs`] returns
+//!   a lazy iterator, enabling efficient handling of millions of references.
+//! - **Full POSIX tree fidelity** – Encoder/decoder support all five
+//!   [`EntryKind`][libvctrl_handler::EntryKind] variants:
+//!   `Blob`, `Executable`, `Symlink`, `Tree`, `Submodule`.
+//! - **Robust binary format** – Compact, little-endian binary encoding
+//!   with versioning, bounds checks, and `DoS` protection.
+//! - **Defensive validation** – [`validate_name`][crate::validate::name::validate_name]
+//!   prevents path traversal attacks; [`validate_hash_bytes`][crate::validate::hash::validate_hash_bytes]
+//!   enforces strict hash integrity.
+//! - **Thread-safe and safe** – `#![forbid(unsafe_code)]` guarantees no
+//!   undefined behavior; all types are `Send + Sync`.
+//!
+//! ## Quick Start
+//!
+//! Add to your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! libvctrl_core = "1.1"
+//! ```
+//!
+//! Then integrate hashing, encoding, and storage in one go:
 //!
 //! ```
 //! use libvctrl_handler::{Blob, Encoder, Hasher, ObjectStore};
 //! use libvctrl_core::codec::BinaryEncoder;
 //! use libvctrl_core::hash::Sha512Hasher;
 //! use libvctrl_core::store::MemoryStore;
+//! use std::io::Read;
 //!
+//! // 1. Create content
 //! let blob = Blob::new(b"my content".to_vec());
 //!
-//! // 1. Encode the blob into bytes
+//! // 2. Encode to deterministic bytes
 //! let encoder = BinaryEncoder;
-//! let encoded_bytes = encoder.encode_blob(&blob).unwrap();
+//! let bytes = encoder.encode_blob(&blob).unwrap();
 //!
-//! // 2. Hash the encoded bytes to get an address
+//! // 3. Hash the bytes to get a content address
 //! let hasher = Sha512Hasher;
-//! let hash = hasher.hash(&encoded_bytes);
+//! let hash = hasher.hash(&bytes);
 //!
-//! // 3. Store the encoded bytes
+//! // 4. Store the encoded bytes in memory
 //! let mut store = MemoryStore::new();
-//! store.put(&hash, &encoded_bytes).unwrap();
+//! store.put(&hash, &bytes).unwrap();
 //!
-//! assert!(store.exists(&hash).unwrap());
+//! // 5. Read back via streaming interface
+//! let mut reader = store.get(&hash).unwrap();
+//! let mut buf = Vec::new();
+//! reader.read_to_end(&mut buf).unwrap();
+//! assert_eq!(buf, bytes);
 //! ```
 
 #![forbid(unsafe_code)]
@@ -66,8 +97,15 @@
     missing_docs,
     rust_2018_idioms,
     unreachable_pub,
+    unused_crate_dependencies,
     unused_qualifications
 )]
+#[cfg(test)]
+use proptest as _;
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 /// Binary serialization and deserialization implementations.
 ///
@@ -137,11 +175,16 @@ pub mod object;
 /// ```
 /// use libvctrl_core::store::MemoryStore;
 /// use libvctrl_handler::{Hash, ObjectStore};
+/// use std::io::Read;
 ///
 /// let mut store = MemoryStore::new();
 /// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
 /// store.put(&hash, b"data").unwrap();
-/// assert!(store.exists(&hash).unwrap());
+///
+/// let mut reader = store.get(&hash).unwrap();
+/// let mut buf = Vec::new();
+/// reader.read_to_end(&mut buf).unwrap();
+/// assert_eq!(buf, b"data");
 /// ```
 pub mod store;
 

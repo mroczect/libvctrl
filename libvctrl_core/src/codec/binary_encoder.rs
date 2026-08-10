@@ -120,7 +120,7 @@ impl Encoder for BinaryEncoder {
     /// 3. For each entry:
     ///    a. `name_len` (1 byte, u8)
     ///    b. `name` (`name_len` bytes, UTF-8)
-    ///    c. `kind` (1 byte, u8: 0 = Blob, 1 = Tree)
+    ///    c. `kind` (1 byte, u8: 0 = Blob, 1 = Executable, 2 = Symlink, 3 = Tree, 4 = Submodule)
     ///    d. `hash` (64 bytes)
     ///
     /// # Errors
@@ -156,7 +156,10 @@ impl Encoder for BinaryEncoder {
             out.extend_from_slice(name.as_bytes());
             out.push(match entry.kind() {
                 EntryKind::Blob => 0,
-                EntryKind::Tree => 1,
+                EntryKind::Executable => 1,
+                EntryKind::Symlink => 2,
+                EntryKind::Tree => 3,
+                EntryKind::Submodule => 4,
                 _ => return Err(VctrlError::SerializationError("unknown entry kind".into())),
             });
             out.extend_from_slice(entry.hash().as_bytes());
@@ -228,7 +231,9 @@ impl Encoder for BinaryEncoder {
         let msg = commit.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
-        if msg_len as usize > MAX_MESSAGE_LENGTH {
+        if msg_len as usize
+            > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large")
+        {
             return Err(VctrlError::SerializationError(
                 "commit message exceeds size limit".into(),
             ));
@@ -307,6 +312,13 @@ impl Encoder for BinaryEncoder {
         let msg = tag.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
+        if msg_len as usize
+            > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large")
+        {
+            return Err(VctrlError::SerializationError(
+                "tag message exceeds size limit".into(),
+            ));
+        }
         out.extend_from_slice(&msg_len.to_le_bytes());
         out.extend_from_slice(msg.as_bytes());
         out.extend_from_slice(&tag.timestamp().to_le_bytes());

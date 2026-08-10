@@ -32,6 +32,11 @@ use std::str;
 /// # Purpose
 /// This constant is checked against the first byte of every serialized payload.
 /// If the versions do not match, the decoder rejects the data.
+///
+/// # Design rationale
+/// Bumping this version allows breaking changes to the wire format in the
+/// future. A decoder reading an unexpected version can fail gracefully
+/// instead of attempting to parse incompatible data.
 const EXPECTED_VERSION: u8 = 2;
 
 /// A binary decoder that deserializes version control objects from a compact byte format.
@@ -130,7 +135,7 @@ impl Decoder for BinaryDecoder {
         let len_bytes: [u8; 8] = data[..8].try_into().unwrap();
         let data_len = usize::try_from(u64::from_le_bytes(len_bytes))
             .map_err(|_| VctrlError::CorruptedData("blob length out of range".into()))?;
-        if data_len > MAX_BLOB_SIZE {
+        if data_len > usize::try_from(MAX_BLOB_SIZE).expect("MAX_BLOB_SIZE too large") {
             return Err(VctrlError::CorruptedData("blob exceeds size limit".into()));
         }
         if data.len() != 8 + data_len {
@@ -170,7 +175,7 @@ impl Decoder for BinaryDecoder {
         }
         let count_bytes: [u8; 4] = data[..4].try_into().unwrap();
         let count = u32::from_le_bytes(count_bytes) as usize;
-        if count > MAX_TREE_ENTRIES {
+        if count > usize::try_from(MAX_TREE_ENTRIES).expect("MAX_TREE_ENTRIES too large") {
             return Err(VctrlError::CorruptedData(
                 "tree entry count exceeds limit".into(),
             ));
@@ -195,7 +200,10 @@ impl Decoder for BinaryDecoder {
             }
             let kind = match data[pos] {
                 0 => EntryKind::Blob,
-                1 => EntryKind::Tree,
+                1 => EntryKind::Executable,
+                2 => EntryKind::Symlink,
+                3 => EntryKind::Tree,
+                4 => EntryKind::Submodule,
                 _ => return Err(VctrlError::CorruptedData("unknown entry kind".into())),
             };
             pos += 1;
@@ -309,7 +317,7 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
-        if msg_len > MAX_MESSAGE_LENGTH {
+        if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large") {
             return Err(VctrlError::CorruptedData(
                 "commit message exceeds size limit".into(),
             ));
@@ -454,7 +462,7 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
-        if msg_len > MAX_MESSAGE_LENGTH {
+        if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large") {
             return Err(VctrlError::SerializationError(
                 "tag message exceeds size limit".into(),
             ));

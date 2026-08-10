@@ -91,16 +91,23 @@ mod roundtrip_success {
     }
 
     #[test]
-    fn tree_mixed_kinds() {
+    fn tree_all_entry_kinds() {
         let entries = vec![
             TreeEntry::new("blob".into(), EntryKind::Blob, hash_from_byte(1)).unwrap(),
-            TreeEntry::new("tree".into(), EntryKind::Tree, hash_from_byte(2)).unwrap(),
+            TreeEntry::new("dir".into(), EntryKind::Tree, hash_from_byte(4)).unwrap(),
+            TreeEntry::new("exec".into(), EntryKind::Executable, hash_from_byte(2)).unwrap(),
+            TreeEntry::new("link".into(), EntryKind::Symlink, hash_from_byte(3)).unwrap(),
+            TreeEntry::new("sub".into(), EntryKind::Submodule, hash_from_byte(5)).unwrap(),
         ];
         let t = Tree::new(entries).unwrap();
         let enc = BinaryEncoder.encode_tree(&t).unwrap();
         let dec = BinaryDecoder.decode_tree(&enc).unwrap();
+        assert_eq!(dec.entries().len(), 5);
         assert_eq!(dec.entries()[0].kind(), EntryKind::Blob);
         assert_eq!(dec.entries()[1].kind(), EntryKind::Tree);
+        assert_eq!(dec.entries()[2].kind(), EntryKind::Executable);
+        assert_eq!(dec.entries()[3].kind(), EntryKind::Symlink);
+        assert_eq!(dec.entries()[4].kind(), EntryKind::Submodule);
     }
 
     #[test]
@@ -140,6 +147,22 @@ mod roundtrip_success {
     }
 
     #[test]
+    fn commit_with_encoding() {
+        let user = UserID::new("a".into(), "a@b".into()).unwrap();
+        let meta = libvctrl_handler::CommitMeta {
+            timestamp: 1,
+            timezone_offset: 2,
+            encoding: Some("UTF-8".into()),
+        };
+        let c = Commit::with_meta(dummy_hash(), vec![], user.clone(), user, "msg".into(), meta);
+        let enc = BinaryEncoder.encode_commit(&c).unwrap();
+        let dec = BinaryDecoder.decode_commit(&enc).unwrap();
+        assert_eq!(dec.encoding(), Some("UTF-8"));
+        assert_eq!(dec.timestamp(), 1);
+        assert_eq!(dec.timezone_offset(), 2);
+    }
+
+    #[test]
     fn tag_lightweight() {
         let t = lightweight_tag("v0.1");
         let enc = BinaryEncoder.encode_tag(&t).unwrap();
@@ -167,29 +190,33 @@ mod roundtrip_success {
         assert_eq!(dec.tagger().unwrap().name(), "tagger");
         assert_eq!(dec.message(), "Release notes");
     }
+
+    #[test]
+    fn tag_with_encoding() {
+        let tagger = UserID::new("t".into(), "t@t".into()).unwrap();
+        let meta = libvctrl_handler::CommitMeta {
+            timestamp: 3,
+            timezone_offset: 4,
+            encoding: Some("ISO-8859-1".into()),
+        };
+        let t = Tag::with_meta(
+            "v2.0".into(),
+            dummy_hash(),
+            Some(tagger),
+            "msg".into(),
+            meta,
+        )
+        .unwrap();
+        let enc = BinaryEncoder.encode_tag(&t).unwrap();
+        let dec = BinaryDecoder.decode_tag(&enc).unwrap();
+        assert_eq!(dec.encoding(), Some("ISO-8859-1"));
+        assert_eq!(dec.timestamp(), 3);
+        assert_eq!(dec.timezone_offset(), 4);
+    }
 }
 
 mod error_handling {
     use super::*;
-
-    fn valid_blob_encoding(data_len: usize) -> Vec<u8> {
-        let blob = Blob::new(vec![0; data_len]);
-        BinaryEncoder.encode_blob(&blob).unwrap()
-    }
-
-    fn valid_empty_tree_encoding() -> Vec<u8> {
-        let tree = Tree::new(vec![]).unwrap();
-        BinaryEncoder.encode_tree(&tree).unwrap()
-    }
-
-    fn valid_commit_encoding() -> Vec<u8> {
-        BinaryEncoder.encode_commit(&minimal_commit()).unwrap()
-    }
-
-    fn valid_lightweight_tag_encoding() -> Vec<u8> {
-        let tag = lightweight_tag("test");
-        BinaryEncoder.encode_tag(&tag).unwrap()
-    }
 
     #[test]
     fn blob_empty_input() {
@@ -206,14 +233,17 @@ mod error_handling {
 
     #[test]
     fn blob_length_mismatch() {
-        let mut enc = valid_blob_encoding(5);
+        let blob = Blob::new(vec![0; 5]);
+        let mut enc = BinaryEncoder.encode_blob(&blob).unwrap();
         enc.push(0x00);
         assert!(BinaryDecoder.decode_blob(&enc).is_err());
     }
 
     #[test]
     fn blob_length_exceeds_max() {
-        let over_size = libvctrl_handler::MAX_BLOB_SIZE + 1;
+        let max_blob_size =
+            usize::try_from(libvctrl_handler::MAX_BLOB_SIZE).expect("MAX_BLOB_SIZE too large");
+        let over_size = max_blob_size + 1;
         let mut bytes = vec![0x02u8];
         bytes.extend_from_slice(&(over_size as u64).to_le_bytes());
         bytes.extend(vec![0x00; over_size]);
@@ -235,7 +265,9 @@ mod error_handling {
 
     #[test]
     fn tree_entry_count_exceeds_max() {
-        let over = libvctrl_handler::MAX_TREE_ENTRIES + 1;
+        let over = usize::try_from(libvctrl_handler::MAX_TREE_ENTRIES)
+            .expect("MAX_TREE_ENTRIES too large")
+            + 1;
         let mut enc = vec![0x02u8];
         enc.extend_from_slice(
             &u32::try_from(over)
@@ -247,7 +279,8 @@ mod error_handling {
 
     #[test]
     fn tree_truncated_entry_name() {
-        let mut enc = valid_empty_tree_encoding();
+        let tree = Tree::new(vec![]).unwrap();
+        let mut enc = BinaryEncoder.encode_tree(&tree).unwrap();
         enc[1..5].copy_from_slice(&1u32.to_le_bytes());
         enc.push(50);
         assert!(BinaryDecoder.decode_tree(&enc).is_err());
@@ -277,21 +310,21 @@ mod error_handling {
 
     #[test]
     fn commit_too_short() {
-        let mut enc = valid_commit_encoding();
+        let mut enc = BinaryEncoder.encode_commit(&minimal_commit()).unwrap();
         enc.truncate(10);
         assert!(BinaryDecoder.decode_commit(&enc).is_err());
     }
 
     #[test]
     fn commit_missing_author_name() {
-        let mut enc = valid_commit_encoding();
+        let mut enc = BinaryEncoder.encode_commit(&minimal_commit()).unwrap();
         enc.truncate(66);
         assert!(BinaryDecoder.decode_commit(&enc).is_err());
     }
 
     #[test]
     fn commit_author_name_length_mismatch() {
-        let mut enc = valid_commit_encoding();
+        let mut enc = BinaryEncoder.encode_commit(&minimal_commit()).unwrap();
         if enc.len() > 66 {
             enc[66] = 200;
         }
@@ -300,7 +333,7 @@ mod error_handling {
 
     #[test]
     fn commit_message_truncated() {
-        let mut enc = valid_commit_encoding();
+        let mut enc = BinaryEncoder.encode_commit(&minimal_commit()).unwrap();
         enc.truncate(enc.len() - 2);
         assert!(BinaryDecoder.decode_commit(&enc).is_err());
     }
@@ -308,7 +341,10 @@ mod error_handling {
     #[test]
     fn commit_message_too_long() {
         let user = UserID::new("a".into(), "a@b".into()).unwrap();
-        let msg = "A".repeat(libvctrl_handler::MAX_MESSAGE_LENGTH + 1);
+        let msg_len = usize::try_from(libvctrl_handler::MAX_MESSAGE_LENGTH)
+            .expect("MAX_MESSAGE_LENGTH too large")
+            + 1;
+        let msg = "A".repeat(msg_len);
         let c = Commit::new(dummy_hash(), vec![], user.clone(), user, msg);
         assert!(BinaryEncoder.encode_commit(&c).is_err());
     }
@@ -320,21 +356,21 @@ mod error_handling {
 
     #[test]
     fn tag_missing_name() {
-        let mut enc = valid_lightweight_tag_encoding();
+        let mut enc = BinaryEncoder.encode_tag(&lightweight_tag("test")).unwrap();
         enc.truncate(1);
         assert!(BinaryDecoder.decode_tag(&enc).is_err());
     }
 
     #[test]
     fn tag_name_length_mismatch() {
-        let mut enc = valid_lightweight_tag_encoding();
+        let mut enc = BinaryEncoder.encode_tag(&lightweight_tag("test")).unwrap();
         enc[1] = 100;
         assert!(BinaryDecoder.decode_tag(&enc).is_err());
     }
 
     #[test]
     fn tag_missing_target_hash() {
-        let mut enc = valid_lightweight_tag_encoding();
+        let mut enc = BinaryEncoder.encode_tag(&lightweight_tag("test")).unwrap();
         let name_len = enc[1] as usize;
         let hash_start = 1 + 1 + name_len;
         enc.truncate(hash_start);
@@ -343,7 +379,7 @@ mod error_handling {
 
     #[test]
     fn tag_invalid_tagger_presence_byte() {
-        let mut enc = valid_lightweight_tag_encoding();
+        let mut enc = BinaryEncoder.encode_tag(&lightweight_tag("test")).unwrap();
         let name_len = enc[1] as usize;
         let presence_pos = 1 + 1 + name_len + 64;
         enc[presence_pos] = 2;
@@ -363,6 +399,17 @@ mod error_handling {
         let mut enc = BinaryEncoder.encode_tag(&tag).unwrap();
         enc.truncate(enc.len() - 1);
         assert!(BinaryDecoder.decode_tag(&enc).is_err());
+    }
+
+    #[test]
+    fn tag_message_too_long() {
+        let tagger = UserID::new("t".into(), "t@t".into()).unwrap();
+        let msg_len = usize::try_from(libvctrl_handler::MAX_MESSAGE_LENGTH)
+            .expect("MAX_MESSAGE_LENGTH too large")
+            + 1;
+        let msg = "A".repeat(msg_len);
+        let tag = Tag::new("v".into(), dummy_hash(), Some(tagger), msg).unwrap();
+        assert!(BinaryEncoder.encode_tag(&tag).is_err());
     }
 }
 
@@ -386,5 +433,10 @@ mod version_handling {
         let mut enc2 = vec![0x00u8];
         enc2.extend_from_slice(&0u64.to_le_bytes());
         assert!(BinaryDecoder.decode_blob(&enc2).is_err());
+    }
+
+    #[test]
+    fn missing_version_byte() {
+        assert!(BinaryDecoder.decode_blob(&[]).is_err());
     }
 }

@@ -21,7 +21,8 @@
 //!
 //! # Internal mechanism
 //! The [`MemoryStore`] maps a 64-byte [`Hash`](libvctrl_handler::Hash) to a
-//! `Vec<u8>` payload. The [`MemoryRefStore`] maps a `String` name to a
+//! `Vec<u8>` payload, wrapping it in a `std::io::Cursor` for streaming reads.
+//! The [`MemoryRefStore`] maps a `String` name to a
 //! [`Hash`](libvctrl_handler::Hash). Both structs encapsulate their internal
 //! maps as private fields, ensuring that all mutations occur through the
 //! trait methods to enforce validation rules (like name length checks).
@@ -41,11 +42,16 @@
 /// ```
 /// use libvctrl_core::store::memory::MemoryStore;
 /// use libvctrl_handler::{Hash, ObjectStore};
+/// use std::io::Read;
 ///
 /// let mut store = MemoryStore::new();
 /// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
 /// store.put(&hash, b"object data").unwrap();
-/// assert!(store.exists(&hash).unwrap());
+///
+/// let mut reader = store.get(&hash).unwrap();
+/// let mut buf = Vec::new();
+/// reader.read_to_end(&mut buf).unwrap();
+/// assert_eq!(buf, b"object data");
 /// ```
 pub mod memory;
 
@@ -87,11 +93,15 @@ pub mod ref_store;
 /// ```
 /// use libvctrl_core::store::MemoryStore;
 /// use libvctrl_handler::{Hash, ObjectStore};
+/// use std::io::Read;
 ///
 /// let mut store = MemoryStore::new();
 /// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
 /// store.put(&hash, b"data").unwrap();
-/// assert_eq!(store.get(&hash).unwrap(), b"data");
+///
+/// let mut buf = Vec::new();
+/// store.get(&hash).unwrap().read_to_end(&mut buf).unwrap();
+/// assert_eq!(buf, b"data");
 /// ```
 pub use memory::MemoryStore;
 

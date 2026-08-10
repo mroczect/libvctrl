@@ -9,22 +9,25 @@
 //! - **Ephemeral Storage**: As a non-persistent store, it is ideal for unit
 //!   testing, temporary caching, or short-lived sessions where disk or network
 //!   I/O is unnecessary or undesirable.
-//! - **Simplicity**: By delegating storage to `std::collections::HashMap`, the
-//!   implementation remains trivial and focuses entirely on satisfying the
-//!   trait contract without external dependencies.
+//! - **Streaming Reads**: The `get` method returns a `Box<dyn Read>`, which
+//!   wraps the data in a [`std::io::Cursor`]. This design allows the caller to
+//!   stream the object's contents incrementally, which is crucial for large
+//!   blobs that should not be loaded entirely into memory at once.
 //! - **Idempotent Deletion**: The `delete` method acts as a no-op if the object
 //!   does not exist, preventing errors during cleanup and simplifying caller
 //!   logic.
 //!
 //! # Internal mechanism
 //! The store maps a 64-byte [`Hash`](libvctrl_handler::Hash) to a `Vec<u8>`.
-//! Because `Hash` is `Copy` and implements `Eq` + `Hash`, it serves as an
-//! efficient `HashMap` key. Data is copied on both insertion (`put`) and
-//! retrieval (`get`) to maintain strict ownership boundaries and ensure the
-//! caller cannot mutate the stored data directly.
+//! Data is copied on insertion (`put`) into a new owned buffer. On retrieval
+//! (`get`), the internal `Vec<u8>` is cloned and wrapped in a
+//! [`std::io::Cursor`]. This cloning ensures that the caller receives an
+//! independent snapshot of the data and does not hold a lock on the store's
+//! internal structures.
 
 use libvctrl_handler::{Hash, ObjectStore, VctrlError};
 use std::collections::HashMap;
+use std::io::{Cursor, Read};
 
 /// An in-memory implementation of the [`ObjectStore`](libvctrl_handler::ObjectStore) trait.
 ///
@@ -40,18 +43,24 @@ use std::collections::HashMap;
 ///
 /// # Examples
 ///
-/// Storing and retrieving a blob:
+/// Storing and retrieving a blob via streaming:
 ///
 /// ```
 /// use libvctrl_core::store::MemoryStore;
 /// use libvctrl_handler::{Hash, ObjectStore};
+/// use std::io::Read;
 ///
 /// let mut store = MemoryStore::new();
 /// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
 ///
 /// store.put(&hash, b"my data").unwrap();
 /// assert!(store.exists(&hash).unwrap());
-/// assert_eq!(store.get(&hash).unwrap(), b"my data");
+///
+/// let mut reader = store.get(&hash).unwrap();
+/// let mut buf = Vec::new();
+/// reader.read_to_end(&mut buf).unwrap();
+///
+/// assert_eq!(buf, b"my data");
 /// ```
 #[derive(Debug, Default)]
 pub struct MemoryStore {
@@ -110,11 +119,12 @@ impl ObjectStore for MemoryStore {
         Ok(())
     }
 
-    /// Retrieves a raw object from memory by its hash.
+    /// Retrieves a raw object from memory by its hash as a stream.
     ///
     /// # Design rationale
-    /// Returns a cloned copy of the data. This prevents the caller from holding
-    /// a mutable reference to the store's internals.
+    /// Returns a `Box<dyn Read>`. The internal `Vec<u8>` is cloned and wrapped
+    /// in a `std::io::Cursor`. This prevents the caller from holding a mutable
+    /// reference to the store's internals and allows for streaming reads.
     ///
     /// # Errors
     /// Returns [`VctrlError::ObjectNotFound`](libvctrl_handler::VctrlError::ObjectNotFound)
@@ -125,16 +135,22 @@ impl ObjectStore for MemoryStore {
     /// ```
     /// use libvctrl_core::store::MemoryStore;
     /// use libvctrl_handler::{Hash, ObjectStore};
+    /// use std::io::Read;
     ///
     /// let mut store = MemoryStore::new();
     /// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
     /// store.put(&hash, b"blob").unwrap();
-    /// assert_eq!(store.get(&hash).unwrap(), b"blob");
+    ///
+    /// let mut reader = store.get(&hash).unwrap();
+    /// let mut buf = Vec::new();
+    /// reader.read_to_end(&mut buf).unwrap();
+    /// assert_eq!(buf, b"blob");
     /// ```
-    fn get(&self, hash: &Hash) -> Result<Vec<u8>, VctrlError> {
+    fn get(&self, hash: &Hash) -> Result<Box<dyn Read + '_>, VctrlError> {
         self.objects
             .get(hash)
             .cloned()
+            .map(|v| Box::new(Cursor::new(v)) as Box<dyn Read>)
             .ok_or(VctrlError::ObjectNotFound(*hash))
     }
 
@@ -192,7 +208,8 @@ impl ObjectStore for MemoryStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libvctrl_handler::{HASH_LENGTH, Hash, ObjectStore};
+    use libvctrl_handler::HASH_LENGTH;
+    use std::io::Read;
 
     fn dummy_hash(byte: u8) -> Hash {
         let mut arr = [byte; HASH_LENGTH];
@@ -207,7 +224,9 @@ mod tests {
         let data = b"hello world";
         store.put(&hash, data).unwrap();
         assert!(store.exists(&hash).unwrap());
-        assert_eq!(store.get(&hash).unwrap(), data);
+        let mut buf = Vec::new();
+        store.get(&hash).unwrap().read_to_end(&mut buf).unwrap();
+        assert_eq!(buf, data);
     }
 
     #[test]
@@ -240,6 +259,8 @@ mod tests {
         let hash = dummy_hash(5);
         store.put(&hash, b"old").unwrap();
         store.put(&hash, b"new").unwrap();
-        assert_eq!(store.get(&hash).unwrap(), b"new");
+        let mut buf = Vec::new();
+        store.get(&hash).unwrap().read_to_end(&mut buf).unwrap();
+        assert_eq!(buf, b"new");
     }
 }

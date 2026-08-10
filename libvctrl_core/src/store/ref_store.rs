@@ -18,14 +18,17 @@
 //! - **Input Validation**: The `set_ref` method enforces name length constraints
 //!   ([`MAX_NAME_LENGTH`](libvctrl_handler::MAX_NAME_LENGTH)) to prevent
 //!   resource exhaustion and ensure compatibility with filesystem-based backends.
+//! - **Deterministic Iteration**: The `list_refs` method sorts the references
+//!   before returning them. This ensures deterministic output, which is critical
+//!   for reproducible testing and stable diffs.
 //!
 //! # Internal mechanism
 //! The store maps a `String` to a 64-byte [`Hash`](libvctrl_handler::Hash).
-//! Lookups, insertions, and deletions are average O(1) operations. The `Hash`
-//! is `Copy`, so retrieving a reference returns a cheap stack copy rather than
-//! a heap allocation.
+//! Lookups, insertions, and deletions are average O(1) operations. The
+//! [`Hash`](libvctrl_handler::Hash) is `Copy`, so retrieving a reference returns
+//! a cheap stack copy rather than a heap allocation.
 
-use libvctrl_handler::{Hash, MAX_NAME_LENGTH, RefStore, VctrlError};
+use libvctrl_handler::{Hash, RefStore, VctrlError};
 use std::collections::HashMap;
 
 /// An in-memory implementation of the [`RefStore`](libvctrl_handler::RefStore) trait.
@@ -86,6 +89,8 @@ impl MemoryRefStore {
 }
 
 impl RefStore for MemoryRefStore {
+    type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
+
     /// Sets or updates a named reference to point to a specific hash.
     ///
     /// # Design rationale
@@ -109,7 +114,11 @@ impl RefStore for MemoryRefStore {
     /// store.set_ref("HEAD", &hash).unwrap();
     /// ```
     fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError> {
-        if name.is_empty() || name.len() > MAX_NAME_LENGTH {
+        if name.is_empty()
+            || name.len()
+                > usize::try_from(libvctrl_handler::MAX_NAME_LENGTH)
+                    .expect("MAX_NAME_LENGTH too large")
+        {
             return Err(VctrlError::InvalidName(name.into()));
         }
         let _ = self.refs.insert(name.to_string(), *hash);
@@ -174,9 +183,14 @@ impl RefStore for MemoryRefStore {
     /// Lists all reference names currently stored.
     ///
     /// # Design rationale
-    /// Collects all keys from the internal `HashMap` into a `Vec<String>`. Note
-    /// that because `HashMap` iteration order is non-deterministic, the order
-    /// of the resulting vector is not guaranteed.
+    /// Collects all keys from the internal `HashMap` into a `Vec<String>`,
+    /// sorts them alphabetically, and returns an iterator. The sorting step is
+    /// crucial for deterministic output, as `HashMap` iteration order is
+    /// non-deterministic.
+    ///
+    /// The iterator yields `Result<String, VctrlError>` to satisfy the trait
+    /// definition, which allows disk-based backends to yield I/O errors
+    /// mid-iteration. This in-memory implementation always yields `Ok`.
     ///
     /// # Errors
     /// This implementation is infallible, but returns a `Result` to satisfy the
@@ -190,15 +204,16 @@ impl RefStore for MemoryRefStore {
     ///
     /// let mut store = MemoryRefStore::new();
     /// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
-    /// store.set_ref("a", &hash).unwrap();
     /// store.set_ref("b", &hash).unwrap();
+    /// store.set_ref("a", &hash).unwrap();
     ///
-    /// let mut refs = store.list_refs().unwrap();
-    /// refs.sort(); // Sort for deterministic testing
+    /// let refs: Vec<String> = store.list_refs().unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     /// assert_eq!(refs, vec!["a".to_string(), "b".to_string()]);
     /// ```
-    fn list_refs(&self) -> Result<Vec<String>, VctrlError> {
-        Ok(self.refs.keys().cloned().collect())
+    fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
+        let mut names: Vec<String> = self.refs.keys().cloned().collect();
+        names.sort();
+        Ok(names.into_iter().map(Ok).collect::<Vec<_>>().into_iter())
     }
 }
 
@@ -248,7 +263,10 @@ mod tests {
     #[test]
     fn set_ref_with_too_long_name_fails() {
         let mut store = MemoryRefStore::new();
-        let long_name = "a".repeat(MAX_NAME_LENGTH + 1);
+        let long_name = "a".repeat(
+            usize::try_from(libvctrl_handler::MAX_NAME_LENGTH).expect("MAX_NAME_LENGTH too large")
+                + 1,
+        );
         assert!(store.set_ref(&long_name, &dummy_hash()).is_err());
     }
 
@@ -257,7 +275,8 @@ mod tests {
         let mut store = MemoryRefStore::new();
         store.set_ref("a", &dummy_hash()).unwrap();
         store.set_ref("b", &dummy_hash()).unwrap();
-        let list = store.list_refs().unwrap();
+        let iter = store.list_refs().unwrap();
+        let list: Vec<String> = iter.collect::<Result<Vec<_>, _>>().unwrap();
         assert_eq!(list.len(), 2);
         assert!(list.contains(&"a".to_string()));
         assert!(list.contains(&"b".to_string()));

@@ -77,11 +77,16 @@ use libvctrl_handler::{MAX_NAME_LENGTH, VctrlError};
 /// assert!(validate_name(".").is_err());
 /// assert!(validate_name("..").is_err());
 /// ```
+///
+/// # Panics
+///
+/// Panics if `MAX_NAME_LENGTH` cannot be converted to `usize`. This is a
+/// programmer error that indicates a misconfigured constant.
 pub fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
         return Err(VctrlError::InvalidName("name is empty".into()));
     }
-    if name.len() > MAX_NAME_LENGTH {
+    if name.len() > usize::try_from(MAX_NAME_LENGTH).expect("MAX_NAME_LENGTH too large") {
         return Err(VctrlError::InvalidName(format!(
             "name exceeds maximum length {MAX_NAME_LENGTH}: '{name}'"
         )));
