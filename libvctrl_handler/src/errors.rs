@@ -61,6 +61,8 @@
 //!
 //! // I/O error with source
 //! let io = std::io::Error::new(std::io::ErrorKind::NotFound, "file missing");
+//! use std::error::Error;
+//!
 //! let err = VctrlError::IoError(io);
 //! assert!(err.to_string().contains("I/O error"));
 //! assert!(err.source().is_some());
@@ -109,7 +111,6 @@ use std::fmt;
 ///
 /// ```
 /// use libvctrl_handler::VctrlError;
-/// use std::error::Error;
 ///
 /// let io = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
 /// let err1 = VctrlError::IoError(io);
@@ -291,7 +292,6 @@ impl Clone for VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
-    /// use std::error::Error;
     ///
     /// let io = std::io::Error::new(std::io::ErrorKind::AddrInUse, "port 8080");
     /// let err = VctrlError::IoError(io);
@@ -331,7 +331,6 @@ impl fmt::Display for VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
-    /// use std::error::Error;
     ///
     /// let err = VctrlError::InvalidName("HEAD".into());
     /// let msg = err.to_string();
@@ -410,7 +409,6 @@ impl PartialEq for VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
-    /// use std::error::Error;
     ///
     /// let a = VctrlError::InvalidHashLength(64);
     /// let b = VctrlError::InvalidHashLength(64);

@@ -212,15 +212,16 @@ pub use user_id::UserID;
 /// assert!(matches!(err, VctrlError::InvalidName(_)));
 ///
 /// // Names exceeding the max length are rejected
-/// let long_name = "a".repeat(libvctrl_handler::MAX_NAME_LENGTH + 1);
+/// let long_name = "a".repeat(libvctrl_handler::MAX_NAME_LENGTH as usize + 1);
 /// let err = UserID::new(long_name, "test@example.com".to_string()).unwrap_err();
 /// assert!(matches!(err, VctrlError::InvalidName(_)));
 /// ```
+#[allow(clippy::cast_possible_truncation)]
 fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
         return Err(VctrlError::InvalidName("name is empty".into()));
     }
-    if name.len() > MAX_NAME_LENGTH {
+    if name.len() > MAX_NAME_LENGTH as usize {
         return Err(VctrlError::InvalidName(format!(
             "name exceeds maximum length {MAX_NAME_LENGTH}: '{name}'"
         )));
