@@ -30,7 +30,10 @@ impl Encoder for BinaryEncoder {
             out.extend_from_slice(name.as_bytes());
             out.push(match entry.kind() {
                 EntryKind::Blob => 0,
-                EntryKind::Tree => 1,
+                EntryKind::Executable => 1,
+                EntryKind::Symlink => 2,
+                EntryKind::Tree => 3,
+                EntryKind::Submodule => 4,
                 _ => return Err(VctrlError::SerializationError("unknown entry kind".into())),
             });
             out.extend_from_slice(entry.hash().as_bytes());
@@ -67,7 +70,7 @@ impl Encoder for BinaryEncoder {
         let msg = commit.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
-        if msg_len as usize > MAX_MESSAGE_LENGTH {
+        if msg_len as usize > MAX_MESSAGE_LENGTH as usize {
             return Err(VctrlError::SerializationError(
                 "commit message exceeds size limit".into(),
             ));
