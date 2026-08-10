@@ -70,7 +70,9 @@ impl Encoder for BinaryEncoder {
         let msg = commit.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
-        if msg_len as usize > MAX_MESSAGE_LENGTH as usize {
+        if msg_len as usize
+            > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large")
+        {
             return Err(VctrlError::SerializationError(
                 "commit message exceeds size limit".into(),
             ));

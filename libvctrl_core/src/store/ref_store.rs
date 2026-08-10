@@ -19,7 +19,11 @@ impl RefStore for MemoryRefStore {
     type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
 
     fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError> {
-        if name.is_empty() || name.len() > libvctrl_handler::MAX_NAME_LENGTH as usize {
+        if name.is_empty()
+            || name.len()
+                > usize::try_from(libvctrl_handler::MAX_NAME_LENGTH)
+                    .expect("MAX_NAME_LENGTH too large")
+        {
             return Err(VctrlError::InvalidName(name.into()));
         }
         let _ = self.refs.insert(name.to_string(), *hash);

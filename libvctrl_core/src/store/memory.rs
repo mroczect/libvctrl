@@ -44,17 +44,12 @@ impl ObjectStore for MemoryStore {
 mod tests {
     use super::*;
     use libvctrl_handler::HASH_LENGTH;
+    use std::io::Read;
 
     fn dummy_hash(byte: u8) -> Hash {
         let mut arr = [byte; HASH_LENGTH];
         arr[0] = byte;
         Hash::from_bytes(&arr).unwrap()
-    }
-
-    fn read_to_vec(reader: &mut Box<dyn Read>) -> Vec<u8> {
-        let mut buf = Vec::new();
-        reader.read_to_end(&mut buf).unwrap();
-        buf
     }
 
     #[test]
@@ -64,8 +59,9 @@ mod tests {
         let data = b"hello world";
         store.put(&hash, data).unwrap();
         assert!(store.exists(&hash).unwrap());
-        let mut reader = store.get(&hash).unwrap();
-        assert_eq!(read_to_vec(&mut reader), data);
+        let mut buf = Vec::new();
+        store.get(&hash).unwrap().read_to_end(&mut buf).unwrap();
+        assert_eq!(buf, data);
     }
 
     #[test]
@@ -98,7 +94,8 @@ mod tests {
         let hash = dummy_hash(5);
         store.put(&hash, b"old").unwrap();
         store.put(&hash, b"new").unwrap();
-        let mut reader = store.get(&hash).unwrap();
-        assert_eq!(read_to_vec(&mut reader), b"new");
+        let mut buf = Vec::new();
+        store.get(&hash).unwrap().read_to_end(&mut buf).unwrap();
+        assert_eq!(buf, b"new");
     }
 }
