@@ -36,7 +36,10 @@ fn as_bytes_matches_input() {
 fn display_is_full_hex() {
     let hash = make_hash(0xAB);
     let s = hash.to_string();
-    assert_eq!(s.len(), HASH_LENGTH * 2);
+    assert_eq!(
+        s.len(),
+        usize::try_from(MAX_NAME_LENGTH).expect("MAX_NAME_LENGTH too large") * 2
+    );
     assert!(s.chars().all(|c| c.is_ascii_hexdigit()));
 }
 
