@@ -133,6 +133,7 @@ pub trait ObjectStore {
     /// ```
     /// # use libvctrl_handler::{Hash, ObjectStore, VctrlError};
     /// # use std::collections::HashMap;
+    /// # use std::io::Read;
     /// # #[derive(Default)]
     /// # struct Store(HashMap<Hash, Vec<u8>>);
     /// # impl ObjectStore for Store {
@@ -202,6 +203,7 @@ pub trait ObjectStore {
     /// ```
     /// # use libvctrl_handler::{Hash, ObjectStore, VctrlError};
     /// # use std::collections::HashMap;
+    /// # use std::io::Read;
     /// # #[derive(Default)]
     /// # struct Store(HashMap<Hash, Vec<u8>>);
     /// # impl ObjectStore for Store {
@@ -233,6 +235,7 @@ pub trait ObjectStore {
     /// ```
     /// # use libvctrl_handler::{Hash, ObjectStore, VctrlError};
     /// # use std::collections::HashMap;
+    /// # use std::io::Read;
     /// # #[derive(Default)]
     /// # struct Store(HashMap<Hash, Vec<u8>>);
     /// # impl ObjectStore for Store {
@@ -292,9 +295,9 @@ pub trait ObjectStore {
 ///         Ok(())
 ///     }
 ///     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
-///         let mut names: Vec<_> = self.0.keys().cloned().map(Ok).collect();
+///         let mut names: Vec<_> = self.0.keys().cloned().collect();
 ///         names.sort();
-///         Ok(names.into_iter())
+///         Ok(names.into_iter().map(Ok).collect::<Vec<_>>().into_iter())
 ///     }
 /// }
 ///
@@ -330,7 +333,7 @@ pub trait RefStore {
     /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
     /// #     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
-    /// #         Ok(std::iter::empty())
+    /// #         Ok(vec![].into_iter())
     /// #     }
     /// # }
     /// let mut r = Refs::default();
@@ -362,7 +365,7 @@ pub trait RefStore {
     /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
     /// #     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
-    /// #         Ok(std::iter::empty())
+    /// #         Ok(vec![].into_iter())
     /// #     }
     /// # }
     /// let mut r = Refs::default();
@@ -395,7 +398,7 @@ pub trait RefStore {
     /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
     /// #     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
-    /// #         Ok(std::iter::empty())
+    /// #         Ok(vec![].into_iter())
     /// #     }
     /// # }
     /// let mut r = Refs::default();
@@ -430,9 +433,9 @@ pub trait RefStore {
     /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
     /// #     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
-    /// #         let mut names: Vec<_> = self.0.keys().cloned().map(Ok).collect();
+    /// #         let mut names: Vec<_> = self.0.keys().cloned().collect();
     /// #         names.sort();
-    /// #         Ok(names.into_iter())
+    /// #         Ok(names.into_iter().map(Ok).collect::<Vec<_>>().into_iter())
     /// #     }
     /// # }
     /// let mut r = Refs::default();
