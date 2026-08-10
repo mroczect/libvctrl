@@ -34,7 +34,7 @@ impl Decoder for BinaryDecoder {
         let len_bytes: [u8; 8] = data[..8].try_into().unwrap();
         let data_len = usize::try_from(u64::from_le_bytes(len_bytes))
             .map_err(|_| VctrlError::CorruptedData("blob length out of range".into()))?;
-        if data_len > MAX_BLOB_SIZE as usize {
+        if data_len > usize::try_from(MAX_BLOB_SIZE).expect("MAX_BLOB_SIZE too large") {
             return Err(VctrlError::CorruptedData("blob exceeds size limit".into()));
         }
         if data.len() != 8 + data_len {
@@ -50,7 +50,7 @@ impl Decoder for BinaryDecoder {
         }
         let count_bytes: [u8; 4] = data[..4].try_into().unwrap();
         let count = u32::from_le_bytes(count_bytes) as usize;
-        if count > MAX_TREE_ENTRIES as usize {
+        if count > usize::try_from(MAX_TREE_ENTRIES).expect("MAX_TREE_ENTRIES too large") {
             return Err(VctrlError::CorruptedData(
                 "tree entry count exceeds limit".into(),
             ));
@@ -167,7 +167,7 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
-        if msg_len > MAX_MESSAGE_LENGTH as usize {
+        if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large") {
             return Err(VctrlError::CorruptedData(
                 "commit message exceeds size limit".into(),
             ));
@@ -286,7 +286,7 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
-        if msg_len > MAX_MESSAGE_LENGTH as usize {
+        if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large") {
             return Err(VctrlError::SerializationError(
                 "tag message exceeds size limit".into(),
             ));
