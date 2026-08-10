@@ -61,6 +61,8 @@
 //!
 //! // I/O error with source
 //! let io = std::io::Error::new(std::io::ErrorKind::NotFound, "file missing");
+//! use std::error::Error;
+//!
 //! let err = VctrlError::IoError(io);
 //! assert!(err.to_string().contains("I/O error"));
 //! assert!(err.source().is_some());
@@ -213,6 +215,7 @@ pub enum VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let io = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "pipe closed");
     /// let err = VctrlError::IoError(io);
