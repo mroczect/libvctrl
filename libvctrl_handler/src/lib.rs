@@ -134,7 +134,7 @@ pub mod enums;
 ///
 /// ```
 /// use libvctrl_handler::errors::VctrlError;
-/// use std::error::Error;
+///
 /// let err = VctrlError::Other("fail".to_string());
 /// assert_eq!(err.to_string(), "fail");
 /// ```
@@ -190,6 +190,8 @@ pub mod macros;
 /// ```
 /// use libvctrl_handler::traits::Hasher;
 /// use libvctrl_handler::Hash;
+/// use libvctrl_handler::errors::VctrlError;
+/// use std::error::Error;
 ///
 /// struct DummyHasher;
 /// impl Hasher for DummyHasher {
