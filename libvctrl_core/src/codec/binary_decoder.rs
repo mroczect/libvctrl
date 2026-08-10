@@ -34,7 +34,7 @@ impl Decoder for BinaryDecoder {
         let len_bytes: [u8; 8] = data[..8].try_into().unwrap();
         let data_len = usize::try_from(u64::from_le_bytes(len_bytes))
             .map_err(|_| VctrlError::CorruptedData("blob length out of range".into()))?;
-        if data_len > MAX_BLOB_SIZE {
+        if data_len > MAX_BLOB_SIZE as usize {
             return Err(VctrlError::CorruptedData("blob exceeds size limit".into()));
         }
         if data.len() != 8 + data_len {
@@ -50,7 +50,7 @@ impl Decoder for BinaryDecoder {
         }
         let count_bytes: [u8; 4] = data[..4].try_into().unwrap();
         let count = u32::from_le_bytes(count_bytes) as usize;
-        if count > MAX_TREE_ENTRIES {
+        if count > MAX_TREE_ENTRIES as usize {
             return Err(VctrlError::CorruptedData(
                 "tree entry count exceeds limit".into(),
             ));
@@ -75,7 +75,10 @@ impl Decoder for BinaryDecoder {
             }
             let kind = match data[pos] {
                 0 => EntryKind::Blob,
-                1 => EntryKind::Tree,
+                1 => EntryKind::Executable,
+                2 => EntryKind::Symlink,
+                3 => EntryKind::Tree,
+                4 => EntryKind::Submodule,
                 _ => return Err(VctrlError::CorruptedData("unknown entry kind".into())),
             };
             pos += 1;
@@ -164,7 +167,7 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
-        if msg_len > MAX_MESSAGE_LENGTH {
+        if msg_len > MAX_MESSAGE_LENGTH as usize {
             return Err(VctrlError::CorruptedData(
                 "commit message exceeds size limit".into(),
             ));
@@ -283,7 +286,7 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
-        if msg_len > MAX_MESSAGE_LENGTH {
+        if msg_len > MAX_MESSAGE_LENGTH as usize {
             return Err(VctrlError::SerializationError(
                 "tag message exceeds size limit".into(),
             ));
