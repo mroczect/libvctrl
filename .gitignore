@@ -6,3 +6,4 @@ pull_request_body.md
 *.bak
 /tmp
 issue*
+/dist
