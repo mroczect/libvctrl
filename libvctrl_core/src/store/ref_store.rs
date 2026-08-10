@@ -1,4 +1,4 @@
-use libvctrl_handler::{Hash, MAX_NAME_LENGTH, RefStore, VctrlError};
+use libvctrl_handler::{Hash, RefStore, VctrlError};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -16,8 +16,10 @@ impl MemoryRefStore {
 }
 
 impl RefStore for MemoryRefStore {
+    type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
+
     fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError> {
-        if name.is_empty() || name.len() > MAX_NAME_LENGTH {
+        if name.is_empty() || name.len() > libvctrl_handler::MAX_NAME_LENGTH as usize {
             return Err(VctrlError::InvalidName(name.into()));
         }
         let _ = self.refs.insert(name.to_string(), *hash);
@@ -36,8 +38,10 @@ impl RefStore for MemoryRefStore {
         Ok(())
     }
 
-    fn list_refs(&self) -> Result<Vec<String>, VctrlError> {
-        Ok(self.refs.keys().cloned().collect())
+    fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
+        let mut names: Vec<String> = self.refs.keys().cloned().collect();
+        names.sort();
+        Ok(names.into_iter().map(Ok).collect::<Vec<_>>().into_iter())
     }
 }
 
@@ -87,7 +91,7 @@ mod tests {
     #[test]
     fn set_ref_with_too_long_name_fails() {
         let mut store = MemoryRefStore::new();
-        let long_name = "a".repeat(MAX_NAME_LENGTH + 1);
+        let long_name = "a".repeat(libvctrl_handler::MAX_NAME_LENGTH as usize + 1);
         assert!(store.set_ref(&long_name, &dummy_hash()).is_err());
     }
 
@@ -96,7 +100,8 @@ mod tests {
         let mut store = MemoryRefStore::new();
         store.set_ref("a", &dummy_hash()).unwrap();
         store.set_ref("b", &dummy_hash()).unwrap();
-        let list = store.list_refs().unwrap();
+        let iter = store.list_refs().unwrap();
+        let list: Vec<String> = iter.collect::<Result<Vec<_>, _>>().unwrap();
         assert_eq!(list.len(), 2);
         assert!(list.contains(&"a".to_string()));
         assert!(list.contains(&"b".to_string()));
