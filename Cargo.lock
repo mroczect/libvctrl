@@ -539,6 +539,12 @@ dependencies = [
 [[package]]
 name = "libvctrl"
 version = "1.0.0"
+dependencies = [
+ "libvctrl_core",
+ "libvctrl_handler",
+ "libvctrl_sha512",
+ "proptest",
+]
 
 [[package]]
 name = "libvctrl_core"
