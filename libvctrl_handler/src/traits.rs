@@ -636,12 +636,12 @@ pub trait Decoder {
 ///
 /// struct DummySigner;
 /// impl Signer for DummySigner {
-///     fn sign(&self, data: &[u8]) -> Result<Vec<u8>, VctrlError> {
+///     fn sign(&mut self, data: &[u8]) -> Result<Vec<u8>, VctrlError> {
 ///         Ok(data.to_vec())
 ///     }
 /// }
 ///
-/// let signer = DummySigner;
+/// let mut signer = DummySigner;
 /// let sig = signer.sign(b"msg").unwrap();
 /// assert_eq!(sig, b"msg");
 /// ```
@@ -658,13 +658,13 @@ pub trait Signer {
     /// # use libvctrl_handler::{Signer, VctrlError};
     /// # struct SignerImpl;
     /// # impl Signer for SignerImpl {
-    /// #     fn sign(&self, d: &[u8]) -> Result<Vec<u8>, VctrlError> { Ok(d.to_vec()) }
+    /// #     fn sign(&mut self, d: &[u8]) -> Result<Vec<u8>, VctrlError> { Ok(d.to_vec()) }
     /// # }
-    /// let signer = SignerImpl;
+    /// let mut signer = SignerImpl;
     /// let sig = signer.sign(b"data").unwrap();
     /// assert!(!sig.is_empty());
     /// ```
-    fn sign(&self, data: &[u8]) -> Result<Vec<u8>, VctrlError>;
+    fn sign(&mut self, data: &[u8]) -> Result<Vec<u8>, VctrlError>;
 }
 
 /// Defines the interface for verifying cryptographic signatures.
