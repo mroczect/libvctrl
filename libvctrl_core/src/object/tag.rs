@@ -1,4 +1,3 @@
-
 use libvctrl_handler::{CommitMeta, Hash, Tag, UserID, VctrlError};
 
 #[derive(Debug, Default)]
