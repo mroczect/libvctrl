@@ -21,7 +21,7 @@ A precision toolkit for building custom version control systems.
 | [`libvctrl_plumbing`](libvctrl_plumbing/)   | 0.1.0   | Atomic version control operations (generic over contracts).             |
 | [`libvctrl_porcelain`](libvctrl_porcelain/) | 0.1.0   | High‑level convenience API.                                             |
 | [`libvctrl_sha512`](libvctrl_sha512/)       | 2.0.0   | SHA‑512 / HMAC / HKDF implementations used by `libvctrl_core`.          |
-| [`libvctrl`](libvctrl/)                     | 0.1.0   | Facade crate re‑exporting all of the above into a single namespace.     |
+| [`libvctrl`](libvctrl/)                     | 2.0.0   | Facade crate re‑exporting all of the above into a single namespace.     |
 
 ## Quick Start
 
