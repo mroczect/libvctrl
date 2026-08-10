@@ -26,15 +26,19 @@ fn blob_strategy() -> impl Strategy<Value = Blob> {
     proptest::collection::vec(any::<u8>(), 0..64 * 1024).prop_map(Blob::new)
 }
 
+fn entry_kind_strategy() -> impl Strategy<Value = EntryKind> {
+    prop_oneof![
+        Just(EntryKind::Blob),
+        Just(EntryKind::Executable),
+        Just(EntryKind::Symlink),
+        Just(EntryKind::Tree),
+        Just(EntryKind::Submodule),
+    ]
+}
+
 fn tree_entry_strategy() -> impl Strategy<Value = TreeEntry> {
-    (name_strategy(), any::<u8>(), hash_strategy()).prop_map(|(name, kind_byte, hash)| {
-        let kind = if kind_byte % 2 == 0 {
-            EntryKind::Blob
-        } else {
-            EntryKind::Tree
-        };
-        TreeEntry::new(name, kind, hash).unwrap()
-    })
+    (name_strategy(), entry_kind_strategy(), hash_strategy())
+        .prop_map(|(name, kind, hash)| TreeEntry::new(name, kind, hash).unwrap())
 }
 
 fn tree_strategy() -> impl Strategy<Value = Tree> {
