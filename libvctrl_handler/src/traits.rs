@@ -264,7 +264,9 @@ pub trait ObjectStore {
 ///
 /// References are stored separately from the [`ObjectStore`] because they
 /// are mutable and frequently updated, whereas objects are immutable and
-/// content-addressed.
+/// content-addressed. The associated type `RefsIterator` allows implementations
+/// to return any iterator over reference names, enabling lazy or streaming
+/// listing where appropriate.
 ///
 /// # Examples
 ///
@@ -276,6 +278,8 @@ pub trait ObjectStore {
 /// struct InMemoryRefs(HashMap<String, Hash>);
 ///
 /// impl RefStore for InMemoryRefs {
+///     type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
+///
 ///     fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError> {
 ///         self.0.insert(name.to_string(), *hash);
 ///         Ok(())
@@ -287,8 +291,10 @@ pub trait ObjectStore {
 ///         self.0.remove(name);
 ///         Ok(())
 ///     }
-///     fn list_refs(&self) -> Result<Vec<String>, VctrlError> {
-///         Ok(self.0.keys().cloned().collect())
+///     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
+///         let mut names: Vec<_> = self.0.keys().cloned().map(Ok).collect();
+///         names.sort();
+///         Ok(names.into_iter())
 ///     }
 /// }
 ///
@@ -300,6 +306,7 @@ pub trait ObjectStore {
 pub trait RefStore {
     /// An iterator over all reference names, yielding `Result<String, VctrlError>`.
     type RefsIterator: Iterator<Item = Result<String, VctrlError>>;
+
     /// Sets or updates a named reference to point to a specific hash.
     ///
     /// # Errors
@@ -314,6 +321,7 @@ pub trait RefStore {
     /// # #[derive(Default)]
     /// # struct Refs(HashMap<String, Hash>);
     /// # impl RefStore for Refs {
+    /// #     type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
     /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> {
     /// #         self.0.insert(n.to_string(), *h); Ok(())
     /// #     }
@@ -321,7 +329,9 @@ pub trait RefStore {
     /// #         self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string()))
     /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
-    /// #     fn list_refs(&self) -> Result<Vec<String>, VctrlError> { Ok(self.0.keys().cloned().collect()) }
+    /// #     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
+    /// #         Ok(std::iter::empty())
+    /// #     }
     /// # }
     /// let mut r = Refs::default();
     /// let h = Hash::from_bytes(&[0u8; 64]).unwrap();
@@ -343,6 +353,7 @@ pub trait RefStore {
     /// # #[derive(Default)]
     /// # struct Refs(HashMap<String, Hash>);
     /// # impl RefStore for Refs {
+    /// #     type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
     /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> {
     /// #         self.0.insert(n.to_string(), *h); Ok(())
     /// #     }
@@ -350,7 +361,9 @@ pub trait RefStore {
     /// #         self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string()))
     /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
-    /// #     fn list_refs(&self) -> Result<Vec<String>, VctrlError> { Ok(self.0.keys().cloned().collect()) }
+    /// #     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
+    /// #         Ok(std::iter::empty())
+    /// #     }
     /// # }
     /// let mut r = Refs::default();
     /// let h = Hash::from_bytes(&[0u8; 64]).unwrap();
@@ -373,6 +386,7 @@ pub trait RefStore {
     /// # #[derive(Default)]
     /// # struct Refs(HashMap<String, Hash>);
     /// # impl RefStore for Refs {
+    /// #     type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
     /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> {
     /// #         self.0.insert(n.to_string(), *h); Ok(())
     /// #     }
@@ -380,7 +394,9 @@ pub trait RefStore {
     /// #         self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string()))
     /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
-    /// #     fn list_refs(&self) -> Result<Vec<String>, VctrlError> { Ok(self.0.keys().cloned().collect()) }
+    /// #     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
+    /// #         Ok(std::iter::empty())
+    /// #     }
     /// # }
     /// let mut r = Refs::default();
     /// let h = Hash::from_bytes(&[0u8; 64]).unwrap();
@@ -405,6 +421,7 @@ pub trait RefStore {
     /// # #[derive(Default)]
     /// # struct Refs(HashMap<String, Hash>);
     /// # impl RefStore for Refs {
+    /// #     type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
     /// #     fn set_ref(&mut self, n: &str, h: &Hash) -> Result<(), VctrlError> {
     /// #         self.0.insert(n.to_string(), *h); Ok(())
     /// #     }
@@ -412,17 +429,22 @@ pub trait RefStore {
     /// #         self.0.get(n).copied().ok_or_else(|| VctrlError::RefNotFound(n.to_string()))
     /// #     }
     /// #     fn delete_ref(&mut self, n: &str) -> Result<(), VctrlError> { self.0.remove(n); Ok(()) }
-    /// #     fn list_refs(&self) -> Result<Vec<String>, VctrlError> { Ok(self.0.keys().cloned().collect()) }
+    /// #     fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
+    /// #         let mut names: Vec<_> = self.0.keys().cloned().map(Ok).collect();
+    /// #         names.sort();
+    /// #         Ok(names.into_iter())
+    /// #     }
     /// # }
     /// let mut r = Refs::default();
     /// let h = Hash::from_bytes(&[0u8; 64]).unwrap();
     /// r.set_ref("main", &h).unwrap();
     /// r.set_ref("dev", &h).unwrap();
-    /// let mut names = r.list_refs().unwrap();
+    /// let iter = r.list_refs().unwrap();
+    /// let mut names: Vec<_> = iter.collect::<Result<Vec<_>, _>>().unwrap();
     /// names.sort();
     /// assert_eq!(names, vec!["dev".to_string(), "main".to_string()]);
     /// ```
-    fn list_refs(&self) -> Result<Vec<String>, VctrlError>;
+    fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError>;
 }
 
 /// Defines the interface for hashing raw data into a [`Hash`].
