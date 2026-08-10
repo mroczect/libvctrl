@@ -298,6 +298,8 @@ pub trait ObjectStore {
 /// assert_eq!(refs.get_ref("main").unwrap(), hash);
 /// ```
 pub trait RefStore {
+    /// An iterator over all reference names, yielding `Result<String, VctrlError>`.
+    type RefsIterator: Iterator<Item = Result<String, VctrlError>>;
     /// Sets or updates a named reference to point to a specific hash.
     ///
     /// # Errors
