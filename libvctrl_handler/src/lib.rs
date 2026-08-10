@@ -134,6 +134,7 @@ pub mod enums;
 ///
 /// ```
 /// use libvctrl_handler::errors::VctrlError;
+/// use std::error::Error;
 /// let err = VctrlError::Other("fail".to_string());
 /// assert_eq!(err.to_string(), "fail");
 /// ```
