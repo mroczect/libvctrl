@@ -4,7 +4,7 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
         return Err(VctrlError::InvalidName("name is empty".into()));
     }
-    if name.len() > MAX_NAME_LENGTH as usize {
+    if name.len() > usize::try_from(MAX_NAME_LENGTH).expect("MAX_NAME_LENGTH too large") {
         return Err(VctrlError::InvalidName(format!(
             "name exceeds maximum length {MAX_NAME_LENGTH}: '{name}'"
         )));
