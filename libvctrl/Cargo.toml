@@ -6,6 +6,44 @@ description = "A precision toolkit for building custom version control systems"
 license = "MIT"
 authors = ["mroczect"]
 repository = "https://github.com/mroczect/libvctrl"
+homepage = "https://github.com/mroczect/libvctrl"
+documentation = "https://docs.rs/libvctrl"
 readme = "README.md"
-keywords = ["version-control", "vcs"]
-categories = ["development-tools"]
+keywords = ["version-control", "vcs", "git", "merkle", "sdk"]
+categories = ["development-tools", "data-structures", "cryptography::cryptocurrencies"]
+exclude = [
+    ".github/*",
+    "tests/*",
+    "benches/*",
+    "*.bak",
+]
+
+[dependencies]
+libvctrl_handler = { path = "../libvctrl_handler", version = "4.0.0" }
+libvctrl_core = { path = "../libvctrl_core", version = "2.0.0" }
+libvctrl_sha512 = { path = "../libvctrl_sha512", version = "2.0.0", default-features = false }
+
+[dev-dependencies]
+proptest = "1.11.0"
+[features]
+default = ["sha384"]
+sha384 = ["libvctrl_sha512/sha384"]
+opt_size = ["libvctrl_sha512/opt_size"]
+
+[lints.clippy]
+all = "deny"
+pedantic = "deny"
+nursery = "deny"
+cargo = "deny"
+missing_const_for_fn = "deny"
+redundant_clone = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+rust_2018_idioms = "deny"
+unreachable_pub = "deny"
+unused_qualifications = "deny"
