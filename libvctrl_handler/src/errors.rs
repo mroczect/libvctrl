@@ -109,6 +109,7 @@ use std::fmt;
 ///
 /// ```
 /// use libvctrl_handler::VctrlError;
+/// use std::error::Error;
 ///
 /// let io = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
 /// let err1 = VctrlError::IoError(io);
@@ -129,6 +130,7 @@ pub enum VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let err = VctrlError::InvalidHashLength(15);
     /// assert!(err.to_string().contains("15"));
@@ -146,6 +148,7 @@ pub enum VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let err = VctrlError::InvalidName("".into());
     /// assert!(err.to_string().starts_with("Invalid name:"));
@@ -179,6 +182,7 @@ pub enum VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let err = VctrlError::RefNotFound("main".into());
     /// assert!(err.to_string().contains("main"));
@@ -196,6 +200,7 @@ pub enum VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let err = VctrlError::CorruptedData("invalid tree entry".into());
     /// assert!(err.to_string().starts_with("Corrupted data:"));
@@ -213,6 +218,7 @@ pub enum VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let io = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "pipe closed");
     /// let err = VctrlError::IoError(io);
@@ -232,6 +238,7 @@ pub enum VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let err = VctrlError::SerializationError("failed to encode commit".into());
     /// assert!(err.to_string().contains("Serialization error:"));
@@ -246,6 +253,7 @@ pub enum VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let err = VctrlError::Other("something unexpected happened".into());
     /// assert_eq!(err.to_string(), "something unexpected happened");
@@ -283,6 +291,7 @@ impl Clone for VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let io = std::io::Error::new(std::io::ErrorKind::AddrInUse, "port 8080");
     /// let err = VctrlError::IoError(io);
@@ -322,6 +331,7 @@ impl fmt::Display for VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let err = VctrlError::InvalidName("HEAD".into());
     /// let msg = err.to_string();
@@ -400,6 +410,7 @@ impl PartialEq for VctrlError {
     ///
     /// ```
     /// use libvctrl_handler::VctrlError;
+    /// use std::error::Error;
     ///
     /// let a = VctrlError::InvalidHashLength(64);
     /// let b = VctrlError::InvalidHashLength(64);
