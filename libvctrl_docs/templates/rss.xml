@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:atom="http://www.w3.org/2005/Atom"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>{{ site.site_name }}</title>
+    <description>{{ site.description | default(value="") }}</description>
+    <link>{{ base_url }}</link>
+    <atom:link href="{{ base_url }}/rss.xml" rel="self" type="application/rss+xml"/>
+    <language>{{ site.language | default(value="en") }}</language>
+    <generator>librawssg</generator>
+    {% if site.author %}
+    <managingEditor>{{ site.author }} ({{ site.author }})</managingEditor>
+    <webMaster>{{ site.author }} ({{ site.author }})</webMaster>
+    {% endif %}
+    <lastBuildDate>{{ now() | date(format="%a, %d %b %Y %H:%M:%S +0000") }}</lastBuildDate>
+
+    {% for post in posts %}
+    <item>
+      <title>{{ post.frontmatter.title }}</title>
+      <description><![CDATA[{{ post.frontmatter.desc }}]]></description>
+      <link>{{ base_url }}/{{ post.url }}</link>
+      <guid isPermaLink="true">{{ base_url }}/{{ post.url }}</guid>
+      {% if post.pub_date %}
+      <pubDate>{{ post.pub_date }}</pubDate>
+      {% endif %}
+      {% if post.frontmatter.author %}
+      <dc:creator>{{ post.frontmatter.author }}</dc:creator>
+      {% endif %}
+      {% for tag in post.frontmatter.tags %}
+      <category>{{ tag }}</category>
+      {% endfor %}
+    </item>
+    {% endfor %}
+  </channel>
+</rss>
