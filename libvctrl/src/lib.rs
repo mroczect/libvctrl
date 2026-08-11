@@ -55,7 +55,7 @@
 //!
 //! // 3. Hash the encoded bytes to get an address
 //! let hasher = Sha512Hasher;
-//! let tree_hash = hasher.hash(&encoded_bytes);
+//! let tree_hash = hasher.hash(&encoded_bytes)?;
 //!
 //! // 4. Store the encoded object in memory
 //! let mut store = MemoryStore::new();
@@ -242,11 +242,12 @@ pub use handler::macros;
 /// ```
 /// use libvctrl::traits::Hasher;
 /// use libvctrl::Hash;
+/// use libvctrl::VctrlError;
 ///
 /// struct DummyHasher;
 /// impl Hasher for DummyHasher {
-///     fn hash(&self, _data: &[u8]) -> Hash {
-///         Hash::from_bytes(&[0u8; 64]).unwrap()
+///     fn hash(&self, _data: &[u8]) -> Result<Hash, VctrlError> {
+///         Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
 ///     }
 /// }
 /// ```
@@ -322,12 +323,12 @@ pub use handler::VctrlError;
 /// # Examples
 ///
 /// ```
-/// use libvctrl::{Hasher, Hash};
+/// use libvctrl::{Hasher, Hash, VctrlError};
 ///
 /// struct MyHasher;
 /// impl Hasher for MyHasher {
-///     fn hash(&self, _data: &[u8]) -> Hash {
-///         Hash::from_bytes(&[0u8; 64]).unwrap()
+///     fn hash(&self, _data: &[u8]) -> Result<Hash, VctrlError> {
+///         Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
 ///     }
 /// }
 /// ```
@@ -476,7 +477,7 @@ pub use reference::codec::BinaryEncoder;
 /// use libvctrl::{Hasher, Sha512Hasher};
 ///
 /// let hasher = Sha512Hasher;
-/// let hash = hasher.hash(b"data");
+/// let hash = hasher.hash(b"data").unwrap();
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub use reference::hash::Sha512Hasher;
