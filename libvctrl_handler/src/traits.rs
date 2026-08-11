@@ -466,18 +466,18 @@ pub trait RefStore {
 /// # Examples
 ///
 /// ```
-/// use libvctrl_handler::{Blob, Hash, Hasher};
+/// use libvctrl_handler::{Blob, Hash, Hasher, VctrlError};
 ///
 /// struct DummyHasher;
 /// impl Hasher for DummyHasher {
-///     fn hash(&self, _data: &[u8]) -> Hash {
-///         Hash::from_bytes(&[0u8; 64]).unwrap()
+///     fn hash(&self, _data: &[u8]) -> Result<Hash, VctrlError> {
+///         Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
 ///     }
 /// }
 ///
 /// let hasher = DummyHasher;
 /// let blob = Blob::new(b"hello".to_vec());
-/// let hash = hasher.hash(blob.data());
+/// let hash = hasher.hash(blob.data()).unwrap();
 /// assert_eq!(hash.as_bytes(), &[0u8; 64]);
 /// ```
 pub trait Hasher {
@@ -491,13 +491,15 @@ pub trait Hasher {
     /// # Examples
     ///
     /// ```
-    /// # use libvctrl_handler::{Hash, Hasher};
+    /// # use libvctrl_handler::{Hash, Hasher, VctrlError};
     /// # struct HasherImpl;
     /// # impl Hasher for HasherImpl {
-    /// #     fn hash(&self, _d: &[u8]) -> Hash { Hash::from_bytes(&[0u8; 64]).unwrap() }
+    /// #     fn hash(&self, _d: &[u8]) -> Result<Hash, VctrlError> {
+    /// #         Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
+    /// #     }
     /// # }
     /// let hasher = HasherImpl;
-    /// let hash = hasher.hash(b"data");
+    /// let hash = hasher.hash(b"data").unwrap();
     /// assert_eq!(hash.as_bytes().len(), 64);
     /// ```
     fn hash(&self, data: &[u8]) -> Result<Hash, VctrlError>;
