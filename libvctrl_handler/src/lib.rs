@@ -195,7 +195,7 @@ pub mod macros;
 ///
 /// struct DummyHasher;
 /// impl Hasher for DummyHasher {
-///     fn hash(&self, _data: &[u8]) -> Hash {
+///     fn hash(&self, _data: &[u8]) -> Result<libvctrl_handler::Hash, VctrlError> {
 ///         Hash::from_bytes(&[0u8; 64]).unwrap()
 ///     }
 /// }
@@ -291,7 +291,7 @@ pub use errors::VctrlError;
 ///
 /// struct MyHasher;
 /// impl Hasher for MyHasher {
-///     fn hash(&self, _data: &[u8]) -> Hash {
+///     fn hash(&self, _data: &[u8]) -> Result<libvctrl_handler::Hash, VctrlError> {
 ///         Hash::from_bytes(&[0u8; 64]).unwrap()
 ///     }
 /// }
