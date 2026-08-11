@@ -24,21 +24,21 @@ fn main() -> Result<(), VctrlError> {
     let readme_content = b"# My Project\n\nHello, world!";
     let readme_blob = libvctrl::Blob::new(readme_content.to_vec());
     let encoded_readme = encoder.encode_blob(&readme_blob)?;
-    let readme_hash = hasher.hash(&encoded_readme);
+    let readme_hash = hasher.hash(&encoded_readme)?; // FIXED: handle Result
     obj_store.put(&readme_hash, &encoded_readme)?;
 
     // --- Blob: src/main.rs ---
     let main_rs_content = b"fn main() { println!(\"Hello from libvctrl!\"); }";
     let main_blob = libvctrl::Blob::new(main_rs_content.to_vec());
     let encoded_main = encoder.encode_blob(&main_blob)?;
-    let main_hash = hasher.hash(&encoded_main);
+    let main_hash = hasher.hash(&encoded_main)?; // FIXED: handle Result
     obj_store.put(&main_hash, &encoded_main)?;
 
     // --- Tree: src/ (subdirectory) ---
     let src_entry = TreeEntry::new("main.rs".into(), EntryKind::Blob, main_hash)?;
     let src_tree = Tree::new(vec![src_entry])?;
     let encoded_src_tree = encoder.encode_tree(&src_tree)?;
-    let src_tree_hash = hasher.hash(&encoded_src_tree);
+    let src_tree_hash = hasher.hash(&encoded_src_tree)?; // FIXED: handle Result
     obj_store.put(&src_tree_hash, &encoded_src_tree)?;
 
     // --- Root tree: README.md + src/ ---
@@ -46,7 +46,7 @@ fn main() -> Result<(), VctrlError> {
     let src_dir_entry = TreeEntry::new("src".into(), EntryKind::Tree, src_tree_hash)?;
     let root_tree = Tree::new(vec![readme_entry, src_dir_entry])?;
     let encoded_root_tree = encoder.encode_tree(&root_tree)?;
-    let root_tree_hash = hasher.hash(&encoded_root_tree);
+    let root_tree_hash = hasher.hash(&encoded_root_tree)?; // FIXED: handle Result
     obj_store.put(&root_tree_hash, &encoded_root_tree)?;
 
     // --- Commit ---
@@ -58,7 +58,7 @@ fn main() -> Result<(), VctrlError> {
         "Initial commit".into(),
     );
     let encoded_commit = encoder.encode_commit(&commit)?;
-    let commit_hash = hasher.hash(&encoded_commit);
+    let commit_hash = hasher.hash(&encoded_commit)?; // FIXED: handle Result
     obj_store.put(&commit_hash, &encoded_commit)?;
 
     // Set HEAD
