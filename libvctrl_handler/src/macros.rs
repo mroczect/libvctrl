@@ -37,3 +37,27 @@ macro_rules! vctrl_error_other {
         $crate::VctrlError::Other(format!($($arg)*))
     };
 }
+
+/// Helper macro to generate the `string_payload` function for [`VctrlError`].
+///
+/// This macro is used inside the [`PartialEq`] implementation of
+/// [`VctrlError`] to extract the string payload from all variants that carry
+/// a [`String`]. It must be exported because it is invoked from the
+/// `errors` module.
+///
+/// # Example of invocation
+///
+/// ```ignore
+/// string_payload_variants!(InvalidName, RefNotFound, InvalidEmail, ...);
+/// ```
+#[macro_export]
+macro_rules! string_payload_variants {
+    ($($variant:ident),* $(,)?) => {
+        const fn string_payload(v: &VctrlError) -> Option<&str> {
+            match v {
+                $( VctrlError::$variant(s) => Some(s.as_str()), )*
+                _ => None,
+            }
+        }
+    };
+}
