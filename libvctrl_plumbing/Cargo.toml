@@ -2,12 +2,35 @@
 name = "libvctrl_plumbing"
 version = "0.1.0"
 edition = "2024"
-description = "Atomic operations for version control (plumbing layer) – generic over libvctrl traits"
+description = "Plumbing commands for the libvctrl version control system"
 license = "MIT"
 authors = ["mroczect"]
 repository = "https://github.com/mroczect/libvctrl"
+homepage = "https://github.com/mroczect/libvctrl"
+documentation = "https://docs.rs/libvctrl"
 readme = "README.md"
 keywords = ["version-control", "vcs", "plumbing"]
 categories = ["development-tools"]
 
 [dependencies]
+libvctrl = { path = "../libvctrl", version = "2.1.1" }
+
+[dev-dependencies]
+
+# [lints.clippy]
+# all = "deny"
+# pedantic = "deny"
+# nursery = "deny"
+# cargo = "deny"
+# missing_const_for_fn = "deny"
+# redundant_clone = "deny"
+# unwrap_used = "deny"
+# expect_used = "deny"
+# panic = "deny"
+
+# [lints.rust]
+# unsafe_code = "forbid"
+# missing_docs = "deny"
+# rust_2018_idioms = "deny"
+# unreachable_pub = "deny"
+# unused_qualifications = "deny"
