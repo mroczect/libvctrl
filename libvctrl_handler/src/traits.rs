@@ -483,6 +483,11 @@ pub trait RefStore {
 pub trait Hasher {
     /// Computes a cryptographic [`Hash`] from the provided byte slice.
     ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if the hashing operation fails internally
+    /// (e.g., algorithm constraints, entropy exhaustion for salted hashes).
+    ///
     /// # Examples
     ///
     /// ```
@@ -495,8 +500,7 @@ pub trait Hasher {
     /// let hash = hasher.hash(b"data");
     /// assert_eq!(hash.as_bytes().len(), 64);
     /// ```
-    #[must_use]
-    fn hash(&self, data: &[u8]) -> Hash;
+    fn hash(&self, data: &[u8]) -> Result<Hash, VctrlError>;
 }
 
 /// Defines the interface for serializing version control objects.
