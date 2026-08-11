@@ -195,13 +195,13 @@ pub mod macros;
 ///
 /// struct DummyHasher;
 /// impl Hasher for DummyHasher {
-///     fn hash(&self, _data: &[u8]) -> Hash {
-///         Hash::from_bytes(&[0u8; 64]).unwrap()
-///     }
+/// fn hash(&self, _data: &[u8]) -> Result<libvctrl_handler::Hash, VctrlError> {
+///     Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
+/// }
 /// }
 ///
 /// let hasher = DummyHasher;
-/// let h = hasher.hash(b"hello");
+/// let h = hasher.hash(b"hello").unwrap();
 /// assert_eq!(h.as_bytes().len(), 64);
 /// ```
 pub mod traits;
@@ -287,12 +287,12 @@ pub use errors::VctrlError;
 /// # Examples
 ///
 /// ```
-/// use libvctrl_handler::{Hasher, Hash};
+/// use libvctrl_handler::{Hasher, Hash, VctrlError};
 ///
 /// struct MyHasher;
 /// impl Hasher for MyHasher {
-///     fn hash(&self, _data: &[u8]) -> Hash {
-///         Hash::from_bytes(&[0u8; 64]).unwrap()
+///     fn hash(&self, _data: &[u8]) -> Result<libvctrl_handler::Hash, VctrlError> {
+///         Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
 ///     }
 /// }
 /// ```

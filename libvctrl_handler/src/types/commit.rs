@@ -117,8 +117,9 @@ impl Commit {
     ///
     /// assert_eq!(commit.timestamp(), 0);
     /// ```
+    #[allow(clippy::missing_const_for_fn)]
     #[must_use]
-    pub const fn new(
+    pub fn new(
         tree: Hash,
         parents: Vec<Hash>,
         author: UserID,
