@@ -9,8 +9,6 @@ use crate::enums::EntryKind;
 use crate::errors::VctrlError;
 use crate::types::hash::Hash;
 
-use super::validate_name;
-
 /// A single entry in a directory tree.
 ///
 /// Each entry associates a `name` with a `hash` of the object it points to
@@ -82,7 +80,7 @@ impl TreeEntry {
     /// assert_eq!(entry.name(), "src/main.rs");
     /// ```
     pub fn new(name: String, kind: EntryKind, hash: Hash) -> Result<Self, VctrlError> {
-        validate_name(&name)?;
+        super::validate_tree_entry_name(&name)?;
         Ok(Self { name, kind, hash })
     }
 
