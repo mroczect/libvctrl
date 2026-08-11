@@ -17,7 +17,7 @@ fn build_database() -> Result<(MemoryStore, MemoryRefStore), VctrlError> {
 
     let readme_blob = libvctrl::Blob::new(b"# My Project\n\nHello, world!".to_vec());
     let readme_enc = encoder.encode_blob(&readme_blob)?;
-    let readme_hash = hasher.hash(&readme_enc);
+    let readme_hash = hasher.hash(&readme_enc)?;
     obj_store.put(&readme_hash, &readme_enc)?;
 
     let root1 = Tree::new(vec![TreeEntry::new(
@@ -26,7 +26,7 @@ fn build_database() -> Result<(MemoryStore, MemoryRefStore), VctrlError> {
         readme_hash,
     )?])?;
     let root1_enc = encoder.encode_tree(&root1)?;
-    let root1_hash = hasher.hash(&root1_enc);
+    let root1_hash = hasher.hash(&root1_enc)?;
     obj_store.put(&root1_hash, &root1_enc)?;
 
     let c1 = {
@@ -38,7 +38,7 @@ fn build_database() -> Result<(MemoryStore, MemoryRefStore), VctrlError> {
             "Initial commit".into(),
         );
         let enc = encoder.encode_commit(&commit)?;
-        let h = hasher.hash(&enc);
+        let h = hasher.hash(&enc)?;
         obj_store.put(&h, &enc)?;
         h
     };
@@ -46,7 +46,7 @@ fn build_database() -> Result<(MemoryStore, MemoryRefStore), VctrlError> {
     let main_blob =
         libvctrl::Blob::new(b"fn main() { println!(\"Hello from libvctrl!\"); }".to_vec());
     let main_enc = encoder.encode_blob(&main_blob)?;
-    let main_hash = hasher.hash(&main_enc);
+    let main_hash = hasher.hash(&main_enc)?;
     obj_store.put(&main_hash, &main_enc)?;
 
     let root2 = Tree::new(vec![
@@ -54,13 +54,13 @@ fn build_database() -> Result<(MemoryStore, MemoryRefStore), VctrlError> {
         TreeEntry::new("main.rs".into(), EntryKind::Blob, main_hash)?,
     ])?;
     let root2_enc = encoder.encode_tree(&root2)?;
-    let root2_hash = hasher.hash(&root2_enc);
+    let root2_hash = hasher.hash(&root2_enc)?;
     obj_store.put(&root2_hash, &root2_enc)?;
 
     let c2 = {
         let commit = Commit::new(root2_hash, vec![c1], bob.clone(), bob, "Add main.rs".into());
         let enc = encoder.encode_commit(&commit)?;
-        let h = hasher.hash(&enc);
+        let h = hasher.hash(&enc)?;
         obj_store.put(&h, &enc)?;
         h
     };

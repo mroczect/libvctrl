@@ -27,6 +27,7 @@
 //! The conversion uses `.expect()` safely because the output length of SHA-512 is
 //! statically guaranteed to be exactly 64 bytes by the algorithm's specification.
 
+use libvctrl_handler::VctrlError;
 use libvctrl_handler::{Hash, Hasher};
 use libvctrl_sha512::Hash as Sha512Hash;
 
@@ -52,9 +53,7 @@ use libvctrl_sha512::Hash as Sha512Hash;
 /// use libvctrl_core::hash::Sha512Hasher;
 ///
 /// let hasher = Sha512Hasher;
-/// let hash = hasher.hash(b"hello world");
-///
-/// // SHA-512 produces a 64-byte digest
+/// let hash = hasher.hash(b"hello world").unwrap();
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 #[derive(Debug, Default, Clone)]
@@ -92,8 +91,8 @@ impl Hasher for Sha512Hasher {
     /// assert_eq!(hash1, hash2);
     /// assert_ne!(hash1, hash3);
     /// ```
-    fn hash(&self, data: &[u8]) -> Hash {
+    fn hash(&self, data: &[u8]) -> Result<Hash, VctrlError> {
         let digest = Sha512Hash::hash(data);
-        Hash::from_bytes(&digest).expect("SHA-512 produces 64 bytes")
+        Ok(Hash::from_bytes(&digest).unwrap())
     }
 }

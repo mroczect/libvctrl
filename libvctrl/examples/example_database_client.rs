@@ -51,13 +51,13 @@ fn main() -> Result<(), VctrlError> {
 
     let blob = libvctrl::Blob::new(b"Hello, Server!".to_vec());
     let encoded_blob = encoder.encode_blob(&blob)?;
-    let blob_hash = hasher.hash(&encoded_blob);
+    let blob_hash = hasher.hash(&encoded_blob)?;
     server.store(&blob_hash, &encoded_blob);
 
     let entry = TreeEntry::new("hello.txt".into(), EntryKind::Blob, blob_hash)?;
     let tree = Tree::new(vec![entry])?;
     let encoded_tree = encoder.encode_tree(&tree)?;
-    let tree_hash = hasher.hash(&encoded_tree);
+    let tree_hash = hasher.hash(&encoded_tree)?;
     server.store(&tree_hash, &encoded_tree);
 
     let commit = Commit::new(
@@ -68,7 +68,7 @@ fn main() -> Result<(), VctrlError> {
         "Server commit".into(),
     );
     let encoded_commit = encoder.encode_commit(&commit)?;
-    let commit_hash = hasher.hash(&encoded_commit);
+    let commit_hash = hasher.hash(&encoded_commit)?;
     server.store(&commit_hash, &encoded_commit);
 
     // Client connects to server

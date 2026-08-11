@@ -75,7 +75,7 @@
 //!
 //! // 3. Hash the bytes to get a content address
 //! let hasher = Sha512Hasher;
-//! let hash = hasher.hash(&bytes);
+//! let hash = hasher.hash(&bytes).unwrap();
 //!
 //! // 4. Store the encoded bytes in memory
 //! let mut store = MemoryStore::new();
@@ -140,7 +140,7 @@ pub mod codec;
 /// use libvctrl_core::hash::Sha512Hasher;
 ///
 /// let hasher = Sha512Hasher;
-/// let hash = hasher.hash(b"data");
+/// let hash = hasher.hash(b"data").unwrap();
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub mod hash;
