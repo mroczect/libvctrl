@@ -3,11 +3,13 @@ set -euo pipefail
 
 WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CRATES=(
-    "libvctrl_handler"
-    "libvctrl_core"
-    "libvctrl_plumbing"
-    "libvctrl_porcelain"
-    "libvctrl"
+	"libvctrl"
+	"libvctrl_core"
+	"libvctrl_docs"
+	"libvctrl_handler"
+	"libvctrl_plumbing"
+	"libvctrl_porcelain"
+	"libvctrl_sha512"
 )
 DRY_RUN=false
 
