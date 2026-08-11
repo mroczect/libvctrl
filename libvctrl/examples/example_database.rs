@@ -17,7 +17,7 @@ fn main() -> Result<(), VctrlError> {
     // ---- Commit 1: Initial commit (README.md only) ----
     let readme_blob = libvctrl::Blob::new(b"# My Project\n\nHello, world!".to_vec());
     let encoded_readme = encoder.encode_blob(&readme_blob)?;
-    let readme_hash = hasher.hash(&encoded_readme);
+    let readme_hash = hasher.hash(&encoded_readme)?;
     obj_store.put(&readme_hash, &encoded_readme)?;
 
     let root1 = Tree::new(vec![TreeEntry::new(
@@ -26,7 +26,7 @@ fn main() -> Result<(), VctrlError> {
         readme_hash,
     )?])?;
     let encoded_root1 = encoder.encode_tree(&root1)?;
-    let root1_hash = hasher.hash(&encoded_root1);
+    let root1_hash = hasher.hash(&encoded_root1)?;
     obj_store.put(&root1_hash, &encoded_root1)?;
 
     let c1 = {
@@ -38,7 +38,7 @@ fn main() -> Result<(), VctrlError> {
             "Initial commit".into(),
         );
         let enc = encoder.encode_commit(&commit)?;
-        let hash = hasher.hash(&enc);
+        let hash = hasher.hash(&enc)?;
         obj_store.put(&hash, &enc)?;
         hash
     };
@@ -50,7 +50,7 @@ fn main() -> Result<(), VctrlError> {
     let main_blob =
         libvctrl::Blob::new(b"fn main() { println!(\"Hello from libvctrl!\"); }".to_vec());
     let encoded_main = encoder.encode_blob(&main_blob)?;
-    let main_hash = hasher.hash(&encoded_main);
+    let main_hash = hasher.hash(&encoded_main)?;
     obj_store.put(&main_hash, &encoded_main)?;
 
     let root2 = Tree::new(vec![
@@ -58,13 +58,13 @@ fn main() -> Result<(), VctrlError> {
         TreeEntry::new("main.rs".into(), EntryKind::Blob, main_hash)?,
     ])?;
     let encoded_root2 = encoder.encode_tree(&root2)?;
-    let root2_hash = hasher.hash(&encoded_root2);
+    let root2_hash = hasher.hash(&encoded_root2)?;
     obj_store.put(&root2_hash, &encoded_root2)?;
 
     let c2 = {
         let commit = Commit::new(root2_hash, vec![c1], bob.clone(), bob, "Add main.rs".into());
         let enc = encoder.encode_commit(&commit)?;
-        let hash = hasher.hash(&enc);
+        let hash = hasher.hash(&enc)?;
         obj_store.put(&hash, &enc)?;
         hash
     };
