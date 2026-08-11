@@ -120,8 +120,10 @@ impl Blob {
     /// let blob = Blob::new(vec![1, 2, 3, 4]);
     /// assert_eq!(blob.size(), 4);
     /// ```
+    #[allow(clippy::missing_const_for_fn)]
     #[must_use]
-    pub const fn new(data: Vec<u8>) -> Self {
+    pub fn new(data: Vec<u8>) -> Self {
+        // `const` removed
         Self { data }
     }
 
