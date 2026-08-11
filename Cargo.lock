@@ -571,6 +571,9 @@ version = "4.1.0"
 [[package]]
 name = "libvctrl_plumbing"
 version = "0.1.0"
+dependencies = [
+ "libvctrl",
+]
 
 [[package]]
 name = "libvctrl_porcelain"
