@@ -39,7 +39,7 @@
 /// use libvctrl_core::hash::sha512::Sha512Hasher;
 ///
 /// let hasher = Sha512Hasher;
-/// let hash = hasher.hash(b"data");
+/// let hash = hasher.hash(b"data").unwrap();
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub mod sha512;
@@ -61,7 +61,7 @@ pub mod sha512;
 /// use libvctrl_core::hash::Sha512Hasher;
 ///
 /// let hasher = Sha512Hasher;
-/// let hash = hasher.hash(b"data");
+/// let hash = hasher.hash(b"data").unwrap();
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub use sha512::Sha512Hasher;
