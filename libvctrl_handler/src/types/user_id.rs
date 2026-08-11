@@ -78,7 +78,7 @@ impl UserID {
     pub fn new(name: String, email: String) -> Result<Self, VctrlError> {
         validate_name(&name)?;
         if email.is_empty() {
-            return Err(VctrlError::InvalidName("email is empty".into()));
+            return Err(VctrlError::InvalidEmail("email is empty".into())); // CHANGED
         }
         Ok(Self { name, email })
     }
