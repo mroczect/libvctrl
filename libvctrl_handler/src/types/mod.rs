@@ -228,3 +228,16 @@ fn validate_name(name: &str) -> Result<(), VctrlError> {
     }
     Ok(())
 }
+
+/// Validates that a tree entry name does not contain path separators or
+/// special directory names (`"."`, `".."`). This prevents accidental or
+/// malicious path traversal when the name is used as a filesystem component.
+fn validate_tree_entry_name(name: &str) -> Result<(), VctrlError> {
+    validate_name(name)?;
+    if name.contains('/') || name == "." || name == ".." {
+        return Err(VctrlError::InvalidName(format!(
+            "tree entry name contains forbidden path characters or names: '{name}'"
+        )));
+    }
+    Ok(())
+}
