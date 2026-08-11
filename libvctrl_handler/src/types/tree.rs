@@ -76,8 +76,8 @@ impl TreeEntry {
     /// #     Hash::from_bytes(&bytes).unwrap()
     /// # }
     /// let hash = make_hash();
-    /// let entry = TreeEntry::new("src/main.rs".into(), EntryKind::Blob, hash).unwrap();
-    /// assert_eq!(entry.name(), "src/main.rs");
+    /// let entry = TreeEntry::new("main.rs".into(), EntryKind::Blob, hash).unwrap();
+    /// assert_eq!(entry.name(), "main.rs");
     /// ```
     pub fn new(name: String, kind: EntryKind, hash: Hash) -> Result<Self, VctrlError> {
         super::validate_tree_entry_name(&name)?;
