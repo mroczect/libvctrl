@@ -10,6 +10,10 @@ on:
       - "libvctrl_porcelain@*"
       - "libvctrl_sha512@*"
 
+# Grant write access to repository contents so the job can create releases
+permissions:
+  contents: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
