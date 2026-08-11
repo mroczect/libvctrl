@@ -1,10 +1,5 @@
-# .github/FUNDING.yml
-# Funding configuration for the libvctrl project
-
-# GitHub Sponsors
 github: mroczect
 
-# Custom funding URLs (one-time or recurring)
 custom:
   - "https://github.com/sponsors/mroczect"
   - "https://crates.io/crates/libvctrl"
