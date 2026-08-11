@@ -2,35 +2,17 @@
 set -euo pipefail
 
 ###############################################################################
-# Release Preparation Script for a Rust Workspace
-#
-# What it does:
-#   - Runs tests and clippy for the chosen crate(s).
-#   - Creates a git tag named "crate@version" and pushes it to origin.
-#   - After the push, a GitHub Actions workflow (e.g., "Publish to crates.io")
-#     picks up the tag and performs the actual `cargo publish`.
-#
-# Usage:
-#   ./scripts/prepare_release.sh                  # process all crates
-#   ./scripts/prepare_release.sh libvctrl_handler # single crate
-#
-# Requirements:
-#   - cargo, jq, git, gh (GitHub CLI) are installed.
-#   - gh auth login has been performed (for creating releases).
-#   - The remote repository has the publishing workflow configured.
+# Release preparation script
+# Runs tests & clippy, then creates and pushes a git tag to trigger CI.
 ###############################################################################
 
 readonly LOG_FILE="release_$(date +%Y%m%d_%H%M%S).log"
 
-# Output colours
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[0;33m'
 readonly NC='\033[0m'
 
-# -----------------------------------------------------------------------------
-# Logging
-# -----------------------------------------------------------------------------
 log() {
     local level="$1"; shift
     local msg="$*"
@@ -49,9 +31,6 @@ error_exit() {
     exit 1
 }
 
-# -----------------------------------------------------------------------------
-# Prerequisites
-# -----------------------------------------------------------------------------
 check_prerequisites() {
     for cmd in cargo jq git gh; do
         if ! command -v "$cmd" &>/dev/null; then
@@ -63,9 +42,6 @@ check_prerequisites() {
     fi
 }
 
-# -----------------------------------------------------------------------------
-# Ensure clean repo
-# -----------------------------------------------------------------------------
 ensure_clean_workspace() {
     if ! git diff-index --quiet HEAD --; then
         error_exit "There are uncommitted changes. Commit or stash them first."
@@ -94,9 +70,6 @@ ensure_clean_workspace() {
     fi
 }
 
-# -----------------------------------------------------------------------------
-# Get publishable crate names and versions
-# -----------------------------------------------------------------------------
 get_publishable_crates() {
     cargo metadata --no-deps --format-version 1 2>/dev/null \
         | jq -r '
@@ -110,9 +83,6 @@ get_publishable_crates() {
           '
 }
 
-# -----------------------------------------------------------------------------
-# Process one crate
-# -----------------------------------------------------------------------------
 prepare_crate() {
     local crate_name="$1"
     local version="$2"
@@ -124,49 +94,32 @@ prepare_crate() {
     log INFO "Preparing release for: $crate_name v$version"
     cd "$manifest_dir" || error_exit "Failed to enter $manifest_dir"
 
-    # 1. Tests
     log INFO "Running tests..."
     if ! cargo test -p "$crate_name" --all-targets; then
         cd - > /dev/null
         error_exit "Tests failed for $crate_name."
     fi
 
-    # 2. Clippy
     log INFO "Running clippy..."
     if ! cargo clippy -p "$crate_name" --all-targets -- -D warnings; then
         cd - > /dev/null
         error_exit "Clippy failed for $crate_name."
     fi
 
-    # 3. Create and push tag (this will trigger the CI workflow)
     local tag="${crate_name}@${version}"
     log INFO "Creating tag $tag..."
     if git rev-parse "$tag" >/dev/null 2>&1; then
         log WARN "Tag $tag already exists, skipping."
     else
-        git tag "$tag"
+        git tag -a "$tag" -m "Release $crate_name v$version"
         git push origin "$tag"
         log INFO "Tag $tag pushed. CI will now publish to crates.io."
     fi
-
-    # 4. Optionally create a GitHub release immediately (or let CI do it)
-    #    Uncomment the following if you want the script to also create a release.
-    #    Otherwise, you can add a step to your CI workflow to create a release.
-    #
-    # log INFO "Creating GitHub release for $tag..."
-    # if gh release view "$tag" &>/dev/null; then
-    #     log WARN "Release already exists."
-    # else
-    #     gh release create "$tag" --generate-notes --title "$crate_name v$version"
-    # fi
 
     cd - > /dev/null
     log INFO "Done."
 }
 
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
 main() {
     TARGET_CRATE=""
     while [[ $# -gt 0 ]]; do
