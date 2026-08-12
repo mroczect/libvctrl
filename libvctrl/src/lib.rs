@@ -240,7 +240,7 @@ pub use handler::macros;
 /// # Examples
 ///
 /// ```
-/// use libvctrl::traits::Hasher;
+/// use libvctrl::Hasher;
 /// use libvctrl::Hash;
 /// use libvctrl::VctrlError;
 ///
