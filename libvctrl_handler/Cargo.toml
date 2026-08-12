@@ -1,6 +1,6 @@
 [package]
 name = "libvctrl_handler"
-version = "4.2.0"
+version = "4.3.0"
 edition = "2024"
 description = "Fundamental contracts for building a version control system – no implementations, only traits and types"
 license = "MIT"
