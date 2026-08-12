@@ -188,16 +188,16 @@ pub mod macros;
 /// Implementing a dummy [`Hasher`]:
 ///
 /// ```
-/// use libvctrl_handler::traits::Hasher;
+/// use libvctrl_handler::traits::core::hasher::Hasher;
 /// use libvctrl_handler::Hash;
 /// use libvctrl_handler::errors::VctrlError;
 /// use std::error::Error;
 ///
 /// struct DummyHasher;
 /// impl Hasher for DummyHasher {
-/// fn hash(&self, _data: &[u8]) -> Result<libvctrl_handler::Hash, VctrlError> {
-///     Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
-/// }
+///     fn hash(&self, _data: &[u8]) -> Result<Hash, VctrlError> {
+///         Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
+///     }
 /// }
 ///
 /// let hasher = DummyHasher;
@@ -296,7 +296,10 @@ pub use errors::VctrlError;
 ///     }
 /// }
 /// ```
-pub use traits::{Decoder, Encoder, Hasher, ObjectStore, RefStore, Signer, Transport, Verifier};
+pub use traits::core::{
+    decoder::Decoder, encoder::Encoder, hasher::Hasher, object_store::ObjectStore,
+    ref_store::RefStore, signer::Signer, transport::Transport, verifier::Verifier,
+};
 
 /// Re-exports of the core data structures.
 ///
