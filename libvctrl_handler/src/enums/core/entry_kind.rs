@@ -1,3 +1,5 @@
+//! Definition of the [`EntryKind`] enum.
+//!
 //! Logical object type enumerations for `libvctrl_handler`.
 //!
 //! # Purpose
