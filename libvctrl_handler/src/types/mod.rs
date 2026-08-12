@@ -1,223 +1,94 @@
-//! Core data structures for version control objects.
+//! # Types
 //!
-//! # Purpose
-//! This module aggregates the fundamental, pure-data types used to represent
-//! objects in a version control system. These include [`Blob`] (file contents),
-//! [`Tree`] (directory listings), [`Commit`] (history snapshots), and [`Tag`]
-//! (named references to commits).
+//! Fundamental data types and name validation utilities for the version control system.
 //!
-//! # Design rationale
-//! The types defined here are intentionally separated from the behavior traits
-//! (like [`Encoder`](crate::Encoder) or [`ObjectStore`](crate::ObjectStore)).
-//! This separation follows the "data vs. behavior" design pattern:
-//! - The structs here are plain data carriers with private fields and getter
-//!   methods, ensuring immutability after construction.
-//! - The traits in the rest of the crate define *how* these objects are
-//!   serialized, stored, and transported.
+//! This module houses all core types—blobs, trees, commits, tags, and hashes—in the `core`
+//! submodule and re-exports them for ergonomic access. It also provides shared name validation
+//! functions that enforce invariants across the system.
 //!
-//! This allows different backends (e.g., in-memory vs. disk-based) to interact
-//! with the exact same logical types without coupling the data definitions to
-//! I/O logic.
+//! ## Architecture
 //!
-//! # Internal mechanism
-//! The module also provides a private `validate_name` helper used by the
-//! constructors of name-bearing types ([`Tag`], [`TreeEntry`], [`UserID`]) to
-//! enforce length and non-emptiness constraints centrally.
+//! - `core` module: contains the structs and enums that model the object model. These types
+//!   implement parsing, serialization, and domain-specific behaviours.
+//! - Re-export: `pub use core::*` lifts every type to `crate::types`, so consumers can write
+//!   `use libvctrl_handler::types::Blob` instead of `libvctrl_handler::types::core::Blob`.
+//! - Validation helpers: `validate_name` and `validate_tree_entry_name` are `pub(crate)`,
+//!   intentionally scoped to the crate to prevent external misuse while remaining available
+//!   to all internal modules.
+//!
+//! ## Crate name assumption
+//!
+//! For documentation doctests this module assumes the library crate is named `libvctrl_handler`.
+//! Adjust import paths accordingly when integrating into a real project.
+//!
+//! # Examples
+//!
+//! Using a re-exported type:
+//!
+//! ```
+//! use libvctrl_handler::types::Blob;
+//! let blob = Blob::new(b"hello world".to_vec());
+//! ```
+
+/// Core object-model types.
+///
+/// This submodule defines the fundamental building blocks of the version control system:
+/// [`Blob`], [`Tree`], [`Commit`], [`Tag`], [`Hash`], and supporting types like [`UserID`].
+/// Each type is designed as a plain-old-data struct with immutable fields, mirroring the
+/// content-addressable storage philosophy. They are intentionally `pub` so that external
+/// consumers can construct and inspect them, while mutations remain the responsibility of
+/// higher-level managers.
+///
+/// # How it fits
+///
+/// The `core` module is the source of truth. Other subsystems (`traits`, `handlers`, …)
+/// depend on these types through re-exports from the parent `types` module, keeping
+/// dependency graphs shallow and avoiding circular imports.
+///
+/// # Examples
+///
+/// Constructing a blob through the `core` path:
+///
+/// ```
+/// use libvctrl_handler::types::core::Blob;
+/// let blob = Blob::new(b"example data".to_vec());
+/// ```
+pub mod core;
 
 use crate::constants::MAX_NAME_LENGTH;
 use crate::errors::VctrlError;
 
-/// Module containing the [`Blob`](crate::Blob) type, representing raw file content.
+/// Re-exports all types from `core` into the `types` namespace.
+///
+/// Without this re-export, consumers would need to write `use libvctrl_handler::types::core::Blob`.
+/// By lifting them to `types`, we present a cleaner public API while keeping the
+/// implementation modular.
 ///
 /// # Examples
 ///
 /// ```
-/// use libvctrl_handler::types::blob::Blob;
-///
-/// let blob = Blob::new(vec![0u8; 4]);
-/// assert_eq!(blob.size(), 4);
+/// use libvctrl_handler::types::Blob;
+/// let blob = Blob::new(b"lifted access".to_vec());
 /// ```
-pub mod blob;
+pub use core::*;
 
-/// Module containing the [`Commit`](crate::Commit) and [`CommitMeta`](crate::CommitMeta) types, representing historical snapshots.
+/// Validates a general-purpose name (branch, tag, remote, etc.) against length constraints.
 ///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::types::commit::{Commit, CommitMeta};
-///
-/// let meta = CommitMeta::default();
-/// assert_eq!(meta.timestamp, 0);
-/// ```
-pub mod commit;
-
-/// Module containing the [`Hash`](crate::Hash) type, a 64-byte cryptographic digest.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::types::hash::Hash;
-///
-/// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
-/// assert!(!hash.as_bytes().is_empty());
-/// ```
-pub mod hash;
-
-/// Module containing the [`Tag`](crate::Tag) type, representing a named reference.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::types::tag::Tag;
-/// use libvctrl_handler::Hash;
-///
-/// let target = Hash::from_bytes(&[0u8; 64]).unwrap();
-/// let tag = Tag::new("v1.0".to_string(), target, None, "Release".to_string()).unwrap();
-/// assert_eq!(tag.name(), "v1.0");
-/// ```
-pub mod tag;
-
-/// Module containing the [`Tree`](crate::Tree) and [`TreeEntry`](crate::TreeEntry) types, representing directory structures.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::types::tree::{Tree, TreeEntry};
-/// use libvctrl_handler::{EntryKind, Hash};
-///
-/// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
-/// let entry = TreeEntry::new("file.txt".to_string(), EntryKind::Blob, hash).unwrap();
-/// let tree = Tree::new(vec![entry]).unwrap();
-/// assert_eq!(tree.entries().len(), 1);
-/// ```
-pub mod tree;
-
-/// Module containing the [`UserID`](crate::UserID) type, representing identities.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::types::user_id::UserID;
-///
-/// let user = UserID::new("Alice".to_string(), "alice@example.com".to_string()).unwrap();
-/// assert_eq!(user.name(), "Alice");
-/// ```
-pub mod user_id;
-
-/// Re-export of the [`Blob`](crate::Blob) type for convenience.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::Blob;
-///
-/// let blob = Blob::new(vec![1, 2, 3]);
-/// assert_eq!(blob.size(), 3);
-/// ```
-pub use blob::Blob;
-
-/// Re-export of the [`Commit`](crate::Commit) and [`CommitMeta`](crate::CommitMeta) types for convenience.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::{Commit, CommitMeta, Hash, UserID};
-///
-/// let tree = Hash::from_bytes(&[0u8; 64]).unwrap();
-/// let author = UserID::new("Alice".to_string(), "alice@example.com".to_string()).unwrap();
-/// let committer = UserID::new("Bob".to_string(), "bob@example.com".to_string()).unwrap();
-/// let meta = CommitMeta { timestamp: 100, ..Default::default() };
-///
-/// let commit = Commit::with_meta(tree, Vec::new(), author, committer, "msg".to_string(), meta);
-/// assert_eq!(commit.timestamp(), 100);
-/// ```
-pub use commit::{Commit, CommitMeta};
-
-/// Re-export of the [`Hash`](crate::Hash) type for convenience.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::Hash;
-///
-/// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
-/// assert_eq!(hash.as_bytes().len(), 64);
-/// ```
-pub use hash::Hash;
-
-/// Re-export of the [`Tag`](crate::Tag) type for convenience.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::{Hash, Tag};
-///
-/// let target = Hash::from_bytes(&[0u8; 64]).unwrap();
-/// let tag = Tag::new("v1.0".to_string(), target, None, "Release".to_string()).unwrap();
-/// assert_eq!(tag.name(), "v1.0");
-/// ```
-pub use tag::Tag;
-
-/// Re-export of the [`Tree`](crate::Tree) and [`TreeEntry`](crate::TreeEntry) types for convenience.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::{EntryKind, Hash, Tree, TreeEntry};
-///
-/// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
-/// let entry = TreeEntry::new("file.txt".to_string(), EntryKind::Blob, hash).unwrap();
-/// let tree = Tree::new(vec![entry]).unwrap();
-/// assert_eq!(tree.entries().len(), 1);
-/// ```
-pub use tree::{Tree, TreeEntry};
-
-/// Re-export of the [`UserID`](crate::UserID) type for convenience.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::UserID;
-///
-/// let user = UserID::new("Alice".to_string(), "alice@example.com".to_string()).unwrap();
-/// assert_eq!(user.name(), "Alice");
-/// ```
-pub use user_id::UserID;
-
-/// Validates a name string according to the system's length and emptiness rules.
-///
-/// # Why this exists
-/// Names in a version control system (e.g., references, tree entries, user names)
-/// must be non-empty and bounded in length to prevent resource exhaustion and
-/// ensure compatibility with filesystem limits. This helper centralizes the
-/// validation logic so that all name-bearing types apply the same rules
-/// consistently.
+/// Names are required to be non-empty and not exceed [`MAX_NAME_LENGTH`] bytes.
+/// This function is `pub(crate)` because name validation is an internal invariant;
+/// external users should never be able to inject a name that bypasses these checks.
 ///
 /// # How it works
-/// It checks if the string slice is empty. If so, it returns an
-/// [`InvalidName`](crate::VctrlError::InvalidName) error. Then it checks if the byte
-/// length exceeds [`MAX_NAME_LENGTH`]. If it does, it returns an
-/// [`InvalidName`](crate::VctrlError::InvalidName) error containing the offending name.
 ///
-/// # Examples
+/// 1. Checks emptiness → early `InvalidName` error.
+/// 2. Checks length against the compile-time constant `MAX_NAME_LENGTH`.
 ///
-/// While this function is private, its behavior is observable through public
-/// constructors like [`UserID::new`](crate::UserID::new):
+/// # Errors
 ///
-/// ```
-/// use libvctrl_handler::{UserID, VctrlError};
-///
-/// // Empty names are rejected
-/// let err = UserID::new("".to_string(), "test@example.com".to_string()).unwrap_err();
-/// assert!(matches!(err, VctrlError::InvalidName(_)));
-///
-/// // Names exceeding the max length are rejected
-/// let long_name = "a".repeat(libvctrl_handler::MAX_NAME_LENGTH as usize + 1);
-/// let err = UserID::new(long_name, "test@example.com".to_string()).unwrap_err();
-/// assert!(matches!(err, VctrlError::InvalidName(_)));
-/// ```
+/// Returns [`VctrlError::InvalidName`] with a descriptive message when the name is empty
+/// or too long.
 #[allow(clippy::cast_possible_truncation)]
-fn validate_name(name: &str) -> Result<(), VctrlError> {
+pub(crate) fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
         return Err(VctrlError::InvalidName("name is empty".into()));
     }
@@ -229,10 +100,28 @@ fn validate_name(name: &str) -> Result<(), VctrlError> {
     Ok(())
 }
 
-/// Validates that a tree entry name does not contain path separators or
-/// special directory names (`"."`, `".."`). This prevents accidental or
-/// malicious path traversal when the name is used as a filesystem component.
-fn validate_tree_entry_name(name: &str) -> Result<(), VctrlError> {
+/// Validates a name intended for a tree entry (file or directory name inside a tree object).
+///
+/// In addition to the checks performed by [`validate_name`], this function forbids:
+/// - Slash characters (`/`), which would interfere with path parsing.
+/// - The reserved names `.` and `..`, which have special meanings in Unix-like systems.
+///
+/// # Why it exists
+///
+/// Tree entries must be simple, flat names without directory separators. Enforcing this
+/// at the validation layer prevents entire classes of path-traversal and tree-corruption
+/// bugs before they reach storage.
+///
+/// # How it works
+///
+/// 1. Calls [`validate_name`] to enforce basic constraints.
+/// 2. Checks for `/`, `.`, and `..` characters.
+///
+/// # Errors
+///
+/// Returns [`VctrlError::InvalidName`] if the name is empty, too long, or contains forbidden
+/// characters/names.
+pub(crate) fn validate_tree_entry_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
     if name.contains('/') || name == "." || name == ".." {
         return Err(VctrlError::InvalidName(format!(
