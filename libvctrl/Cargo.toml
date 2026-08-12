@@ -19,7 +19,7 @@ exclude = [
 ]
 
 [dependencies]
-libvctrl_handler = { path = "../libvctrl_handler", version = "4.3.0" }
+libvctrl_handler = { path = "../libvctrl_handler", version = "4.4.0" }
 libvctrl_core = { path = "../libvctrl_core", version = "2.0.1" }
 libvctrl_sha512 = { path = "../libvctrl_sha512", version = "2.0.0", default-features = false }
 
