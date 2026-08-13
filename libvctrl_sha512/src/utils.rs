@@ -1,20 +1,88 @@
 //! Low-level utility functions and constants shared across the crate.
 //!
-//! This module provides:
+//! # Purpose
 //!
-//! - Constants [`BLOCKBYTES`] and [`BYTES`] describing SHA-512 block and output sizes.
+//! This module provides foundational building blocks used by the
+//! cryptographic implementations in this crate. It centralizes:
+//!
+//! - Constants [`BLOCKBYTES`] and [`BYTES`] describing SHA-512 block and
+//!   output sizes.
 //! - Big-endian byte-order conversion helpers [`load_be`] and [`store_be`].
-//! - A non-short-circuiting comparison function [`verify`] that aims to reduce
-//!   timing side-channel leakage.
+//! - A non-short-circuiting comparison function [`verify`] that aims to
+//!   reduce timing side-channel leakage.
 //!
-//! All functions are `#[inline(always)]` (or close to it) to ensure zero-cost
-//! abstraction in the hot paths of hash and HMAC computations.
+//! # Design Rationale
+//!
+//! The utilities are deliberately small and highly optimized:
+//!
+//! - **Zero-cost abstraction**: All functions are marked `#[inline]` or
+//!   `#[inline(always)]` to ensure they are compiled directly into the
+//!   callers without function call overhead. In release builds, the
+//!   endianness conversions become single `mov` and `bswap` instructions on
+//!   little-endian platforms.
+//! - **`no_std` compatibility**: The module uses only `core` primitives
+//!   (`u64::from_be_bytes`, `u64::to_be_bytes`,
+//!   `core::ptr::read_volatile`), so it works in embedded and bare-metal
+//!   environments.
+//! - **Centralized constants**: Defining [`BLOCKBYTES`] and [`BYTES`] once
+//!   avoids magic numbers scattered throughout the crate. When the
+//!   underlying hash algorithm changes (e.g., future SHA-256 support), these
+//!   constants can be updated in one place.
+//!
+//! # Security Considerations
+//!
+//! The [`verify`] function is designed to resist timing side-channel
+//! attacks. Standard slice equality short-circuits on the first differing
+//! byte, which can leak information through timing. [`verify`] instead
+//! iterates over the full input and accumulates XOR differences, returning
+//! `true` only if all bytes match. On WASM targets an extra hash-based
+//! mixing step is added to further obscure timing patterns. However, it is
+//! not a fully constant-time implementation on all architectures; for
+//! high-security applications, a dedicated constant-time library is
+//! recommended.
+//!
+//! # Internal Mechanism
+//!
+//! The byte-order functions use standard library methods that are
+//! well-optimized. [`load_be`] reads 8 bytes and converts them to `u64`
+//! big-endian. [`store_be`] performs the inverse. The [`verify`] function
+//! uses a 32-bit accumulator and XORs each byte pair; an optional WASM
+//! path adds two separate hash accumulators to scramble the intermediate
+//! state.
+//!
+//! # Examples
+//!
+//! Basic use of the constants and conversion functions:
+//!
+//! ```
+//! # use libvctrl_sha512::utils::{BLOCKBYTES, BYTES, load_be, store_be};
+//! assert_eq!(BLOCKBYTES, 128);
+//! assert_eq!(BYTES, 64);
+//!
+//! let mut buf = [0u8; 8];
+//! store_be(&mut buf, 0, 0x0102030405060708);
+//! assert_eq!(load_be(&buf, 0), 0x0102030405060708);
+//! ```
 
 /// SHA-512 block size in bytes.
 ///
 /// The SHA-512 algorithm processes messages in 1024-bit (128-byte) blocks.
 /// This constant is used throughout the crate to dimension internal buffers
 /// and to verify HKDF/HMAC input constraints.
+///
+/// # Design Rationale
+///
+/// The block size is a fundamental property of SHA-512. Exposing it as a
+/// constant allows other modules (HMAC, HKDF) to refer to it without
+/// hardcoding magic numbers. If the algorithm is swapped in the future, this
+/// constant can be updated accordingly.
+///
+/// # Examples
+///
+/// ```
+/// # use libvctrl_sha512::utils::BLOCKBYTES;
+/// assert_eq!(BLOCKBYTES, 128);
+/// ```
 pub const BLOCKBYTES: usize = 128;
 
 /// SHA-512 output size in bytes.
@@ -22,6 +90,19 @@ pub const BLOCKBYTES: usize = 128;
 /// A full SHA-512 digest is 512 bits = 64 bytes. HMAC-SHA-512 and HKDF-SHA-512
 /// also produce 64-byte outputs. For SHA-384, the output is truncated to 48 bytes
 /// (`BYTES` still represents the underlying SHA-512 length).
+///
+/// # Design Rationale
+///
+/// The output size is used for buffer sizing and to validate HMAC/HKDF
+/// constraints. Keeping it as a public constant promotes clarity and
+/// prevents magic numbers.
+///
+/// # Examples
+///
+/// ```
+/// # use libvctrl_sha512::utils::BYTES;
+/// assert_eq!(BYTES, 64);
+/// ```
 pub const BYTES: usize = 64;
 
 /// Loads a 64-bit unsigned integer from a big-endian byte slice at a given offset.
