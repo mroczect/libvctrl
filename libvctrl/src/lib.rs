@@ -7,7 +7,7 @@
 //! into a single coherent namespace, allowing developers to bootstrap a fully
 //! functional VCS backend without stitching multiple crates together manually.
 //!
-//! ## Architecture
+//! # Architecture
 //!
 //! The SDK is composed of three re-exported sub-crates:
 //!
@@ -21,7 +21,7 @@
 //! 3. **Cryptography** ([`crypto`]): A pure-Rust, `no_std`-compatible SHA-512,
 //!    HMAC-SHA-512, and HKDF-SHA-512 implementation.
 //!
-//! ## Design Rationale
+//! # Design Rationale
 //!
 //! - **Facade Pattern**: By re-exporting the essential types at the root level,
 //!   users can simply `use libvctrl::*;` without worrying about deep module
@@ -32,6 +32,26 @@
 //! - **Robustness**: All underlying crates enforce `#![forbid(unsafe_code)]`
 //!   and strict Clippy lints, guaranteeing memory safety and high code quality
 //!   across the entire stack.
+//!
+//! # Features
+//!
+//! The crate exposes feature flags that forward to `libvctrl_sha512`:
+//!
+//! - **default**: `sha384` - Includes SHA-384 support in the [`crypto`] module.
+//! - **sha384**: Enables the SHA-384 hasher.
+//! - **`opt_size`**: Favours smaller code size over speed in cryptographic
+//!   primitives.
+//!
+//! # Module Overview
+//!
+//! - [`handler`] and root re-exports: contracts (types, traits, errors).
+//! - [`mod@reference`]: reference implementations (store, codec, builders).
+//! - [`crypto`]: SHA-512, HMAC, HKDF primitives.
+//!
+//! # Safety
+//!
+//! The crate is `#![forbid(unsafe_code)]`. No unsafe code is used anywhere.
+//! All types and functions are safe and memory-safe.
 //!
 //! # Examples
 //!
