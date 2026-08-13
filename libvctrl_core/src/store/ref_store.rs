@@ -1,13 +1,15 @@
 //! In-memory reference storage backend for `libvctrl_core`.
 //!
 //! # Purpose
+//!
 //! This module provides the [`MemoryRefStore`], a concrete implementation of the
 //! [`RefStore`](libvctrl_handler::RefStore) trait. It uses a standard
-//! `HashMap` to map human-readable reference names (e.g., "HEAD",
-//! "refs/heads/main") to cryptographic [`Hash`]es.
+//! [`HashMap`] to map human-readable reference names (e.g., "HEAD",
+//! "refs/heads/main") to cryptographic [`Hash`](libvctrl_handler::Hash) values.
 //!
-//! # Design rationale
-//! - **Ephemeral and Mutable**: Unlike objects, which are immutable and
+//! # Design Rationale
+//!
+//! - **Ephemeral and mutable**: Unlike objects, which are immutable and
 //!   content-addressed, references are frequently updated (e.g., when a new
 //!   commit is made). This store provides a fast, ephemeral location for these
 //!   mutations in RAM.
@@ -15,34 +17,80 @@
 //!   allows backends to optimize their storage layouts. For example, an object
 //!   store might be content-addressable and read-only, while a ref store needs
 //!   to support arbitrary name updates.
-//! - **Input Validation**: The `set_ref` method enforces name length constraints
+//! - **Input validation**: The `set_ref` method enforces name length constraints
 //!   ([`MAX_NAME_LENGTH`](libvctrl_handler::MAX_NAME_LENGTH)) to prevent
 //!   resource exhaustion and ensure compatibility with filesystem-based backends.
-//! - **Deterministic Iteration**: The `list_refs` method sorts the references
+//! - **Deterministic iteration**: The `list_refs` method sorts the references
 //!   before returning them. This ensures deterministic output, which is critical
 //!   for reproducible testing and stable diffs.
 //!
-//! # Internal mechanism
+//! # Internal Mechanism
+//!
 //! The store maps a `String` to a 64-byte [`Hash`](libvctrl_handler::Hash).
 //! Lookups, insertions, and deletions are average O(1) operations. The
 //! [`Hash`](libvctrl_handler::Hash) is `Copy`, so retrieving a reference returns
 //! a cheap stack copy rather than a heap allocation.
+//!
+//! # Complexity
+//!
+//! - `set_ref`: average O(1) insertion into a [`HashMap`].
+//! - `get_ref`: average O(1) lookup.
+//! - `delete_ref`: average O(1) removal.
+//! - `list_refs`: O(n log n) due to sorting, where n is the number of
+//!   references.
+//!
+//! # Examples
+//!
+//! Setting and retrieving a branch reference:
+//!
+//! ```
+//! use libvctrl_core::store::MemoryRefStore;
+//! use libvctrl_handler::{Hash, RefStore};
+//!
+//! let mut store = MemoryRefStore::new();
+//! let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+//!
+//! store.set_ref("refs/heads/main", &hash).unwrap();
+//! assert_eq!(store.get_ref("refs/heads/main").unwrap(), hash);
+//! ```
 
 use libvctrl_handler::{Hash, RefStore, VctrlError};
 use std::collections::HashMap;
 
-/// An in-memory implementation of the [`RefStore`](libvctrl_handler::RefStore) trait.
+/// An in-memory implementation of the
+/// [`RefStore`](libvctrl_handler::RefStore) trait.
 ///
 /// # Purpose
-/// Stores version control references in a `HashMap` residing in RAM. This
+///
+/// Stores version control references in a [`HashMap`] residing in RAM. This
 /// backend is primarily intended for testing, ephemeral operations, and
 /// in-memory state management.
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// This struct derives [`Default`] to allow easy instantiation. The internal
-/// `HashMap` is kept private to ensure that all modifications go through the
+/// [`HashMap`] is kept private to ensure that all modifications go through the
 /// `RefStore` trait implementation, preserving the integrity of the interface
 /// and ensuring name validation is always enforced.
+///
+/// # Field Privacy
+///
+/// The `refs` field is private. External code cannot directly access or
+/// mutate the internal map; all operations must go through the trait methods.
+/// This encapsulation prevents accidental bypass of name validation and
+/// preserves the invariants of the store.
+///
+/// # Memory Layout
+///
+/// The store owns a [`HashMap`] where keys are [`String`] names and values are
+/// [`Hash`] values (64-byte arrays, `Copy`). The map is allocated on the heap,
+/// and its capacity grows dynamically as references are inserted.
+///
+/// # Thread Safety
+///
+/// `MemoryRefStore` is not [`Sync`] because [`HashMap`] itself is not safe for
+/// concurrent access. If shared access is needed, wrap it in a [`Mutex`] or
+/// [`RwLock`].
 ///
 /// # Examples
 ///
@@ -66,9 +114,18 @@ pub struct MemoryRefStore {
 impl MemoryRefStore {
     /// Creates a new, empty `MemoryRefStore`.
     ///
-    /// # Design rationale
-    /// This is a standard constructor that initializes an empty `HashMap`. It
-    /// is functionally equivalent to `MemoryRefStore::default()`.
+    /// # Design Rationale
+    ///
+    /// This is a standard constructor that initializes an empty [`HashMap`].
+    /// It is functionally equivalent to `MemoryRefStore::default()`. The
+    /// constructor takes no arguments and performs no allocation until the
+    /// first reference is inserted.
+    ///
+    /// # Performance
+    ///
+    /// Creating the store is O(1) and does not allocate heap memory for the
+    /// map because [`HashMap::new`] defers allocation until the first
+    /// insertion.
     ///
     /// # Examples
     ///
@@ -93,14 +150,29 @@ impl RefStore for MemoryRefStore {
 
     /// Sets or updates a named reference to point to a specific hash.
     ///
-    /// # Design rationale
+    /// # Purpose
+    ///
+    /// Inserts or overwrites a mapping from a reference name to a target
+    /// [`Hash`]. If the name already exists, its target is updated to the new
+    /// hash. This operation supports both branch and tag updates.
+    ///
+    /// # Design Rationale
+    ///
     /// This method enforces name validation by rejecting empty names or names
     /// exceeding [`MAX_NAME_LENGTH`](libvctrl_handler::MAX_NAME_LENGTH). If a
     /// reference with the same name already exists, its target hash is
-    /// overwritten.
+    /// overwritten. The method takes `&str` for the name to allow borrowed
+    /// string slices and converts it to an owned [`String`] for storage.
+    ///
+    /// # Complexity
+    ///
+    /// Average O(1) insertion plus O(k) copy of the name, where k is the
+    /// name length.
     ///
     /// # Errors
-    /// Returns [`VctrlError::InvalidName`](libvctrl_handler::VctrlError::InvalidName)
+    ///
+    /// Returns
+    /// [`VctrlError::InvalidName`](libvctrl_handler::VctrlError::InvalidName)
     /// if the name is empty or exceeds the maximum allowed length.
     ///
     /// # Examples
@@ -127,12 +199,27 @@ impl RefStore for MemoryRefStore {
 
     /// Retrieves the hash a named reference points to.
     ///
-    /// # Design rationale
+    /// # Purpose
+    ///
+    /// Looks up a reference by name and returns the associated [`Hash`]. This
+    /// is the primary read operation for resolving branch or tag names to
+    /// object hashes.
+    ///
+    /// # Design Rationale
+    ///
     /// Returns a copied `Hash` value (which is `Copy`) rather than a reference,
-    /// allowing the caller to use it without borrowing from the store.
+    /// allowing the caller to use it without borrowing from the store. This
+    /// avoids lifetime entanglement and permits subsequent mutation of the
+    /// store while the returned hash is still in use.
+    ///
+    /// # Complexity
+    ///
+    /// Average O(1) lookup.
     ///
     /// # Errors
-    /// Returns [`VctrlError::RefNotFound`](libvctrl_handler::VctrlError::RefNotFound)
+    ///
+    /// Returns
+    /// [`VctrlError::RefNotFound`](libvctrl_handler::VctrlError::RefNotFound)
     /// if the reference does not exist.
     ///
     /// # Examples
@@ -155,13 +242,27 @@ impl RefStore for MemoryRefStore {
 
     /// Deletes a named reference.
     ///
-    /// # Design rationale
-    /// This operation is idempotent. If the reference does not exist, the method
-    /// silently succeeds without returning an error, simplifying cleanup logic.
+    /// # Purpose
+    ///
+    /// Removes a reference from the store by name. After this operation,
+    /// subsequent calls to `get_ref` with the same name return
+    /// [`VctrlError::RefNotFound`].
+    ///
+    /// # Design Rationale
+    ///
+    /// This operation is idempotent. If the reference does not exist, the
+    /// method silently succeeds without returning an error, simplifying
+    /// cleanup logic. This mirrors the behavior of many map removal
+    /// operations.
+    ///
+    /// # Complexity
+    ///
+    /// Average O(1) removal.
     ///
     /// # Errors
-    /// This implementation is infallible, but returns a `Result` to satisfy the
-    /// trait interface.
+    ///
+    /// This implementation is infallible, but returns a `Result` to satisfy
+    /// the [`RefStore`](libvctrl_handler::RefStore) trait interface.
     ///
     /// # Examples
     ///
@@ -182,19 +283,32 @@ impl RefStore for MemoryRefStore {
 
     /// Lists all reference names currently stored.
     ///
-    /// # Design rationale
-    /// Collects all keys from the internal `HashMap` into a `Vec<String>`,
-    /// sorts them alphabetically, and returns an iterator. The sorting step is
-    /// crucial for deterministic output, as `HashMap` iteration order is
-    /// non-deterministic.
+    /// # Purpose
+    ///
+    /// Returns an iterator over all reference names in the store. The names
+    /// are sorted alphabetically to ensure deterministic output, which is
+    /// important for tests and stable user-facing listings.
+    ///
+    /// # Design Rationale
+    ///
+    /// The method collects all keys from the internal [`HashMap`] into a
+    /// [`Vec<String>`], sorts them alphabetically, and returns an iterator.
+    /// The sorting step is crucial because [`HashMap`] iteration order is
+    /// non-deterministic; without sorting, the order could vary between runs.
     ///
     /// The iterator yields `Result<String, VctrlError>` to satisfy the trait
     /// definition, which allows disk-based backends to yield I/O errors
     /// mid-iteration. This in-memory implementation always yields `Ok`.
     ///
+    /// # Complexity
+    ///
+    /// O(n log n) due to sorting, plus O(n) for collecting and cloning names,
+    /// where n is the number of references.
+    ///
     /// # Errors
-    /// This implementation is infallible, but returns a `Result` to satisfy the
-    /// trait interface.
+    ///
+    /// This implementation is infallible, but returns a `Result` to satisfy
+    /// the [`RefStore`](libvctrl_handler::RefStore) trait interface.
     ///
     /// # Examples
     ///
