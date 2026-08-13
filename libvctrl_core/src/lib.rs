@@ -64,7 +64,7 @@
 //!   [`EntryKind`][libvctrl_handler::EntryKind] variants:
 //!   `Blob`, `Executable`, `Symlink`, `Tree`, `Submodule`.
 //! - **Robust binary format**: Compact, little-endian binary encoding
-//!   with versioning, bounds checks, and DoS protection.
+//!   with versioning, bounds checks, and `DoS` protection.
 //! - **Defensive validation**: [`validate_name`](crate::validate::name::validate_name)
 //!   prevents path traversal attacks;
 //!   [`validate_hash_bytes`](crate::validate::hash::validate_hash_bytes)
