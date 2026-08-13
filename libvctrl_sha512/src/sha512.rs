@@ -1,5 +1,7 @@
 //! SHA-512 and SHA-384 hash function implementations.
 //!
+//! # Purpose
+//!
 //! This module implements the SHA-512 cryptographic hash function as defined in
 //! FIPS 180-4, with optional support for SHA-384 when the `sha384` feature is
 //! enabled. The implementation is designed for `no_std` environments, requires
@@ -20,6 +22,20 @@
 //! generate highly optimized code for both speed and size (via the `opt_size`
 //! feature).
 //!
+//! # Message Schedule and Compression
+//!
+//! SHA-512 processes input in 1024-bit (128-byte) blocks. Each block is expanded
+//! into an 80-round message schedule. The compression function operates on the
+//! 512-bit state (eight 64-bit words) using bitwise majority, choice, and sigma
+//! functions. The implementation follows the standard FIPS 180-4 definition.
+//!
+//! # Features
+//!
+//! - **`opt_size`**: When enabled, the largest functions (`m` and `f`) are
+//!   marked `#[inline(never)]` to reduce code size at the cost of some speed.
+//! - **`sha384`**: When enabled, the [`crate::sha384`] module provides a
+//!   SHA-384 hasher that shares this module's core compression logic.
+//!
 //! # Security Considerations
 //!
 //! The [`Hash::zeroize`] method overwrites all internal state and uses a
@@ -29,6 +45,15 @@
 //! basic XOR accumulation (and on WASM, an additional hash-based accumulator) to
 //! reduce timing side-channel leakage, but it is not a full constant-time
 //! implementation.
+//!
+//! # Performance
+//!
+//! The implementation avoids heap allocation entirely. The `Hash` struct stores
+//! its state and buffer inline, so the total size is about 192 bytes. The
+//! compression loop is written to allow the compiler to fully unroll the 80
+//! rounds and generate efficient SIMD-like code on modern CPUs. The
+//! `opt_size` feature trades speed for smaller code when binary size is more
+//! important than throughput.
 //!
 //! # Examples
 //!
@@ -63,6 +88,7 @@ use crate::utils::{load_be, store_be, verify};
 /// # Design
 ///
 /// The message schedule expansion is split into two phases per 16-round cycle:
+///
 /// 1. Perform 16 rounds using the initial 16 words (method `g` with `s=0`).
 /// 2. Expand the schedule ([`expand`]) and perform the next 16 rounds (method `g`
 ///    with `s=1`).
@@ -94,6 +120,17 @@ pub(crate) struct State(pub(crate) [u64; 8]);
 
 impl W {
     /// Loads a 128-byte block from `input` and converts it to 16 big-endian 64-bit words.
+    ///
+    /// # Purpose
+    ///
+    /// This is the entry point for processing a message block. It reads the
+    /// raw bytes, converts each 8-byte chunk from big-endian to a `u64`, and
+    /// stores the result in the message schedule.
+    ///
+    /// # How It Works
+    ///
+    /// The function iterates over 16 chunks, each of 8 bytes, using
+    /// [`load_be`]. The input slice must be at least 128 bytes long.
     fn new(input: &[u8]) -> Self {
         let mut words = [0u64; 16];
         for (i, e) in words.iter_mut().enumerate() {
@@ -103,44 +140,83 @@ impl W {
     }
 
     /// SHA-512 choose function: `(x & y) ^ (!x & z)`.
+    ///
+    /// # Purpose
+    ///
+    /// Used in the compression round. It selects bits from `y` where `x` is
+    /// set, and from `z` where `x` is clear. This is a standard bitwise
+    /// operation in SHA-512.
     #[inline(always)]
     const fn ch(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (!x & z)
     }
 
     /// SHA-512 majority function: `(x & y) ^ (x & z) ^ (y & z)`.
+    ///
+    /// # Purpose
+    ///
+    /// Returns the bitwise majority of three input words. Used in the
+    /// compression round to combine state variables.
     #[inline(always)]
     const fn maj(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (x & z) ^ (y & z)
     }
 
     /// SHA-512 upper-case sigma 0: `ROTR28(x) ^ ROTR34(x) ^ ROTR39(x)`.
+    ///
+    /// # Purpose
+    ///
+    /// This is one of the two large sigma functions used in the compression
+    /// round. It provides diffusion by mixing bits across three different
+    /// right rotations.
     #[inline(always)]
     const fn big_sigma0(x: u64) -> u64 {
         x.rotate_right(28) ^ x.rotate_right(34) ^ x.rotate_right(39)
     }
 
     /// SHA-512 upper-case sigma 1: `ROTR14(x) ^ ROTR18(x) ^ ROTR41(x)`.
+    ///
+    /// # Purpose
+    ///
+    /// This is the second large sigma function used in the compression round.
+    /// It complements [`big_sigma0`](Self::big_sigma0) for stronger diffusion.
     #[inline(always)]
     const fn big_sigma1(x: u64) -> u64 {
         x.rotate_right(14) ^ x.rotate_right(18) ^ x.rotate_right(41)
     }
 
     /// SHA-512 lower-case sigma 0: `ROTR1(x) ^ ROTR8(x) ^ SHR7(x)`.
+    ///
+    /// # Purpose
+    ///
+    /// Used in the message schedule expansion to mix bits from previous words.
     #[inline(always)]
     const fn small_sigma0(x: u64) -> u64 {
         x.rotate_right(1) ^ x.rotate_right(8) ^ (x >> 7)
     }
 
     /// SHA-512 lower-case sigma 1: `ROTR19(x) ^ ROTR61(x) ^ SHR6(x)`.
+    ///
+    /// # Purpose
+    ///
+    /// Used in the message schedule expansion. It provides additional
+    /// diffusion when generating schedule words 16 through 79.
     #[inline(always)]
     const fn small_sigma1(x: u64) -> u64 {
         x.rotate_right(19) ^ x.rotate_right(61) ^ (x >> 6)
     }
 
-    /// Performs message schedule expansion step: `W[a] += σ1(W[b]) + W[c] + σ0(W[d])`.
+    /// Performs message schedule expansion step:
+    /// `W[a] += σ1(W[b]) + W[c] + σ0(W[d])`.
+    ///
+    /// # Purpose
+    ///
+    /// This is one step of the SHA-512 message schedule expansion. It combines
+    /// four previous words to compute a new schedule word. The method is
+    /// called repeatedly by [`expand`] to generate the full 80-word schedule.
     ///
     /// # Inline Control
+    ///
     /// When `opt_size` is enabled, this function is marked `#[inline(never)]`
     /// to reduce code bloat from the many call sites in [`expand`].
     #[cfg_attr(feature = "opt_size", inline(never))]
@@ -154,8 +230,21 @@ impl W {
             .wrapping_add(Self::small_sigma0(words[src_d]));
     }
 
-    /// Expands the initial 16-word message schedule into the full 80-word schedule
-    /// by computing the remaining 64 words in-place.
+    /// Expands the initial 16-word message schedule into the full 80-word
+    /// schedule by computing the remaining 64 words in-place.
+    ///
+    /// # Purpose
+    ///
+    /// After the first 16 words are loaded from the input block, this method
+    /// generates the next 64 words using the SHA-512 expansion recurrence.
+    /// The generated words are stored in-place in the same array.
+    ///
+    /// # How It Works
+    ///
+    /// The method calls [`m`](Self::m) 16 times with the appropriate indices
+    /// to compute the next 16 words from the previous ones. Because the
+    /// expansion is circular in the first 16 positions, the code carefully
+    /// overwrites values that are no longer needed.
     #[inline]
     fn expand(&mut self) {
         self.m(0, 14, 9, 1);
@@ -176,15 +265,21 @@ impl W {
         self.m(15, 13, 8, 0);
     }
 
-    /// Applies a single SHA-512 round transformation using the i-th message word and round constant k.
+    /// Applies a single SHA-512 round transformation using the i-th message
+    /// word and round constant `k`.
     ///
-    /// The state array is accessed with circular offsets `(16 - i + x) & 7` to
-    /// simulate the standard working variable rotation without explicitly
-    /// shifting all eight registers. This reduces register pressure and
-    /// improves instruction-level parallelism.
+    /// # Purpose
+    ///
+    /// This is the core of the SHA-512 compression function. It mixes one
+    /// message word and one round constant into the state using the standard
+    /// SHA-512 round operations. The state array is accessed with circular
+    /// offsets `(16 - i + x) & 7` to simulate the standard working variable
+    /// rotation without explicitly shifting all eight registers. This reduces
+    /// register pressure and improves instruction-level parallelism.
     ///
     /// # Inline Control
-    /// Same as [`m`]: conditionally `inline(never)` for `opt_size`.
+    ///
+    /// Same as [`m`](Self::m): conditionally `inline(never)` for `opt_size`.
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     #[allow(clippy::missing_const_for_fn)]
@@ -211,9 +306,19 @@ impl W {
 
     /// Executes 16 consecutive rounds of SHA-512 starting at round `s*16`.
     ///
-    /// The 80 round constants are stored as a single constant array and sliced
-    /// by the starting round index. This avoids per-round constant loads and
-    /// allows the compiler to fully unroll the 16 calls to [`f`].
+    /// # Purpose
+    ///
+    /// The 80 round constants are stored as a single constant array and
+    /// sliced by the starting round index. This avoids per-round constant
+    /// loads and allows the compiler to fully unroll the 16 calls to
+    /// [`f`](Self::f).
+    ///
+    /// # How It Works
+    ///
+    /// The method calls [`f`](Self::f) 16 times, once for each word in the
+    /// current message schedule segment, with the appropriate round constant
+    /// from the sliced array. The `s` parameter selects the starting segment:
+    /// 0, 1, 2, 3, or 4.
     #[allow(clippy::unreadable_literal)]
     fn g(&self, state: &mut State, s: usize) {
         const ROUND_CONSTANTS: [u64; 80] = [

@@ -1,184 +1,247 @@
 # libvctrl_core
 
+**Version:** 2.0.1  
+**Crate type:** Rust library (reference implementations)  
+**Workspace:** libvcrtl
+
+`libvctrl_core` is the **batteries-included reference implementation layer** for the abstract contracts defined in [`libvctrl_handler`](https://docs.rs/libvctrl_handler). It provides production-ready, safe implementations of hashing, binary serialization, in-memory storage, reference management, and builder utilities. By consuming `libvctrl_handler` as its first downstream crate, `libvctrl_core` validates the contracts and gives developers a complete, working VCS backend stack out of the box.
+
+The crate enforces the same strict code quality standards as `libvctrl_handler`:
+
+- `#![forbid(unsafe_code)]`
+- `#![deny(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]`
+- `#![deny(missing_docs)]`
+- `#![deny(rust_2018_idioms, unreachable_pub, unused_crate_dependencies, unused_qualifications)]`
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [System Architecture](#system-architecture)
+- [Core Features](#core-features)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+- [Usage](#usage)
+- [API Reference](#api-reference)
+  - [Codec Module](#codec-module)
+    - [BinaryEncoder](#binaryencoder)
+    - [BinaryDecoder](#binarydecoder)
+    - [Binary Format Specifications](#binary-format-specifications)
+  - [Hash Module](#hash-module)
+    - [Sha512Hasher](#sha512hasher)
+  - [Object Module](#object-module)
+    - [BlobBuilder](#blobbuilder)
+    - [CommitBuilder](#commitbuilder)
+    - [TagBuilder](#tagbuilder)
+    - [TreeBuilder](#treebuilder)
+    - [TreeEntryBuilder](#treeentrybuilder)
+  - [Store Module](#store-module)
+    - [MemoryStore](#memorystore)
+    - [MemoryRefStore](#memoryrefstore)
+  - [Validate Module](#validate-module)
+    - [validate_hash_bytes](#validate_hash_bytes)
+    - [validate_name](#validate_name)
+- [Testing](#testing)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Deployment / Distribution](#deployment--distribution)
+- [Security & Compliance](#security--compliance)
+- [Contributing](#contributing)
+- [License](#license)
+- [Changelog](#changelog)
+
+---
+
 ## Overview
 
-`libvctrl_core` is the reference implementation crate for the `libvctrl_handler` trait contracts. It provides production-ready, fully safe, and strictly linted concrete implementations of the abstract interfaces required to build a modular, content-addressable version control system.
+`libvctrl_core` is the first concrete consumer of the `libvctrl_handler` traits. It transforms the abstract contracts into a runnable foundation for version control systems by providing:
 
-This crate exists for three reasons:
+- **Binary codec** for deterministic serialization and deserialization.
+- **SHA-512 hasher** for content addressing.
+- **In-memory object and reference stores** for ephemeral storage.
+- **Builder patterns** for ergonomic object construction.
+- **Validation utilities** for names and hashes.
 
-- **Contract validation** -- If a trait in `libvctrl_handler` is too difficult or ambiguous to implement, the problem is discovered here first, before downstream consumers encounter it.
-- **Batteries included** -- Developers get a working VCS backend stack (hashing, storage, encoding, validation) immediately, without writing boilerplate implementations.
-- **Quality exemplar** -- All code forbids unsafe (`#![forbid(unsafe_code)]`), passes `clippy::pedantic` and `clippy::nursery`, is heavily tested, and extensively documented. It serves as the authoritative model for anyone writing custom backends.
+Because `libvctrl_core` implements every key trait from `libvctrl_handler`, it also serves as a quality exemplar for downstream developers who need to write custom backends. All code is safe, strictly linted, heavily documented, and thoroughly tested.
 
-## Architecture
+This crate intentionally does not perform persistent disk I/O or network operations; it focuses on core VCS logic that can be embedded in larger systems.
 
-`libvctrl_core` is one crate inside the `libvctrl` Cargo workspace. It depends on two sibling crates -- `libvctrl_handler` (the trait contracts) and `libvctrl_sha512` (a pure-Rust SHA-512 implementation) -- and implements their interfaces with concrete, production-ready types.
+---
 
-### Workspace Crate Dependency Graph
+## System Architecture
+
+### Workspace Context
+
+Within the `libvcrtl` workspace, `libvctrl_core` sits directly above `libvctrl_handler` and below higher-level crates like `libvctrl_plumbing` and `libvctrl_porcelain`.
 
 ```mermaid
 graph TD
-    subgraph Workspace["libvctrl workspace"]
-        handler["libvctrl_handler<br/>(pure trait contracts,<br/>no dependencies)"]
-        sha512["libvctrl_sha512<br/>(SHA-512 / HMAC / HKDF,<br/>standalone)"]
-        core["libvctrl_core<br/>(reference implementations)"]
-        plumbing["libvctrl_plumbing<br/>(low-level CLI,<br/>not yet implemented)"]
-        porcelain["libvctrl_porcelain<br/>(high-level CLI,<br/>not yet implemented)"]
-        cli["libvctrl<br/>(CLI entry point,<br/>not yet implemented)"]
-        docs["libvctrl_docs<br/>(documentation)"]
-    end
+    HANDLER[libvctrl_handler<br/>Contracts and Types]
+    CORE[libvctrl_core<br/>Reference Implementations]
+    PLUMBING[libvctrl_plumbing]
+    PORCELAIN[libvctrl_porcelain]
+    SHA512[libvctrl_sha512<br/>Hash Implementation]
+    LIBVCTRL[libvctrl CLI]
 
-    core -->|depends on| handler
-    core -->|depends on| sha512
-    plumbing -.->|will depend on| handler
-    porcelain -.->|will depend on| handler
-    cli -.->|will depend on| handler
-
-    style core fill:#4a7c59,stroke:#2d4a33,color:#fff
-    style handler fill:#5b7daa,stroke:#3a5278,color:#fff
-    style sha512 fill:#8a6d3b,stroke:#5c4928,color:#fff
+    HANDLER --> CORE
+    SHA512 --> CORE
+    CORE --> PLUMBING
+    CORE --> PORCELAIN
+    PLUMBING --> LIBVCTRL
+    PORCELAIN --> LIBVCTRL
 ```
+
+`libvctrl_core` depends on:
+
+- `libvctrl_handler` version 4.4.0 for all contracts and data types.
+- `libvctrl_sha512` version 2.0.0 for the raw SHA-512 hash algorithm.
 
 ### Internal Module Architecture
 
-Each module in `libvctrl_core` corresponds to a domain responsibility defined in `libvctrl_handler`. The following diagram illustrates the internal structure and the trait-to-implementation mapping:
+The crate is organized by domain responsibility:
 
 ```mermaid
 graph LR
-    subgraph Contracts["libvctrl_handler (traits)"]
-        Encoder["Encoder"]
-        Decoder["Decoder"]
-        Hasher["Hasher"]
-        ObjectStore["ObjectStore"]
-        RefStore["RefStore"]
-    end
+    ROOT[libvctrl_core]
+    CODEC[codec]
+    HASH[hash]
+    OBJECT[object]
+    STORE[store]
+    VALIDATE[validate]
 
-    subgraph Core["libvctrl_core (implementations)"]
-        BinaryEncoder["BinaryEncoder"]
-        BinaryDecoder["BinaryDecoder"]
-        Sha512Hasher["Sha512Hasher"]
-        MemoryStore["MemoryStore"]
-        MemoryRefStore["MemoryRefStore"]
-    end
+    ROOT --> CODEC
+    ROOT --> HASH
+    ROOT --> OBJECT
+    ROOT --> STORE
+    ROOT --> VALIDATE
 
-    BinaryEncoder -.->|impl| Encoder
-    BinaryDecoder -.->|impl| Decoder
-    Sha512Hasher -.->|impl| Hasher
-    MemoryStore -.->|impl| ObjectStore
-    MemoryRefStore -.->|impl| RefStore
+    CODEC --> HANDLER[libvctrl_handler]
+    HASH --> HANDLER
+    HASH --> SHA[libvctrl_sha512]
+    OBJECT --> HANDLER
+    STORE --> HANDLER
+    VALIDATE --> HANDLER
 ```
 
-### Object Lifecycle and Data Flow
+Each module isolates a single responsibility:
 
-The following sequence diagram shows the complete lifecycle of a VCS object as it is created, validated, hashed, encoded, and stored:
+- **`codec`**: `BinaryEncoder` and `BinaryDecoder` for binary serialization.
+- **`hash`**: `Sha512Hasher` bridging `libvctrl_sha512` to `Hasher`.
+- **`object`**: Builder structs for ergonomic construction.
+- **`store`**: In-memory `ObjectStore` and `RefStore` implementations.
+- **`validate`**: Validation helpers for names and hashes.
+
+### Object Lifecycle Data Flow
+
+The following sequence shows how a `Blob` is encoded, hashed, stored, and retrieved using `libvctrl_core`.
 
 ```mermaid
 sequenceDiagram
-    participant App as Application
-    participant Obj as object module
-    participant Val as validate module
-    participant Hash as Sha512Hasher
+    participant App as Downstream App
     participant Enc as BinaryEncoder
+    participant Hash as Sha512Hasher
     participant Store as MemoryStore
 
-    App->>Obj: Construct Blob / Tree / Commit / Tag
-    Obj->>Val: validate_name() / validate_hash_bytes()
-    Val-->>Obj: Ok or VctrlError
-
-    App->>Hash: hash(&binary_data)
-    Hash-->>App: Hash (64-byte SHA-512 digest)
-
     App->>Enc: encode_blob(&blob)
-    Enc-->>App: Vec&lt;u8&gt; (versioned binary payload)
-
-    App->>Store: put(hash, &mut Read)
-    Store-->>App: Ok(())
-
-    Note over App,Store: Round-trip: Store.get(hash) -> BinaryDecoder.decode_*() -> original object
+    Enc-->>App: Vec<u8>
+    App->>Hash: hash(&encoded_bytes)
+    Hash-->>App: Hash
+    App->>Store: put(&hash, &encoded_bytes)
+    App->>Store: get(&hash)
+    Store-->>App: Box<dyn Read>
 ```
+
+---
 
 ## Core Features
 
-- **Binary Codec** -- Deterministic, versioned, little-endian binary wire format with length-prefixed variable-length fields. Supports full round-trip encode/decode for all four VCS object types (`Blob`, `Tree`, `Commit`, `Tag`).
-- **Defensive Decoding** -- The `BinaryDecoder` is panic-free. Every slice access is bounds-checked. Malformed or truncated payloads return `VctrlError::CorruptedData` rather than crashing.
-- **DoS-Resistant Allocation** -- Before allocating memory for variable-length fields (blob data, commit messages, tag messages), the decoder validates the requested length against system limits (`MAX_BLOB_SIZE`, `MAX_MESSAGE_LENGTH`, `MAX_TREE_ENTRIES`).
-- **SHA-512 Content Addressing** -- `Sha512Hasher` delegates to the audited, pure-Rust `libvctrl_sha512` crate to produce 64-byte digests, providing a massive keyspace that makes accidental collisions practically impossible.
-- **In-Memory Object Store** -- `MemoryStore` implements `ObjectStore` with `Box<dyn Read>` for lightweight testing, simulation, and prototyping without any filesystem or network dependency.
-- **In-Memory Reference Store** -- `MemoryRefStore` implements `RefStore` with a `RefsIterator` for managing named references (branches, tags) in memory.
-- **Object Builders** -- The `object` module provides constructors and builder logic for `Blob`, `Commit`, `Tag`, `Tree`, and `TreeEntry` domain objects.
-- **Input Validation** -- The `validate` module enforces hash byte length (`validate_hash_bytes`) and name safety (`validate_name`), including path traversal attack prevention.
-- **Strict UTF-8 Enforcement** -- All string fields in decoded payloads are validated with `str::from_utf8`. Invalid sequences result in a corruption error.
-- **Wire Format Versioning** -- Every serialized payload begins with a version byte. Incompatible formats are rejected early by the decoder, enabling future breaking changes to the wire format without silent data corruption.
-- **Zero Unsafe** -- The entire crate compiles with `#![forbid(unsafe_code)]` and passes `clippy::pedantic` plus `clippy::nursery`.
+- **Binary serialization/deserialization**  
+  Compact, deterministic, little-endian binary format with versioning and strict bounds checks.
+
+- **SHA-512 content addressing**  
+  Produces 64-byte digests matching `HASH_LENGTH`, using an audited pure-Rust backend.
+
+- **Streaming object reads**  
+  `MemoryStore::get` returns `Box<dyn Read>`, enabling incremental consumption without large contiguous allocations.
+
+- **In-memory reference store**  
+  `MemoryRefStore` supports branch and tag management with deterministic sorted iteration.
+
+- **Ergonomic builder patterns**  
+  Fluent APIs for constructing blobs, commits, tags, trees, and tree entries.
+
+- **Defensive validation**  
+  Prevents path traversal, empty names, and invalid hash lengths.
+
+- **Full POSIX tree fidelity**  
+  Encoder and decoder support all five `EntryKind` variants: `Blob`, `Executable`, `Symlink`, `Tree`, `Submodule`.
+
+- **Thread-safe and allocation-efficient**  
+  All concrete types are `Send + Sync`; builders transfer ownership without cloning.
+
+---
 
 ## Technology Stack
 
-- **Language:** Rust (Edition 2024, minimum toolchain 1.85+)
-- **Core Dependency:** `libvctrl_handler` v4.0.0 -- trait contracts (`Encoder`, `Decoder`, `Hasher`, `ObjectStore`, `RefStore`) and domain types (`Blob`, `Tree`, `Commit`, `Tag`, `Hash`, `VctrlError`, and limits)
-- **Crypto Dependency:** `libvctrl_sha512` v2.0.0 -- pure-Rust SHA-512, HMAC, and HKDF implementation
-- **Linting:** `#![forbid(unsafe_code)]`, `clippy::pedantic`, `clippy::nursery`
-- **Testing:** `cargo test` with integration and unit tests covering all encode/decode round-trips, validation edge cases, and store operations
+- **Language:** Rust (edition 2024)
+- **Dependencies:**
+  - `libvctrl_handler` 4.4.0 — contracts and types
+  - `libvctrl_sha512` 2.0.0 — SHA-512 implementation
+- **Dev dependencies:**
+  - `proptest` 1.11.0 — property-based testing
+- **Standard library:**
+  - `std::collections::HashMap`
+  - `std::io::{Cursor, Read}`
+  - `std::str`
+- **Lints:** Clippy all, pedantic, nursery, cargo (all denied)
+
+---
 
 ## Project Structure
 
+Within the `libvctrl_core` crate:
+
 ```text
-src/
-├── codec/
-│   ├── binary_decoder.rs    # BinaryDecoder: panic-free deserialization
-│   ├── binary_encoder.rs    # BinaryEncoder: deterministic serialization
-│   └── mod.rs               # Re-exports BinaryEncoder, BinaryDecoder
-├── hash/
-│   ├── mod.rs               # Re-exports Sha512Hasher
-│   └── sha512.rs            # Sha512Hasher: SHA-512 Hasher trait impl
-├── lib.rs                   # Crate root: module declarations, re-exports, docs
-├── object/
-│   ├── blob.rs              # Blob object builder/constructor
-│   ├── commit.rs            # Commit object builder/constructor
-│   ├── mod.rs               # Re-exports object types
-│   ├── tag.rs               # Tag object builder/constructor
-│   └── tree.rs              # Tree and TreeEntry object builders
-├── store/
-│   ├── memory.rs            # MemoryStore: in-memory ObjectStore impl
-│   ├── mod.rs               # Re-exports store types
-│   └── ref_store.rs         # MemoryRefStore: in-memory RefStore impl
-└── validate/
-    ├── hash.rs              # validate_hash_bytes: 64-byte hash enforcement
-    ├── mod.rs               # Re-exports validation functions
-    └── name.rs              # validate_name: length + path traversal prevention
+libvctrl_core/
+├── Cargo.toml
+└── src/
+    ├── lib.rs
+    ├── codec/
+    │   ├── mod.rs
+    │   ├── binary_encoder.rs
+    │   └── binary_decoder.rs
+    ├── hash/
+    │   ├── mod.rs
+    │   └── sha512.rs
+    ├── object/
+    │   ├── mod.rs
+    │   ├── blob.rs
+    │   ├── commit.rs
+    │   ├── tag.rs
+    │   └── tree.rs
+    ├── store/
+    │   ├── mod.rs
+    │   ├── memory.rs
+    │   └── ref_store.rs
+    └── validate/
+        ├── mod.rs
+        ├── hash.rs
+        └── name.rs
 ```
 
-### Module Responsibility Summary
-
-| Module     | Purpose                                  | Key Types Implemented                        | Traits Satisfied          |
-| ---------- | ---------------------------------------- | -------------------------------------------- | ------------------------- |
-| `codec`    | Binary serialization and deserialization | `BinaryEncoder`, `BinaryDecoder`             | `Encoder`, `Decoder`      |
-| `hash`     | Cryptographic content addressing         | `Sha512Hasher`                               | `Hasher`                  |
-| `object`   | Domain object construction               | `Blob`, `Tree`, `TreeEntry`, `Commit`, `Tag` | N/A (builders)            |
-| `store`    | Object and reference persistence         | `MemoryStore`, `MemoryRefStore`              | `ObjectStore`, `RefStore` |
-| `validate` | Input sanitization and safety checks     | `validate_hash_bytes`, `validate_name`       | N/A (free functions)      |
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- **Rust toolchain** -- Stable Rust 1.85 or later (Edition 2024 is required).
-- **Cargo** -- Included with the Rust toolchain.
-- **Access to crates.io** -- For resolving `libvctrl_handler` and `libvctrl_sha512` dependencies.
-
-Install the toolchain if not already present:
-
-```bash
-rustup install stable
-rustup default stable
-rustup update stable
-```
-
-Verify the version:
-
-```bash
-rustc --version
-# Expect: rustc 1.85.0 (or later)
-```
+- Rust toolchain 1.96.0 or newer (edition 2024 required)
+- Cargo
+- No external services or system dependencies
 
 ### Installation
 
@@ -186,281 +249,595 @@ Add `libvctrl_core` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-libvctrl_core = "4.0"
+libvctrl_core = "2.0.1"
 ```
 
-If you are working inside the `libvctrl` workspace, the dependency is already configured via the workspace `Cargo.toml`. Clone and build:
+Or use Cargo:
 
-```bash
-git clone <repository-url> libvctrl
-cd libvctrl
-cargo build -p libvctrl_core
+```sh
+cargo add libvctrl_core
 ```
+
+This will automatically pull the required `libvctrl_handler` and `libvctrl_sha512` dependencies.
 
 ### Configuration
 
-There are no feature flags, environment variables, or runtime configuration files required by `libvctrl_core` at this time. All modules are compiled by default.
+No configuration is required. The crate is a pure library with no environment variables or runtime configuration.
 
-The relevant system limits are defined in `libvctrl_handler` and consumed by this crate:
-
-| Constant             | Purpose                                                                           |
-| -------------------- | --------------------------------------------------------------------------------- |
-| `MAX_BLOB_SIZE`      | Maximum allowed blob data length in bytes. Prevents DoS via oversized allocation. |
-| `MAX_MESSAGE_LENGTH` | Maximum allowed commit/tag message length in bytes.                               |
-| `MAX_TREE_ENTRIES`   | Maximum allowed number of entries in a single `Tree` object.                      |
-| `HASH_LENGTH`        | Expected hash digest length (64 bytes for SHA-512).                               |
+---
 
 ## Usage
 
-### Encoding and Decoding Objects
+### Quick Start: Encode, Hash, Store, Retrieve
 
-All four VCS object types follow the same encode/decode pattern. The `BinaryEncoder` serializes objects into a versioned binary payload, and the `BinaryDecoder` deserializes them back.
+```rust
+use libvctrl_handler::{Blob, Encoder, Hasher, ObjectStore};
+use libvctrl_core::codec::BinaryEncoder;
+use libvctrl_core::hash::Sha512Hasher;
+use libvctrl_core::store::MemoryStore;
+use std::io::Read;
+
+// 1. Create content
+let blob = Blob::new(b"my content".to_vec());
+
+// 2. Encode to deterministic bytes
+let encoder = BinaryEncoder;
+let bytes = encoder.encode_blob(&blob).unwrap();
+
+// 3. Hash the bytes to get a content address
+let hasher = Sha512Hasher;
+let hash = hasher.hash(&bytes).unwrap();
+
+// 4. Store the encoded bytes in memory
+let mut store = MemoryStore::new();
+store.put(&hash, &bytes).unwrap();
+
+// 5. Read back via streaming interface
+let mut reader = store.get(&hash).unwrap();
+let mut buf = Vec::new();
+reader.read_to_end(&mut buf).unwrap();
+assert_eq!(buf, bytes);
+```
+
+### Building a Commit Using Builders
+
+```rust
+use libvctrl_core::object::CommitBuilder;
+use libvctrl_handler::{Hash, UserID};
+
+let tree = Hash::from_bytes(&[0; 64]).unwrap();
+let author = UserID::new("Alice".to_owned(), "alice@example.com".to_owned()).unwrap();
+let committer = UserID::new("Bob".to_owned(), "bob@example.com".to_owned()).unwrap();
+
+let commit = CommitBuilder::new()
+    .tree(tree)
+    .author(author)
+    .committer(committer)
+    .message("Initial commit")
+    .build()
+    .unwrap();
+
+assert_eq!(commit.message(), "Initial commit");
+```
+
+---
+
+## API Reference
+
+All public items are exported from their respective modules. The recommended import paths are shown in each section.
+
+### Codec Module
+
+Module path: `libvctrl_core::codec`
+
+Contains the binary encoder and decoder.
+
+#### BinaryEncoder
+
+```rust
+pub struct BinaryEncoder;
+```
+
+Implements `libvctrl_handler::Encoder`.
+
+| Method                                                                 | Description                                              |
+| ---------------------------------------------------------------------- | -------------------------------------------------------- |
+| `encode_blob(&self, blob: &Blob) -> Result<Vec<u8>, VctrlError>`       | Encodes a `Blob` into versioned, length-prefixed binary. |
+| `encode_tree(&self, tree: &Tree) -> Result<Vec<u8>, VctrlError>`       | Encodes a `Tree` with entries, kinds, and hashes.        |
+| `encode_commit(&self, commit: &Commit) -> Result<Vec<u8>, VctrlError>` | Encodes a `Commit` with metadata and parents.            |
+| `encode_tag(&self, tag: &Tag) -> Result<Vec<u8>, VctrlError>`          | Encodes a `Tag` with optional tagger.                    |
+
+**Example:**
+
+```rust
+use libvctrl_handler::{Blob, Encoder};
+use libvctrl_core::codec::BinaryEncoder;
+
+let encoder = BinaryEncoder;
+let blob = Blob::new(b"hello".to_vec());
+let bytes = encoder.encode_blob(&blob).unwrap();
+
+assert_eq!(bytes[0], 2); // version byte
+```
+
+#### BinaryDecoder
+
+```rust
+pub struct BinaryDecoder;
+```
+
+Implements `libvctrl_handler::Decoder`.
+
+| Method                                                            | Description                               |
+| ----------------------------------------------------------------- | ----------------------------------------- |
+| `decode_blob(&self, data: &[u8]) -> Result<Blob, VctrlError>`     | Parses a binary blob.                     |
+| `decode_tree(&self, data: &[u8]) -> Result<Tree, VctrlError>`     | Parses a binary tree with sorted entries. |
+| `decode_commit(&self, data: &[u8]) -> Result<Commit, VctrlError>` | Parses a binary commit with all fields.   |
+| `decode_tag(&self, data: &[u8]) -> Result<Tag, VctrlError>`       | Parses a binary tag.                      |
+
+**Example:**
 
 ```rust
 use libvctrl_handler::{Blob, Encoder, Decoder};
 use libvctrl_core::codec::{BinaryEncoder, BinaryDecoder};
 
-// Construct a Blob
-let blob = Blob::new(b"file content here".to_vec());
-
-// Encode to binary
-let encoder = BinaryEncoder;
-let bytes = encoder.encode_blob(&blob).expect("encoding failed");
-
-// Decode back to a Blob
-let decoder = BinaryDecoder;
-let decoded = decoder.decode_blob(&bytes).expect("decoding failed");
-
-assert_eq!(decoded, blob);
+let original = Blob::new(b"data".to_vec());
+let bytes = BinaryEncoder.encode_blob(&original).unwrap();
+let decoded = BinaryDecoder.decode_blob(&bytes).unwrap();
+assert_eq!(decoded, original);
 ```
 
-### Hashing Objects
+#### Binary Format Specifications
+
+All payloads start with a version byte (`VERSION = 2`), followed by little-endian integers and length-prefixed strings.
+
+**Blob format:**
+
+| Offset | Size       | Field               |
+| ------ | ---------- | ------------------- |
+| 0      | 1          | Version             |
+| 1      | 8          | `data_len` (u64 LE) |
+| 9      | `data_len` | `data`              |
+
+**Tree format:**
+
+| Offset | Size   | Field                                                                     |
+| ------ | ------ | ------------------------------------------------------------------------- |
+| 0      | 1      | Version                                                                   |
+| 1      | 4      | `entry_count` (u32 LE)                                                    |
+| 5      | varies | Repeated entries: `name_len` (u8), `name`, `kind` (u8), `hash` (64 bytes) |
+
+**Commit format:**
+
+| Field                       | Size       |
+| --------------------------- | ---------- |
+| Version                     | 1          |
+| Tree hash                   | 64         |
+| Parent count                | 1          |
+| Parent hashes               | 64 * count |
+| Author name len + name      | 1 + len    |
+| Author email len + email    | 1 + len    |
+| Committer name len + name   | 1 + len    |
+| Committer email len + email | 1 + len    |
+| Message len                 | 4          |
+| Message                     | len        |
+| Timestamp                   | 8          |
+| Timezone offset             | 2          |
+| Encoding len                | 1          |
+| Encoding (if len > 0)       | len        |
+
+**Tag format:**
+
+Similar to commit, but starts with name and target hash, then optional tagger.
+
+The decoder enforces all system limits (`MAX_BLOB_SIZE`, `MAX_MESSAGE_LENGTH`, `MAX_TREE_ENTRIES`) and validates UTF-8 to prevent denial-of-service attacks.
+
+---
+
+### Hash Module
+
+Module path: `libvctrl_core::hash`
+
+#### Sha512Hasher
+
+```rust
+#[derive(Debug, Default, Clone)]
+pub struct Sha512Hasher;
+```
+
+Implements `libvctrl_handler::Hasher`.
+
+**Methods:**
+
+- `hash(&self, data: &[u8]) -> Result<Hash, VctrlError>`
+
+Computes a SHA-512 digest of the input using the `libvctrl_sha512` crate and wraps it in a `Hash`. The digest length is always 64 bytes, so conversion cannot fail.
+
+**Example:**
 
 ```rust
 use libvctrl_handler::Hasher;
 use libvctrl_core::hash::Sha512Hasher;
 
 let hasher = Sha512Hasher;
-let digest = hasher.hash(b"content to address");
-
-// The digest is a 64-byte Hash value
-assert_eq!(digest.as_bytes().len(), 64);
+let hash = hasher.hash(b"hello world").unwrap();
+assert_eq!(hash.as_bytes().len(), 64);
 ```
 
-### Using the In-Memory Store
+---
+
+### Object Module
+
+Module path: `libvctrl_core::object`
+
+Contains builders for ergonomic object construction.
+
+#### BlobBuilder
 
 ```rust
-use libvctrl_handler::{Hasher, ObjectStore};
-use libvctrl_core::hash::Sha512Hasher;
+#[derive(Debug, Default)]
+pub struct BlobBuilder { /* private */ }
+
+impl BlobBuilder {
+    pub const fn new() -> Self;
+    pub fn with_data(self, data: Vec<u8>) -> Self;
+    pub fn build(self) -> Blob;
+}
+```
+
+**Example:**
+
+```rust
+use libvctrl_core::object::BlobBuilder;
+
+let blob = BlobBuilder::new()
+    .with_data(b"file content".to_vec())
+    .build();
+
+assert_eq!(blob.size(), 12);
+```
+
+#### CommitBuilder
+
+```rust
+#[derive(Debug, Default)]
+pub struct CommitBuilder { /* private */ }
+
+impl CommitBuilder {
+    pub const fn new() -> Self;
+    pub const fn tree(self, tree: Hash) -> Self;
+    pub fn parent(self, parent: Hash) -> Self;
+    pub fn author(self, author: UserID) -> Self;
+    pub fn committer(self, committer: UserID) -> Self;
+    pub fn message(self, msg: impl Into<String>) -> Self;
+    pub fn meta(self, meta: CommitMeta) -> Self;
+    pub fn build(self) -> Result<Commit, VctrlError>;
+}
+```
+
+`build()` returns `VctrlError::Other` if any required field is missing.
+
+**Example:**
+
+```rust
+use libvctrl_core::object::CommitBuilder;
+use libvctrl_handler::{Hash, UserID};
+
+let tree = Hash::from_bytes(&[0; 64]).unwrap();
+let user = UserID::new("Alice".to_owned(), "a@b.com".to_owned()).unwrap();
+
+let commit = CommitBuilder::new()
+    .tree(tree)
+    .author(user.clone())
+    .committer(user)
+    .message("Initial commit")
+    .build()
+    .unwrap();
+```
+
+#### TagBuilder
+
+```rust
+#[derive(Debug, Default)]
+pub struct TagBuilder { /* private */ }
+
+impl TagBuilder {
+    pub const fn new() -> Self;
+    pub fn name(self, name: impl Into<String>) -> Self;
+    pub const fn target(self, target: Hash) -> Self;
+    pub fn tagger(self, tagger: UserID) -> Self;
+    pub fn message(self, msg: impl Into<String>) -> Self;
+    pub fn meta(self, meta: CommitMeta) -> Self;
+    pub fn build(self) -> Result<Tag, VctrlError>;
+}
+```
+
+**Example:**
+
+```rust
+use libvctrl_core::object::TagBuilder;
+use libvctrl_handler::Hash;
+
+let target = Hash::from_bytes(&[0; 64]).unwrap();
+let tag = TagBuilder::new()
+    .name("v1.0.0")
+    .target(target)
+    .build()
+    .unwrap();
+
+assert_eq!(tag.name(), "v1.0.0");
+```
+
+#### TreeBuilder
+
+```rust
+#[derive(Debug, Default)]
+pub struct TreeBuilder { /* private */ }
+
+impl TreeBuilder {
+    pub const fn new() -> Self;
+    pub fn entry(self, entry: TreeEntry) -> Self;
+    pub fn add_entry(self, name: String, kind: EntryKind, hash: Hash) -> Result<Self, VctrlError>;
+    pub fn build(self) -> Result<Tree, VctrlError>;
+}
+```
+
+`build()` delegates to `Tree::new`, enforcing sorted entry order.
+
+**Example:**
+
+```rust
+use libvctrl_core::object::TreeBuilder;
+use libvctrl_handler::{EntryKind, Hash};
+
+let hash = Hash::from_bytes(&[0; 64]).unwrap();
+let tree = TreeBuilder::new()
+    .add_entry("a.txt".to_owned(), EntryKind::Blob, hash)?
+    .add_entry("b.txt".to_owned(), EntryKind::Blob, hash)?
+    .build()
+    .unwrap();
+# Ok::<(), libvctrl_handler::VctrlError>(())
+```
+
+#### TreeEntryBuilder
+
+```rust
+#[derive(Debug)]
+pub struct TreeEntryBuilder { /* private */ }
+
+impl TreeEntryBuilder {
+    pub const fn new(name: String, kind: EntryKind, hash: Hash) -> Self;
+    pub fn build(self) -> Result<TreeEntry, VctrlError>;
+}
+```
+
+**Example:**
+
+```rust
+use libvctrl_core::object::TreeEntryBuilder;
+use libvctrl_handler::{EntryKind, Hash};
+
+let hash = Hash::from_bytes(&[0; 64]).unwrap();
+let entry = TreeEntryBuilder::new("file.txt".to_owned(), EntryKind::Blob, hash)
+    .build()
+    .unwrap();
+```
+
+---
+
+### Store Module
+
+Module path: `libvctrl_core::store`
+
+#### MemoryStore
+
+```rust
+#[derive(Debug, Default)]
+pub struct MemoryStore { /* private */ }
+
+impl MemoryStore {
+    pub fn new() -> Self;
+}
+
+impl ObjectStore for MemoryStore {
+    fn put(&mut self, hash: &Hash, data: &[u8]) -> Result<(), VctrlError>;
+    fn get(&self, hash: &Hash) -> Result<Box<dyn Read + '_>, VctrlError>;
+    fn delete(&mut self, hash: &Hash) -> Result<(), VctrlError>;
+    fn exists(&self, hash: &Hash) -> Result<bool, VctrlError>;
+}
+```
+
+Uses a `HashMap<Hash, Vec<u8>>` internally. `get` clones the stored bytes and wraps them in a `std::io::Cursor`, enabling streaming reads.
+
+**Example:**
+
+```rust
 use libvctrl_core::store::MemoryStore;
-use std::io::Cursor;
+use libvctrl_handler::{Hash, ObjectStore};
+use std::io::Read;
 
-let store = MemoryStore::new();
-let hasher = Sha512Hasher;
+let mut store = MemoryStore::new();
+let hash = Hash::from_bytes(&[0; 64]).unwrap();
+store.put(&hash, b"my data").unwrap();
 
-// Compute the content hash
-let data = b"stored content";
-let hash = hasher.hash(data);
-
-// Put the object into the store
-let mut reader = Cursor::new(data.to_vec());
-store.put(&hash, &mut reader).expect("put failed");
-
-// Retrieve the object
-let mut retrieved = store.get(&hash).expect("get failed");
+let mut reader = store.get(&hash).unwrap();
 let mut buf = Vec::new();
-retrieved.read_to_end(&mut buf).expect("read failed");
-assert_eq!(buf, data);
+reader.read_to_end(&mut buf).unwrap();
+assert_eq!(buf, b"my data");
 ```
 
-### Validating Names
+#### MemoryRefStore
 
 ```rust
-use libvctrl_core::validate::validate_name;
+#[derive(Debug, Default)]
+pub struct MemoryRefStore { /* private */ }
 
-// Valid name
-assert!(validate_name("src/main.rs").is_ok());
+impl MemoryRefStore {
+    pub fn new() -> Self;
+}
 
-// Path traversal attack is rejected
-assert!(validate_name("../../etc/passwd").is_err());
+impl RefStore for MemoryRefStore {
+    type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
+
+    fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError>;
+    fn get_ref(&self, name: &str) -> Result<Hash, VctrlError>;
+    fn delete_ref(&mut self, name: &str) -> Result<(), VctrlError>;
+    fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError>;
+}
 ```
 
-## API Reference / Core Modules
+Enforces name length limits and returns sorted reference names.
 
-### codec::BinaryEncoder
+**Example:**
 
-A stateless unit struct implementing the `Encoder` trait. Serializes VCS objects into a compact, versioned, little-endian binary format.
+```rust
+use libvctrl_core::store::MemoryRefStore;
+use libvctrl_handler::{Hash, RefStore};
 
-| Method          | Input     | Output Format                                                                |
-| --------------- | --------- | ---------------------------------------------------------------------------- |
-| `encode_blob`   | `&Blob`   | `VERSION(1B) + data_len(8B u64 LE) + data`                                   |
-| `encode_tree`   | `&Tree`   | `VERSION(1B) + entry_count(4B u32 LE) + [entries]`                           |
-| `encode_commit` | `&Commit` | `VERSION(1B) + tree_hash(64B) + parent_count(1B) + ... + message + metadata` |
-| `encode_tag`    | `&Tag`    | `VERSION(1B) + name + target_hash(64B) + tagger? + message + metadata`       |
-
-The wire format version is `2` (public constant `codec::binary_encoder::VERSION`).
-
-### codec::BinaryDecoder
-
-A stateless unit struct implementing the `Decoder` trait. Performs panic-free, bounds-checked deserialization of binary payloads produced by `BinaryEncoder`.
-
-| Method          | Input   | Error Conditions                                                                                        |
-| --------------- | ------- | ------------------------------------------------------------------------------------------------------- |
-| `decode_blob`   | `&[u8]` | Truncated data, version mismatch, blob exceeds `MAX_BLOB_SIZE`, length mismatch                         |
-| `decode_tree`   | `&[u8]` | Truncated data, version mismatch, entry count exceeds `MAX_TREE_ENTRIES`, invalid UTF-8, malformed hash |
-| `decode_commit` | `&[u8]` | Truncated data, version mismatch, message exceeds `MAX_MESSAGE_LENGTH`, invalid UTF-8                   |
-| `decode_tag`    | `&[u8]` | Truncated data, version mismatch, invalid tagger presence byte, invalid UTF-8, message exceeds limit    |
-
-### hash::Sha512Hasher
-
-A zero-sized type implementing the `Hasher` trait. Produces 64-byte SHA-512 digests by delegating to `libvctrl_sha512`.
-
-| Method | Input   | Output                  |
-| ------ | ------- | ----------------------- |
-| `hash` | `&[u8]` | `Hash` (64-byte digest) |
-
-### store::MemoryStore
-
-An in-memory implementation of `ObjectStore`. Stores objects as `Vec<u8>` keyed by `Hash`. Suitable for testing and prototyping.
-
-| Method                      | Description                                |
-| --------------------------- | ------------------------------------------ |
-| `new()`                     | Creates an empty store                     |
-| `put(&Hash, &mut dyn Read)` | Stores an object under the given hash      |
-| `get(&Hash)`                | Retrieves a `Box<dyn Read>` for the object |
-
-### store::MemoryRefStore
-
-An in-memory implementation of `RefStore`. Manages named references (branches, tags) as `Hash` values.
-
-| Method             | Description                                  |
-| ------------------ | -------------------------------------------- |
-| `new()`            | Creates an empty reference store             |
-| `resolve(&str)`    | Resolves a reference name to its `Hash`      |
-| `set(&str, &Hash)` | Sets a reference name to point to a hash     |
-| `iter()`           | Returns a `RefsIterator` over all references |
-
-### validate
-
-| Function              | Signature                           | Purpose                                                                                                   |
-| --------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `validate_hash_bytes` | `(&[u8]) -> Result<(), VctrlError>` | Ensures the slice is exactly 64 bytes (HASH_LENGTH)                                                       |
-| `validate_name`       | `(&str) -> Result<(), VctrlError>`  | Ensures the name is non-empty, within length limits, and does not contain path traversal sequences (`..`) |
-
-### Binary Wire Format Specification
-
-All payloads share a common structure: a leading version byte followed by type-specific fields. Integers are little-endian. Variable-length data is length-prefixed.
-
-**Blob**
-
-```text
-Offset  Size    Field
-0       1       VERSION (u8, always 2)
-1       8       data_len (u64 LE)
-9       N       data (N = data_len bytes)
+let mut store = MemoryRefStore::new();
+let hash = Hash::from_bytes(&[0; 64]).unwrap();
+store.set_ref("refs/heads/main", &hash).unwrap();
+assert_eq!(store.get_ref("refs/heads/main").unwrap(), hash);
 ```
 
-**Tree**
+---
 
-```text
-Offset  Size    Field
-0       1       VERSION (u8, always 2)
-1       4       entry_count (u32 LE)
-5       ...     entries (repeated entry_count times):
-                  1       name_len (u8)
-                  N       name (UTF-8, N = name_len)
-                  1       kind (0=Blob, 1=Executable, 2=Symlink, 3=Tree, 4=Submodule)
-                  64      hash
+### Validate Module
+
+Module path: `libvctrl_core::validate`
+
+#### validate_hash_bytes
+
+```rust
+pub const fn validate_hash_bytes(bytes: &[u8]) -> Result<(), VctrlError>;
 ```
 
-**Commit**
+Checks that a byte slice is exactly `HASH_LENGTH` (64) bytes long.
 
-```text
-Offset  Size    Field
-0       1       VERSION (u8, always 2)
-1       64      tree_hash
-65      1       parent_count (u8)
-66      P*64    parent_hashes
-..      1       author_name_len (u8)
-..      N       author_name (UTF-8)
-..      1       author_email_len (u8)
-..      N       author_email (UTF-8)
-..      1       committer_name_len (u8)
-..      N       committer_name (UTF-8)
-..      1       committer_email_len (u8)
-..      N       committer_email (UTF-8)
-..      4       msg_len (u32 LE)
-..      N       message (UTF-8, N = msg_len)
-..      8       timestamp (i64 LE)
-..      2       timezone_offset (i16 LE)
-..      1       encoding_len (u8)
-..      N       encoding (UTF-8, N = encoding_len; 0 means None)
+**Example:**
+
+```rust
+use libvctrl_core::validate::hash::validate_hash_bytes;
+use libvctrl_handler::HASH_LENGTH;
+
+let valid = [0u8; HASH_LENGTH];
+assert!(validate_hash_bytes(&valid).is_ok());
 ```
 
-**Tag**
+#### validate_name
 
-```text
-Offset  Size    Field
-0       1       VERSION (u8, always 2)
-1       1       name_len (u8)
-2       N       name (UTF-8, N = name_len)
-..      64      target_hash
-..      1       has_tagger (0 or 1)
-..      [if has_tagger == 1:]
-          1       tagger_name_len (u8)
-          N       tagger_name (UTF-8)
-          1       tagger_email_len (u8)
-          N       tagger_email (UTF-8)
-..      4       msg_len (u32 LE)
-..      N       message (UTF-8, N = msg_len)
-..      8       timestamp (i64 LE)
-..      2       timezone_offset (i16 LE)
-..      1       encoding_len (u8)
-..      N       encoding (UTF-8, N = encoding_len; 0 means None)
+```rust
+pub fn validate_name(name: &str) -> Result<(), VctrlError>;
 ```
+
+Validates that a name is:
+
+- Non-empty
+- Not longer than `MAX_NAME_LENGTH`
+- Does not contain `/`
+- Is not `.` or `..`
+
+**Example:**
+
+```rust
+use libvctrl_core::validate::name::validate_name;
+
+assert!(validate_name("feature_branch").is_ok());
+assert!(validate_name("../invalid").is_err());
+```
+
+---
 
 ## Testing
 
-All tests are run via the standard Cargo test harness:
+The crate includes unit tests and doctests. Run all tests with:
 
-```bash
-# Run all tests for this crate
-cargo test -p libvctrl_core
-
-# Run with output for individual tests
-cargo test -p libvctrl_core -- --nocapture
-
-# Run only encode/decode round-trip tests
-cargo test -p libvctrl_core round_trip
+```sh
+cargo test --all-features
 ```
 
-The test suite covers:
+Run only doctests:
 
-- **Encode/decode round-trips** for all four object types (`Blob`, `Tree`, `Commit`, `Tag`).
-- **Corrupted data rejection** -- truncated payloads, wrong version bytes, invalid UTF-8, malformed hashes.
-- **DoS limit enforcement** -- blobs exceeding `MAX_BLOB_SIZE`, messages exceeding `MAX_MESSAGE_LENGTH`, trees exceeding `MAX_TREE_ENTRIES`.
-- **Validation edge cases** -- empty names, overly long names, path traversal attempts, incorrect hash lengths.
-- **Store operations** -- put/get round-trips in `MemoryStore`, reference resolution in `MemoryRefStore`.
+```sh
+cargo test --doc
+```
+
+Run property-based tests (using `proptest`):
+
+```sh
+cargo test --test proptest
+```
+
+Run Clippy with strict lints:
+
+```sh
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+---
+
+## CI/CD Pipeline
+
+No CI/CD pipeline is currently configured in the repository.
+
+If one is added, it should include the following stages:
+
+```mermaid
+graph LR
+    A[Push] --> B[Format Check]
+    B --> C[Clippy Lint]
+    C --> D[Run Tests]
+    D --> E[Build Docs]
+    E --> F[Publish to crates.io]
+```
+
+---
+
+## Deployment / Distribution
+
+The crate is intended to be published to crates.io.
+
+Release process:
+
+1. Update `version` in `Cargo.toml`.
+2. Update `CHANGELOG.md`.
+3. Run `cargo publish --dry-run`.
+4. Run `cargo publish`.
+
+After publication, documentation will be available at `https://docs.rs/libvctrl_core`.
+
+---
+
+## Security & Compliance
+
+`libvctrl_core` is a foundational layer for version control systems and adheres to strict security practices:
+
+- **No unsafe code:** `#![forbid(unsafe_code)]` guarantees memory safety.
+- **DoS protection:** Binary decoder enforces `MAX_BLOB_SIZE`, `MAX_TREE_ENTRIES`, and `MAX_MESSAGE_LENGTH` before allocation.
+- **Strict UTF-8 validation:** All decoded strings are checked for valid UTF-8.
+- **Path traversal prevention:** `validate_name` rejects `/`, `.`, and `..`.
+- **Deterministic serialization:** Binary format ensures reproducible hashes.
+- **Streaming reads:** `MemoryStore::get` returns `Box<dyn Read>` to avoid loading large objects entirely into memory.
+- **Audited cryptography:** `Sha512Hasher` delegates to `libvctrl_sha512`, which is pure Rust and auditable.
+
+Downstream implementations must follow the guidelines in `SECURITY.md` at the workspace root.
+
+---
 
 ## Contributing
 
-Contributions are welcome. Please adhere to the following standards:
+Contributions are welcome. Follow the workspace `CONTRIBUTING.md`.
 
-1. **No unsafe code.** The crate forbids it at the compiler level. Do not attempt to add `unsafe` blocks.
-2. **Clippy compliance.** All contributions must pass `cargo clippy -- -D warnings` with the project's lint configuration (`clippy::pedantic`, `clippy::nursery`).
-3. **Documentation.** Every public item must have a doc comment explaining its purpose, design rationale, and error conditions. Module-level doc comments must include at least one example.
-4. **Tests.** Every new feature or bug fix must include tests that cover both the happy path and failure modes (corrupted data, limit enforcement, invalid input).
-5. **Format.** Run `cargo fmt` before committing. CI will reject unformatted code.
-6. **Wire format stability.** Changes to the binary wire format must bump the `VERSION` constant in both `binary_encoder.rs` and `binary_decoder.rs`. Never change the encoding of an existing version.
-7. **Workspace consistency.** This crate lives in the `libvctrl` workspace. Ensure that changes to `libvctrl_core` do not break the contract signatures in `libvctrl_handler`. If a contract change is needed, update `libvctrl_handler` first and version both crates together.
+For this crate, ensure:
 
-### CI Checklist
+- All public items have documentation with doctests.
+- No `unsafe` code.
+- Run `cargo fmt`.
+- Run `cargo clippy --all-targets --all-features -- -D warnings`.
+- All tests pass with `cargo test --all-features`.
 
-Before opening a pull request, verify locally:
+---
 
-```bash
-cargo fmt --check -p libvctrl_core
-cargo clippy -p libvctrl_core -- -D warnings
-cargo test -p libvctrl_core
-cargo doc -p libvctrl_core --no-deps
-```
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file in the workspace root for details.

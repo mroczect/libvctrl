@@ -2,34 +2,88 @@
 //! [`TreeEntry`](libvctrl_handler::TreeEntry) objects.
 //!
 //! # Purpose
+//!
 //! This module provides [`TreeBuilder`] and [`TreeEntryBuilder`], ergonomic
 //! utilities for assembling version control trees and their entries. They
 //! offer a fluent API to configure fields before finalizing the immutable
 //! structs.
 //!
-//! # Design rationale
-//! - **Validation Encapsulation**: The builders defer validation to the final
+//! # Design Rationale
+//!
+//! - **Validation encapsulation**: The builders defer validation to the final
 //!   `build()` step. [`TreeEntryBuilder`] checks name constraints, while
 //!   [`TreeBuilder`] ensures the resulting tree entries are correctly sorted.
-//! - **Flexible Accumulation**: [`TreeBuilder`] allows adding pre-built
-//!   [`TreeEntry`] objects via `entry()` or raw components via `add_entry()`.
-//! - **Ownership Management**: The builders take ownership of the underlying
+//! - **Flexible accumulation**: [`TreeBuilder`] allows adding pre-built
+//!   [`TreeEntry`] objects via [`entry`](TreeBuilder::entry) or raw components
+//!   via [`add_entry`](TreeBuilder::add_entry).
+//! - **Ownership management**: The builders take ownership of the underlying
 //!   data during configuration. When `build` is called, the data is moved
 //!   directly into the final structs without cloning.
+//! - **Deferred structural validation**: Tree entries must be strictly sorted
+//!   by name. The builder does not enforce sorting until `build()`, allowing
+//!   callers to add entries in any order and still receive a descriptive
+//!   error if the final order is invalid.
+//!
+//! # Internal Mechanism
+//!
+//! [`TreeBuilder`] stores a [`Vec<TreeEntry>`] and appends entries as they are
+//! added. The `build` method delegates to
+//! [`Tree::new`](libvctrl_handler::Tree::new), which iterates over adjacent
+//! entries and rejects any pair that is not strictly ascending.
+//!
+//! [`TreeEntryBuilder`] stores raw components (`name`, `kind`, `hash`) and
+//! delegates to [`TreeEntry::new`](libvctrl_handler::TreeEntry::new) during
+//! `build`, which validates the name against length and path traversal rules.
+//!
+//! # Examples
+//!
+//! Building a tree with pre-built sorted entries:
+//!
+//! ```
+//! use libvctrl_core::object::TreeBuilder;
+//! use libvctrl_handler::{EntryKind, Hash, TreeEntry};
+//!
+//! let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+//! let e1 = TreeEntry::new("a.txt".to_string(), EntryKind::Blob, hash).unwrap();
+//! let e2 = TreeEntry::new("b.txt".to_string(), EntryKind::Blob, hash).unwrap();
+//!
+//! let tree = TreeBuilder::new()
+//!     .entry(e1)
+//!     .entry(e2)
+//!     .build()
+//!     .unwrap();
+//!
+//! assert_eq!(tree.entries().len(), 2);
+//! ```
 
 use libvctrl_handler::{EntryKind, Hash, Tree, TreeEntry, VctrlError};
 
 /// A builder for creating [`Tree`](libvctrl_handler::Tree) objects.
 ///
 /// # Purpose
+///
 /// Provides a fluent interface for accumulating [`TreeEntry`] objects and
 /// finalizing them into an immutable [`Tree`].
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// Implements the standard builder pattern. It derives [`Default`] for easy
 /// instantiation. The `build` method consumes `self` and delegates to
 /// [`Tree::new`](libvctrl_handler::Tree::new), which enforces the structural
-/// invariant that tree entries must be sorted by name and contain no duplicates.
+/// invariant that tree entries must be sorted by name and contain no
+/// duplicates.
+///
+/// # Field Privacy
+///
+/// The internal `entries` vector is private. This ensures that entries are
+/// only added through the builder methods, preserving the linear construction
+/// flow and preventing accidental modification of the final sorted structure.
+///
+/// # Memory Layout
+///
+/// The builder owns a [`Vec<TreeEntry>`], which grows as entries are added.
+/// Each [`TreeEntry`] owns a [`String`] and a [`Hash`]. When `build` is
+/// called, the vector is moved into the resulting [`Tree`] without cloning.
 ///
 /// # Examples
 ///
@@ -59,8 +113,11 @@ pub struct TreeBuilder {
 impl TreeBuilder {
     /// Creates a new, empty `TreeBuilder`.
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This is a `const fn`, allowing instantiation in compile-time contexts.
+    /// It initializes the internal entry vector as empty, so no heap
+    /// allocation occurs until the first entry is added.
     ///
     /// # Examples
     ///
@@ -78,9 +135,12 @@ impl TreeBuilder {
 
     /// Adds a pre-built [`TreeEntry`] to the tree.
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This method provides a fast path for adding entries that have already
-    /// been constructed and validated. It does not perform additional validation.
+    /// been constructed and validated. It does not perform additional
+    /// validation beyond what [`TreeEntry::new`] already did. This is useful
+    /// when entries are created elsewhere and simply need to be collected.
     ///
     /// # Examples
     ///
@@ -101,13 +161,17 @@ impl TreeBuilder {
 
     /// Constructs and adds a [`TreeEntry`] from raw components.
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This is a convenience method that encapsulates [`TreeEntry::new`]. It
     /// returns a `Result` to gracefully handle name validation failures without
-    /// breaking the builder chain.
+    /// breaking the builder chain. This allows callers to build entries
+    /// directly from primitive fields.
     ///
     /// # Errors
-    /// Returns [`VctrlError`] if the name is empty or exceeds the maximum length.
+    ///
+    /// Returns [`VctrlError`] if the name is empty, exceeds the maximum
+    /// length, or contains forbidden path characters (`/`, `.`, `..`).
     ///
     /// # Examples
     ///
@@ -135,16 +199,21 @@ impl TreeBuilder {
         Ok(self)
     }
 
-    /// Consumes the builder and returns a finalized [`Tree`](libvctrl_handler::Tree).
+    /// Consumes the builder and returns a finalized
+    /// [`Tree`](libvctrl_handler::Tree).
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This method consumes `self` to enforce a linear flow. It delegates to
-    /// [`Tree::new`](libvctrl_handler::Tree::new), which enforces the structural
-    /// invariant that entries must be sorted by name.
+    /// [`Tree::new`](libvctrl_handler::Tree::new), which enforces the
+    /// structural invariant that entries must be sorted by name and contain
+    /// no duplicates.
     ///
     /// # Errors
+    ///
     /// Returns [`VctrlError::InvalidName`] if the entries are not sorted or
-    /// contain duplicates.
+    /// contain duplicates. The error message identifies the conflicting
+    /// pair.
     ///
     /// # Examples
     ///
@@ -171,13 +240,22 @@ impl TreeBuilder {
 /// A builder for creating [`TreeEntry`](libvctrl_handler::TreeEntry) objects.
 ///
 /// # Purpose
+///
 /// Provides a fluent interface for assembling a tree entry's data (name, kind,
 /// hash) before finalizing it into an immutable object.
 ///
-/// # Design rationale
+/// # Design Rationale
+///
 /// This builder stores the raw components. The `build` method delegates to
 /// [`TreeEntry::new`](libvctrl_handler::TreeEntry::new), which performs name
-/// validation.
+/// validation. This separation allows callers to prepare components
+/// incrementally and defer validation until the entry is finalized.
+///
+/// # Field Privacy
+///
+/// All fields are private. The builder owns the name, kind, and hash, and
+/// moves them into the final [`TreeEntry`] on build. No additional allocation
+/// or cloning occurs.
 ///
 /// # Examples
 ///
@@ -204,9 +282,11 @@ pub struct TreeEntryBuilder {
 impl TreeEntryBuilder {
     /// Creates a new `TreeEntryBuilder` with the specified raw components.
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This is a `const fn` that simply stores the components. Validation is
-    /// deferred to the `build` step.
+    /// deferred to the [`build`](Self::build) step, allowing callers to
+    /// construct a builder without immediately handling invalid input.
     ///
     /// # Examples
     ///
@@ -225,14 +305,18 @@ impl TreeEntryBuilder {
     /// Consumes the builder and returns a finalized
     /// [`TreeEntry`](libvctrl_handler::TreeEntry).
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This method consumes `self` and delegates to
     /// [`TreeEntry::new`](libvctrl_handler::TreeEntry::new), enforcing name
-    /// length and emptiness constraints.
+    /// length, emptiness, and path traversal constraints. It provides the
+    /// single transition point from raw components to a validated, immutable
+    /// entry.
     ///
     /// # Errors
-    /// Returns [`VctrlError::InvalidName`] if the name is empty or exceeds the
-    /// maximum length.
+    ///
+    /// Returns [`VctrlError::InvalidName`] if the name is empty, exceeds the
+    /// maximum length, or contains forbidden path characters.
     ///
     /// # Examples
     ///

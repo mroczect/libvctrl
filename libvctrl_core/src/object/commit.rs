@@ -1,39 +1,86 @@
-//! Builder pattern for constructing [`Commit`](libvctrl_handler::Commit) objects.
+//! Builder pattern for constructing [`Commit`](libvctrl_handler::Commit)
+//! objects.
 //!
 //! # Purpose
+//!
 //! This module provides the [`CommitBuilder`], an ergonomic utility for
-//! incrementally assembling version control commits. It solves the "telescoping
-//! constructor" problem that arises from the `Commit` struct having many fields,
-//! some required and some optional.
+//! incrementally assembling version control commits. It solves the
+//! "telescoping constructor" problem that arises from the `Commit` struct
+//! having many fields, some required and some optional.
 //!
-//! # Design rationale
-//! - **Required vs. Optional Separation**: The builder enforces that mandatory
-//!   fields (`tree`, `author`, `committer`, `message`) are provided before
-//!   construction. It returns a `Result` during `build()` to gracefully handle
-//!   missing data, rather than panicking.
-//! - **Method Chaining**: The builder consumes and returns `self` by value,
+//! # Design Rationale
+//!
+//! - **Required vs. optional separation**: The builder enforces that
+//!   mandatory fields (`tree`, `author`, `committer`, `message`) are
+//!   provided before construction. It returns a `Result` during `build()`
+//!   to gracefully handle missing data, rather than panicking.
+//! - **Method chaining**: The builder consumes and returns `self` by value,
 //!   enabling a fluent API. This makes commit creation highly readable.
-//! - **Metadata Grouping**: Optional metadata (`CommitMeta`) is handled
-//!   conditionally. If `meta` is provided, `Commit::with_meta` is used; otherwise,
-//!   it falls back to `Commit::new`, which applies defaults.
+//! - **Metadata grouping**: Optional metadata ([`CommitMeta`]) is handled
+//!   conditionally. If `meta` is provided, `Commit::with_meta` is used;
+//!   otherwise, it falls back to `Commit::new`, which applies defaults.
+//! - **Parent accumulation**: Parents are stored in a [`Vec`] and appended
+//!   one by one, supporting both initial commits (zero parents) and merge
+//!   commits (multiple parents).
 //!
-//! # Internal mechanism
-//! The builder holds `Option` wrappers for required fields and a `Vec` for
+//! # Internal Mechanism
+//!
+//! The builder holds `Option` wrappers for required fields and a [`Vec`] for
 //! parents. When [`build`] is called, it consumes the builder, extracts the
-//! fields, and moves them directly into the new `Commit` struct without cloning.
+//! fields, and moves them directly into the new `Commit` struct without
+//! cloning. If any required field is missing, an error is returned.
+//!
+//! # Examples
+//!
+//! Building a commit with default metadata:
+//!
+//! ```
+//! use libvctrl_core::object::CommitBuilder;
+//! use libvctrl_handler::{Hash, UserID};
+//!
+//! let tree = Hash::from_bytes(&[0u8; 64]).unwrap();
+//! let author = UserID::new("Alice".to_string(), "alice@example.com".to_string()).unwrap();
+//! let committer = UserID::new("Bob".to_string(), "bob@example.com".to_string()).unwrap();
+//!
+//! let commit = CommitBuilder::new()
+//!     .tree(tree)
+//!     .author(author)
+//!     .committer(committer)
+//!     .message("Initial commit")
+//!     .build()
+//!     .unwrap();
+//!
+//! assert_eq!(commit.message(), "Initial commit");
+//! assert_eq!(commit.parents().len(), 0);
+//! ```
 
 use libvctrl_handler::{Commit, CommitMeta, Hash, UserID, VctrlError};
 
 /// A builder for creating [`Commit`](libvctrl_handler::Commit) objects.
 ///
 /// # Purpose
-/// Provides a fluent interface for assembling a commit's data before finalizing
-/// it into an immutable object.
 ///
-/// # Design rationale
+/// Provides a fluent interface for assembling a commit's data before
+/// finalizing it into an immutable object.
+///
+/// # Design Rationale
+///
 /// This struct derives [`Default`] so it can be easily instantiated, and
 /// [`Debug`] for logging purposes. The `build` method consumes `self`,
 /// preventing the reuse of the builder after the data has been moved.
+///
+/// # Field Privacy
+///
+/// All fields are private to ensure that state is only modified through the
+/// builder methods. This preserves the linear construction flow and prevents
+/// external code from accidentally bypassing validation.
+///
+/// # Memory Layout
+///
+/// The builder owns several heap-allocated values via `Option` and `Vec`
+/// wrappers. These values are moved into the final [`Commit`] on build,
+/// avoiding unnecessary copies. The `Hash` fields are `Copy` and cheap to
+/// move.
 ///
 /// # Examples
 ///
@@ -69,10 +116,11 @@ pub struct CommitBuilder {
 impl CommitBuilder {
     /// Creates a new, empty `CommitBuilder`.
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This is a `const fn`, allowing the builder to be instantiated in
     /// compile-time contexts if needed. All fields are initialized to `None`
-    /// or empty.
+    /// or empty. No heap allocation occurs until fields are set.
     ///
     /// # Examples
     ///
@@ -95,9 +143,12 @@ impl CommitBuilder {
 
     /// Sets the root tree hash for the commit.
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This is a required field. If `build` is called without setting this,
-    /// it will fail. The method is `const fn` to maximize flexibility.
+    /// it will fail. The method is `const fn` to maximize flexibility. It
+    /// takes ownership of the provided [`Hash`] and stores it in the
+    /// builder.
     ///
     /// # Examples
     ///
@@ -116,9 +167,11 @@ impl CommitBuilder {
 
     /// Adds a parent commit hash.
     ///
-    /// # Design rationale
-    /// Commits can have zero or more parents (merge commits have multiple).
-    /// This method appends to a vector, allowing it to be called multiple times.
+    /// # Design Rationale
+    ///
+    /// Commits can have zero or more parents. This method appends to a
+    /// vector, allowing it to be called multiple times. This supports both
+    /// initial commits (no parents) and merge commits (multiple parents).
     ///
     /// # Examples
     ///
@@ -141,8 +194,11 @@ impl CommitBuilder {
 
     /// Sets the author of the commit.
     ///
-    /// # Design rationale
-    /// This is a required field.
+    /// # Design Rationale
+    ///
+    /// This is a required field. The method takes ownership of the provided
+    /// [`UserID`] and stores it. The author represents the person who wrote
+    /// the changes.
     ///
     /// # Examples
     ///
@@ -161,9 +217,12 @@ impl CommitBuilder {
 
     /// Sets the committer of the commit.
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This is a required field. In many cases, the committer is the same as
-    /// the author, but the API enforces setting it explicitly.
+    /// the author, but the API enforces setting it explicitly to avoid
+    /// ambiguity. The committer represents the person who applied the
+    /// changes to the repository.
     ///
     /// # Examples
     ///
@@ -182,9 +241,11 @@ impl CommitBuilder {
 
     /// Sets the commit message.
     ///
-    /// # Design rationale
+    /// # Design Rationale
+    ///
     /// This is a required field. It takes `impl Into<String>` for ergonomics,
-    /// allowing string literals (`&str`) or owned `String`s to be passed easily.
+    /// allowing string literals (`&str`) or owned [`String`]s to be passed
+    /// easily. The message describes the changes in the commit.
     ///
     /// # Examples
     ///
@@ -201,8 +262,12 @@ impl CommitBuilder {
 
     /// Sets optional metadata (timestamp, timezone, encoding).
     ///
-    /// # Design rationale
-    /// If this method is not called, `build` will use default metadata (timestamp 0).
+    /// # Design Rationale
+    ///
+    /// If this method is not called, `build` will use default metadata
+    /// (timestamp 0, offset 0, no encoding). Providing metadata is useful
+    /// when recreating commits from an environment where timestamp and
+    /// timezone information is known.
     ///
     /// # Examples
     ///
@@ -219,20 +284,29 @@ impl CommitBuilder {
         self
     }
 
-    /// Consumes the builder and returns a finalized [`Commit`](libvctrl_handler::Commit).
+    /// Consumes the builder and returns a finalized
+    /// [`Commit`](libvctrl_handler::Commit).
     ///
-    /// # Design rationale
-    /// This method consumes `self` to enforce a linear flow. It validates that
-    /// all required fields are present, returning a `Result` to gracefully
-    /// handle missing data.
+    /// # Design Rationale
+    ///
+    /// This method consumes `self` to enforce a linear flow. It validates
+    /// that all required fields are present, returning a `Result` to
+    /// gracefully handle missing data instead of panicking. This is the
+    /// single point where the builder transitions into an immutable,
+    /// validated [`Commit`].
     ///
     /// # Errors
-    /// Returns [`VctrlError::Other`](libvctrl_handler::VctrlError::Other) if
-    /// `tree`, `author`, `committer`, or `message` have not been set.
     ///
-    /// # Internal mechanism
-    /// If `meta` was provided, it delegates to `Commit::with_meta`. Otherwise,
-    /// it uses `Commit::new`.
+    /// Returns [`VctrlError::Other`](libvctrl_handler::VctrlError::Other) if
+    /// `tree`, `author`, `committer`, or `message` have not been set. Each
+    /// missing field produces a descriptive error message.
+    ///
+    /// # Internal Mechanism
+    ///
+    /// If `meta` was provided, it delegates to `Commit::with_meta`.
+    /// Otherwise, it uses `Commit::new`, which applies default metadata
+    /// (zeroed timestamps and no encoding). The parent vector is moved into
+    /// the resulting commit.
     ///
     /// # Examples
     ///

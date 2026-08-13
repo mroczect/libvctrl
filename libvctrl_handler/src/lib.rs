@@ -4,7 +4,7 @@
 //!
 //! `libvctrl_handler` provides the core, pure-data types and behavior traits
 //! required to construct a version control system (VCS). It intentionally
-//! contains *no implementations*—only the abstract definitions of objects
+//! contains no implementations, only the abstract definitions of objects
 //! (blobs, trees, commits, tags) and the interfaces for storing, hashing,
 //! encoding, and transporting them.
 //!
@@ -12,38 +12,37 @@
 //!
 //! The crate enforces a strict separation between data and behavior:
 //!
-//! - **Data** is represented by immutable structs in [`types`].
-//! - **Behavior** is defined by traits in [`traits`].
+//! - Data is represented by immutable structs in [`types`].
+//! - Behavior is defined by traits in [`traits`].
 //!
 //! This decoupling allows downstream applications to mix and match backends
-//! (e.g., an in-memory store with a binary encoder and Ed25519 signing) without
-//! altering the core domain logic.
+//! (for example, an in-memory store with a binary encoder and Ed25519
+//! signing) without altering the core domain logic.
 //!
 //! ## Lint policy
 //!
 //! The crate uses a strict set of compiler and Clippy lints to ensure high
-//! code quality. However, `clippy::nursery` is configured as a **warning**
-//! rather than a **deny**, because nursery lints are unstable and can introduce
-//! new warnings with Rust toolchain updates. By using `#![warn(clippy::nursery)]`
-//! we keep the lints visible in CI output without breaking the build for
-//! contributors who use a slightly different compiler version. Individual
-//! nursery lints that are considered critical (e.g., `missing_const_for_fn`)
-//! can still be explicitly denied.
+//! code quality. `clippy::nursery` is configured as a warning rather than a
+//! deny because nursery lints are unstable and can introduce new warnings
+//! with Rust toolchain updates. Critical nursery lints can still be denied
+//! individually if needed.
 //!
 //! # Internal Mechanism
 //!
 //! The crate exports all public types, traits, and constants at the root level
-//! for convenience. Consumers can simply `use libvctrl_handler::*;` to access
-//! the entire contract surface. The re-exports are organized to mirror the
-//! internal module structure:
+//! for convenience. Consumers can use `libvctrl_handler::*;` to access the
+//! entire contract surface. The re-exports mirror the internal module
+//! structure:
 //!
 //! - Constants from [`constants`] are re-exported directly.
 //! - Enums from [`enums`] are re-exported as [`EntryKind`].
 //! - Error types from [`errors`] are re-exported as [`VctrlError`].
-//! - Traits from [`traits`] (e.g., [`Hasher`], [`ObjectStore`]) are re-exported.
-//! - Data types from [`types`] (e.g., [`Blob`], [`Commit`], [`Hash`]) are re-exported.
+//! - Traits from [`traits`] are re-exported (for example [`Hasher`] and
+//!   [`ObjectStore`]).
+//! - Data types from [`types`] are re-exported (for example [`Blob`] and
+//!   [`Hash`]).
 //!
-//! This flat namespace is ideal for a contract crate, as it eliminates
+//! This flat namespace is ideal for a contract crate because it eliminates
 //! excessive qualification in downstream code while still allowing selective
 //! imports.
 //!
@@ -72,7 +71,7 @@
     unused_qualifications
 )]
 // Nursery lints are unstable; we only warn so that toolchain updates do not
-// suddenly break the build. See module-level documentation for rationale.
+// suddenly break the build. See crate-level documentation for rationale.
 #![warn(clippy::nursery)]
 
 /// System-wide constants and structural limits used across the version control
@@ -80,16 +79,16 @@
 ///
 /// # Purpose
 ///
-/// This module centralises all numeric constants (e.g., [`HASH_LENGTH`],
-/// [`MAX_NAME_LENGTH`]) so that they can be used consistently by every other
-/// module and by downstream crates. Changing a constant here automatically
-/// propagates to all dependent code.
+/// This module centralizes all numeric constants (for example [`HASH_LENGTH`]
+/// and [`MAX_NAME_LENGTH`]) so that they can be used consistently by every
+/// other module and by downstream crates. Changing a constant here
+/// automatically propagates to all dependent code.
 ///
 /// # Why a separate module
 ///
 /// Grouping constants in one module avoids circular dependencies and keeps
 /// the root namespace clean. It also makes it easy to document each constant
-/// with its own doc comment and doctest.
+/// with its own doctest.
 ///
 /// # Examples
 ///
@@ -126,15 +125,16 @@ pub mod enums;
 ///
 /// # Purpose
 ///
-/// The [`errors`] module exports the [`VctrlError`] enum, which is the single
-/// error type used by every trait method in this crate. This unification
-/// simplifies error propagation and pattern matching for consumers.
+/// The [`errors`] module exports the [`crate::VctrlError`] enum, which is the
+/// single error type used by every trait method in this crate. This
+/// unification simplifies error propagation and pattern matching for
+/// consumers.
 ///
 /// # Examples
 ///
 /// ```
 /// use libvctrl_handler::errors::VctrlError;
-/// use std::error::Error;
+///
 /// let err = VctrlError::Other("fail".to_string());
 /// assert_eq!(err.to_string(), "fail");
 /// ```
@@ -144,17 +144,16 @@ pub mod errors;
 ///
 /// # Purpose
 ///
-/// The [`vctrl_error_other!`] macro provides a concise way to create
-/// [`VctrlError::Other`] variants with formatted messages, mimicking the
-/// `format!` syntax.
+/// The `vctrl_error_other!` macro provides a concise way to create
+/// [`crate::VctrlError::Other`] variants with formatted messages, mimicking
+/// the `format!` syntax.
 ///
 /// # Examples
 ///
 /// ```
-/// use libvctrl_handler::VctrlError;
 /// use libvctrl_handler::vctrl_error_other;
 ///
-/// let err: VctrlError = vctrl_error_other!("code {}", 500);
+/// let err = vctrl_error_other!("code {}", 500);
 /// assert_eq!(err.to_string(), "code 500");
 /// ```
 pub mod macros;
@@ -171,29 +170,27 @@ pub mod macros;
 ///
 /// # Design Rationale
 ///
-/// Every trait follows the **single responsibility principle**:
+/// Every trait follows the single responsibility principle:
 ///
-/// - [`ObjectStore`] handles object retrieval and storage.
-/// - [`RefStore`] manages named references (branches, tags).
-/// - [`Hasher`] computes cryptographic hashes.
-/// - [`Encoder`] / [`Decoder`] serialise and deserialise objects.
-/// - [`Signer`] / [`Verifier`] handle digital signatures.
-/// - [`Transport`] abstracts the network layer.
+/// - [`crate::ObjectStore`] handles object retrieval and storage.
+/// - [`crate::RefStore`] manages named references (branches, tags).
+/// - [`crate::Hasher`] computes cryptographic hashes.
+/// - [`crate::Encoder`] and [`crate::Decoder`] serialize and deserialize objects.
+/// - [`crate::Signer`] and [`crate::Verifier`] handle digital signatures.
+/// - [`crate::Transport`] abstracts the network layer.
 ///
 /// This separation allows a user to swap, for example, the hash algorithm
 /// without touching any other component.
 ///
 /// # Examples
 ///
-/// Implementing a dummy [`Hasher`]:
+/// Implementing a dummy [`crate::Hasher`]:
 ///
 /// ```
-/// use libvctrl_handler::traits::core::hasher::Hasher;
-/// use libvctrl_handler::Hash;
-/// use libvctrl_handler::errors::VctrlError;
-/// use std::error::Error;
+/// use libvctrl_handler::{Hash, Hasher, VctrlError};
 ///
 /// struct DummyHasher;
+///
 /// impl Hasher for DummyHasher {
 ///     fn hash(&self, _data: &[u8]) -> Result<Hash, VctrlError> {
 ///         Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
@@ -201,8 +198,8 @@ pub mod macros;
 /// }
 ///
 /// let hasher = DummyHasher;
-/// let h = hasher.hash(b"hello").unwrap();
-/// assert_eq!(h.as_bytes().len(), 64);
+/// let hash = hasher.hash(b"hello").unwrap();
+/// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub mod traits;
 
@@ -210,15 +207,17 @@ pub mod traits;
 ///
 /// # Purpose
 ///
-/// The [`types`] module contains all the domain models: [`Blob`], [`Tree`],
-/// [`Commit`], [`Tag`], and supporting types like [`Hash`] and [`UserID`].
-/// These structs are intentionally immutable after construction to simplify
-/// reasoning about state and to guarantee thread safety.
+/// The [`types`] module contains all the domain models: [`crate::Blob`],
+/// [`crate::Tree`], [`crate::Commit`], [`crate::Tag`], and supporting types
+/// like [`crate::Hash`] and [`crate::UserID`]. These structs are intentionally
+/// immutable after construction to simplify reasoning about state and to
+/// guarantee thread safety.
 ///
 /// # Examples
 ///
 /// ```
 /// use libvctrl_handler::types::Blob;
+///
 /// let blob = Blob::new(vec![1, 2, 3]);
 /// assert_eq!(blob.size(), 3);
 /// ```
@@ -268,6 +267,7 @@ pub use enums::EntryKind;
 ///
 /// ```
 /// use libvctrl_handler::VctrlError;
+///
 /// let err = VctrlError::Other("test".to_string());
 /// assert!(err.to_string().contains("test"));
 /// ```
@@ -277,24 +277,29 @@ pub use errors::VctrlError;
 ///
 /// This includes:
 ///
-/// - [`ObjectStore`]
-/// - [`RefStore`]
-/// - [`Hasher`]
-/// - [`Encoder`] / [`Decoder`]
-/// - [`Signer`] / [`Verifier`]
-/// - [`Transport`]
+/// - [`crate::ObjectStore`]
+/// - [`crate::RefStore`]
+/// - [`crate::Hasher`]
+/// - [`crate::Encoder`] and [`crate::Decoder`]
+/// - [`crate::Signer`] and [`crate::Verifier`]
+/// - [`crate::Transport`]
 ///
 /// # Examples
 ///
 /// ```
-/// use libvctrl_handler::{Hasher, Hash, VctrlError};
+/// use libvctrl_handler::{Hash, Hasher, VctrlError};
 ///
 /// struct MyHasher;
+///
 /// impl Hasher for MyHasher {
-///     fn hash(&self, _data: &[u8]) -> Result<libvctrl_handler::Hash, VctrlError> {
+///     fn hash(&self, _data: &[u8]) -> Result<Hash, VctrlError> {
 ///         Ok(Hash::from_bytes(&[0u8; 64]).unwrap())
 ///     }
 /// }
+///
+/// let hasher = MyHasher;
+/// let hash = hasher.hash(b"data").unwrap();
+/// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub use traits::core::{
     decoder::Decoder, encoder::Encoder, hasher::Hasher, object_store::ObjectStore,
@@ -303,14 +308,16 @@ pub use traits::core::{
 
 /// Re-exports of the core data structures.
 ///
-/// All version-control objects ([`Blob`], [`Tree`], [`Commit`], [`Tag`]) and
-/// their supporting types ([`Hash`], [`UserID`], [`CommitMeta`],
-/// [`TreeEntry`]) are available directly from the crate root.
+/// All version-control objects ([`crate::Blob`], [`crate::Tree`],
+/// [`crate::Commit`], [`crate::Tag`]) and their supporting types
+/// ([`crate::Hash`], [`crate::UserID`], [`crate::CommitMeta`],
+/// [`crate::TreeEntry`]) are available directly from the crate root.
 ///
 /// # Examples
 ///
 /// ```
 /// use libvctrl_handler::Blob;
+///
 /// let blob = Blob::new(vec![1, 2, 3]);
 /// assert_eq!(blob.size(), 3);
 /// ```

@@ -1,6 +1,6 @@
 [package]
 name = "libvctrl_core"
-version = "2.0.1"
+version = "2.0.2"
 edition = "2024"
 description = "Reference implementations of the libvctrl contracts (in-memory store, SHA-512 hasher, binary codec)"
 license = "MIT"
@@ -11,8 +11,8 @@ keywords = ["version-control", "vcs", "core"]
 categories = ["development-tools"]
 
 [dependencies]
-libvctrl_handler = {path = "../libvctrl_handler", version = "4.4.0" }
-libvctrl_sha512 = { path = "../libvctrl_sha512", version = "2.0.0" }
+libvctrl_handler = {path = "../libvctrl_handler", version = "4.4.1" }
+libvctrl_sha512 = { path = "../libvctrl_sha512", version = "2.0.1" }
 
 [dev-dependencies]
 proptest = "1.11.0"

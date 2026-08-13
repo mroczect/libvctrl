@@ -13,7 +13,7 @@ keywords = ["version-control", "vcs", "plumbing"]
 categories = ["development-tools"]
 
 [dependencies]
-libvctrl = { path = "../libvctrl", version = "2.1.1" }
+libvctrl = { path = "../libvctrl", version = "2.1.2" }
 
 [dev-dependencies]
 

@@ -1,27 +1,77 @@
 //! Binary serialization format encoder for `libvctrl_core`.
 //!
 //! # Purpose
+//!
 //! This module provides the [`BinaryEncoder`], a concrete implementation of the
 //! [`Encoder`](libvctrl_handler::Encoder) trait. It serializes version control
 //! objects ([`Blob`](libvctrl_handler::Blob), [`Tree`](libvctrl_handler::Tree),
 //! [`Commit`](libvctrl_handler::Commit), [`Tag`](libvctrl_handler::Tag)) into a
-//! compact, little-endian binary format suitable for storage or network transmission.
+//! compact, little-endian binary format suitable for storage or network
+//! transmission.
 //!
-//! # Design rationale
-//! - **Little-Endian Integers**: All integer fields (lengths, timestamps) are
-//!   encoded in little-endian format. This is consistent with modern CPU
-//!   architectures (x86, ARM) and avoids byte-swapping overhead.
-//! - **Length-Prefixed Strings**: Variable-length data (names, messages) are
-//!   prefixed by their length. This allows the corresponding
+//! # Design Rationale
+//!
+//! - **Little-endian integers**: All integer fields (lengths, timestamps,
+//!   timezone offsets) are encoded in little-endian byte order. This matches
+//!   the native byte order of most modern CPU architectures (x86, x86_64,
+//!   ARM little-endian), minimizing byte-swapping overhead during encoding
+//!   and decoding.
+//! - **Length-prefixed strings**: Variable-length data (names, email
+//!   addresses, messages, blob data) are prefixed by their length. This
+//!   allows the corresponding
 //!   [`BinaryDecoder`](crate::codec::BinaryDecoder) to pre-allocate buffers
-//!   efficiently and avoid reading until EOF.
+//!   efficiently and to avoid reading until EOF. Length prefixes also
+//!   provide structural validation points.
 //! - **Versioning**: Every serialized payload begins with a version byte
-//!   ([`VERSION`]). This ensures forward/backward compatibility; if the format
-//!   changes, the version can be bumped, and decoders can reject unsupported
-//!   versions cleanly.
-//! - **Zero-Copy Where Possible**: The encoder uses `extend_from_slice` to
+//!   ([`VERSION`]). This ensures forward and backward compatibility; if the
+//!   format changes, the version can be bumped, and decoders can reject
+//!   unsupported versions cleanly.
+//! - **Zero-copy where possible**: The encoder uses `extend_from_slice` to
 //!   copy data directly into the output `Vec<u8>`, leveraging LLVM's
-//!   `memcpy` intrinsics for fast bulk copies.
+//!   `memcpy` intrinsics for fast bulk copies. It also pre-allocates the
+//!   output buffer based on the estimated object size to minimize heap
+//!   reallocations.
+//!
+//! # Binary Format Overview
+//!
+//! The exact layout for each object type is documented on the corresponding
+//! `encode_*` method. In general:
+//!
+//! 1. The first byte is always the version number.
+//! 2. Fixed-width integer fields follow in little-endian order.
+//! 3. Variable-length fields are prefixed with a length indicator (u8 or
+//!    u32 depending on the maximum possible size).
+//!
+//! # Determinism
+//!
+//! The encoder is fully deterministic. Encoding the same object always
+//! produces the same byte sequence. This is critical for content addressing,
+//! where identical objects must yield identical hashes.
+//!
+//! # Error Handling
+//!
+//! All `encode_*` methods return
+//! [`Result<Vec<u8>, VctrlError>`](libvctrl_handler::VctrlError). Encoding
+//! may fail if a field length exceeds the width of its length prefix (e.g.,
+//! a name longer than 255 bytes cannot be represented by a single-byte
+//! length). In such cases, the encoder returns
+//! [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError).
+//!
+//! # Examples
+//!
+//! Encoding a simple `Blob`:
+//!
+//! ```
+//! use libvctrl_handler::{Blob, Encoder};
+//! use libvctrl_core::codec::BinaryEncoder;
+//!
+//! let encoder = BinaryEncoder;
+//! let blob = Blob::new(b"hello".to_vec());
+//! let bytes = encoder.encode_blob(&blob).unwrap();
+//!
+//! // The first byte is the version
+//! assert_eq!(bytes[0], 2);
+//! ```
 
 use libvctrl_handler::{
     Blob, Commit, Encoder, EntryKind, MAX_MESSAGE_LENGTH, Tag, Tree, VctrlError,
@@ -30,14 +80,17 @@ use libvctrl_handler::{
 /// The binary format version number.
 ///
 /// # Purpose
-/// This constant is prepended to every serialized object. It allows the
-/// [`BinaryDecoder`](crate::codec::BinaryDecoder) to verify that the data
-/// was produced by a compatible encoder.
 ///
-/// # Design rationale
+/// This constant is prepended to every serialized object. It allows the
+/// [`BinaryDecoder`](crate::codec::BinaryDecoder) to verify that the data was
+/// produced by a compatible encoder.
+///
+/// # Design Rationale
+///
 /// Bumping this version allows breaking changes to the wire format in the
 /// future. A decoder reading an unexpected version can fail gracefully
-/// instead of attempting to parse incompatible data.
+/// instead of attempting to parse incompatible data. The current version is
+/// 2, indicating the second revision of the binary format.
 ///
 /// # Examples
 ///
@@ -47,20 +100,30 @@ use libvctrl_handler::{
 /// ```
 pub const VERSION: u8 = 2;
 
-/// A binary encoder that serializes version control objects into a compact byte format.
+/// A binary encoder that serializes version control objects into a compact
+/// byte format.
 ///
 /// # Purpose
+///
 /// Implements the [`Encoder`](libvctrl_handler::Encoder) trait to convert
-/// in-memory objects into a deterministic binary representation.
+/// in-memory objects into a deterministic binary representation suitable for
+/// storage or network transmission. This is the inverse operation of
+/// [`BinaryDecoder`](crate::codec::BinaryDecoder).
 ///
-/// # Design rationale
-/// This encoder is stateless (a unit struct) because encoding does not require
-/// external configuration or state. It can be instantiated cheaply anywhere.
+/// # Design Rationale
 ///
-/// # Internal mechanism
+/// This encoder is stateless (a unit struct) because encoding does not
+/// require external configuration or state. It can be instantiated cheaply
+/// anywhere and reused without side effects. The type is a zero-sized type
+/// (ZST), which means it occupies no memory and can be passed by value with
+/// no runtime cost.
+///
+/// # Internal Mechanism
+///
 /// The encoder pre-allocates a `Vec<u8>` based on the estimated size of the
-/// object to minimize reallocations. It then pushes the version byte, followed
-/// by length-prefixed fields, using `extend_from_slice` for fast memory copies.
+/// object to minimize reallocations. It then pushes the version byte,
+/// followed by length-prefixed fields, using `extend_from_slice` for fast
+/// memory copies. The output is always deterministic.
 ///
 /// # Examples
 ///
@@ -82,14 +145,36 @@ pub struct BinaryEncoder;
 impl Encoder for BinaryEncoder {
     /// Encodes a [`Blob`](libvctrl_handler::Blob) into a byte vector.
     ///
+    /// # Purpose
+    ///
+    /// Converts a [`Blob`](libvctrl_handler::Blob) into its binary
+    /// representation. The resulting byte vector contains the version byte,
+    /// a length prefix, and the raw blob data.
+    ///
     /// # Format
+    ///
     /// 1. `VERSION` (1 byte, u8)
     /// 2. `data_len` (8 bytes, u64 LE)
     /// 3. `data` (`data_len` bytes)
     ///
+    /// # Design Rationale
+    ///
+    /// The blob data is copied as-is without any transformation. This
+    /// preserves the exact byte content and ensures a round-trip with
+    /// [`BinaryDecoder::decode_blob`](crate::codec::BinaryDecoder::decode_blob).
+    ///
     /// # Errors
-    /// This method is currently infallible for valid `Blob`s, but returns a
-    /// `Result` to satisfy the [`Encoder`](libvctrl_handler::Encoder) trait.
+    ///
+    /// This method is currently infallible for valid
+    /// [`Blob`](libvctrl_handler::Blob) values because blob data length is
+    /// constrained by the type system (it is a `Vec<u8>` and its length fits
+    /// in `u64`). The `Result` return type is required by the
+    /// [`Encoder`](libvctrl_handler::Encoder) trait.
+    ///
+    /// # Performance
+    ///
+    /// The output buffer is pre-allocated with the exact required capacity
+    /// (`1 + 8 + data.len()`), so no reallocations occur during encoding.
     ///
     /// # Examples
     ///
@@ -102,6 +187,7 @@ impl Encoder for BinaryEncoder {
     /// let encoded = encoder.encode_blob(&blob).unwrap();
     ///
     /// assert_eq!(encoded.len(), 1 + 8 + 3);
+    /// assert_eq!(encoded[0], 2);
     /// ```
     fn encode_blob(&self, blob: &Blob) -> Result<Vec<u8>, VctrlError> {
         let data = blob.data();
@@ -114,7 +200,15 @@ impl Encoder for BinaryEncoder {
 
     /// Encodes a [`Tree`](libvctrl_handler::Tree) into a byte vector.
     ///
+    /// # Purpose
+    ///
+    /// Converts a [`Tree`](libvctrl_handler::Tree) into its binary
+    /// representation. The tree entries are serialized in the order they are
+    /// stored (which is guaranteed to be sorted by name by the tree
+    /// constructor).
+    ///
     /// # Format
+    ///
     /// 1. `VERSION` (1 byte, u8)
     /// 2. `entry_count` (4 bytes, u32 LE)
     /// 3. For each entry:
@@ -123,10 +217,25 @@ impl Encoder for BinaryEncoder {
     ///    c. `kind` (1 byte, u8: 0 = Blob, 1 = Executable, 2 = Symlink, 3 = Tree, 4 = Submodule)
     ///    d. `hash` (64 bytes)
     ///
+    /// # Design Rationale
+    ///
+    /// The entry kind is encoded as a single byte discriminant to keep the
+    /// format compact. The mapping between [`EntryKind`](libvctrl_handler::EntryKind)
+    /// and the byte value is explicit and stable. Tree entries are validated
+    /// by [`Tree::new`](libvctrl_handler::Tree::new), so this encoder assumes
+    /// the input tree is valid.
+    ///
     /// # Errors
-    /// Returns [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError)
-    /// if the number of entries exceeds `u32::MAX`, or if a name length exceeds
-    /// `u8::MAX` (255 bytes).
+    ///
+    /// Returns
+    /// [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError)
+    /// if:
+    ///
+    /// - The number of entries exceeds `u32::MAX`.
+    /// - A name length exceeds `u8::MAX` (255 bytes).
+    /// - An [`EntryKind`](libvctrl_handler::EntryKind) variant is unknown
+    ///   (this cannot happen for well-formed trees because the enum is
+    ///   `#[non_exhaustive]` but all known variants are mapped).
     ///
     /// # Examples
     ///
@@ -169,7 +278,14 @@ impl Encoder for BinaryEncoder {
 
     /// Encodes a [`Commit`](libvctrl_handler::Commit) into a byte vector.
     ///
+    /// # Purpose
+    ///
+    /// Converts a [`Commit`](libvctrl_handler::Commit) into its binary
+    /// representation, including tree hash, parent hashes, author and
+    /// committer identities, message, and metadata.
+    ///
     /// # Format
+    ///
     /// 1. `VERSION` (1 byte, u8)
     /// 2. `tree_hash` (64 bytes)
     /// 3. `parent_count` (1 byte, u8)
@@ -183,10 +299,24 @@ impl Encoder for BinaryEncoder {
     /// 11. `timezone_offset` (2 bytes, i16 LE)
     /// 12. `encoding_len` (1 byte, u8) + `encoding`
     ///
+    /// # Design Rationale
+    ///
+    /// The parent count and all string lengths use `u8` prefixes because
+    /// these fields are expected to be small. The message length uses a
+    /// `u32` prefix to allow larger messages up to the system limit
+    /// [`MAX_MESSAGE_LENGTH`](libvctrl_handler::MAX_MESSAGE_LENGTH).
+    ///
     /// # Errors
-    /// Returns [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError)
-    /// if string lengths exceed their prefix limits (u8 or u32), if the message
-    /// exceeds `MAX_MESSAGE_LENGTH`, or if there are more than 255 parents.
+    ///
+    /// Returns
+    /// [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError)
+    /// if:
+    ///
+    /// - The number of parents exceeds 255.
+    /// - Any string length exceeds the capacity of its length prefix
+    ///   (u8 or u32).
+    /// - The commit message exceeds
+    ///   [`MAX_MESSAGE_LENGTH`](libvctrl_handler::MAX_MESSAGE_LENGTH).
     ///
     /// # Examples
     ///
@@ -256,7 +386,14 @@ impl Encoder for BinaryEncoder {
 
     /// Encodes a [`Tag`](libvctrl_handler::Tag) into a byte vector.
     ///
+    /// # Purpose
+    ///
+    /// Converts a [`Tag`](libvctrl_handler::Tag) into its binary
+    /// representation, including name, target hash, optional tagger identity,
+    /// message, and metadata.
+    ///
     /// # Format
+    ///
     /// 1. `VERSION` (1 byte, u8)
     /// 2. `name_len` (1 byte, u8) + `name`
     /// 3. `target_hash` (64 bytes)
@@ -269,10 +406,23 @@ impl Encoder for BinaryEncoder {
     /// 8. `timezone_offset` (2 bytes, i16 LE)
     /// 9. `encoding_len` (1 byte, u8) + `encoding`
     ///
+    /// # Design Rationale
+    ///
+    /// The `has_tagger` byte acts as a boolean flag. When `0`, the tagger
+    /// fields are omitted entirely; when `1`, the tagger name and email are
+    /// included. This keeps lightweight tags compact while still supporting
+    /// annotated tags.
+    ///
     /// # Errors
-    /// Returns [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError)
-    /// if string lengths exceed their prefix limits (u8 or u32), or if the
-    /// message exceeds `MAX_MESSAGE_LENGTH`.
+    ///
+    /// Returns
+    /// [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError)
+    /// if:
+    ///
+    /// - Any string length exceeds the capacity of its length prefix
+    ///   (u8 or u32).
+    /// - The tag message exceeds
+    ///   [`MAX_MESSAGE_LENGTH`](libvctrl_handler::MAX_MESSAGE_LENGTH).
     ///
     /// # Examples
     ///
