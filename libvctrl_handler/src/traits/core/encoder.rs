@@ -1,4 +1,66 @@
 //! Serialization of version control objects into byte vectors.
+//!
+//! # Purpose
+//!
+//! This module defines the [`Encoder`] trait, which converts high-level
+//! version control objects ([`Blob`](crate::Blob), [`Tree`](crate::Tree),
+//! [`Commit`](crate::Commit), [`Tag`](crate::Tag)) into byte vectors
+//! suitable for storage in an [`ObjectStore`](crate::ObjectStore) or
+//! transmission via a [`Transport`](crate::Transport). It is the inverse of
+//! [`Decoder`](crate::Decoder).
+//!
+//! # Design Rationale
+//!
+//! The trait provides separate methods for each object type rather than a
+//! generic `encode<T>(&self, obj: &T)` for several reasons:
+//!
+//! - It avoids requiring all object types to implement a common trait.
+//! - It allows encoder implementations to handle type-specific formatting.
+//! - It keeps the domain data structures pure and decoupled from the
+//!   serialization interface.
+//!
+//! Encoding is fallible because an encoder may encounter unsupported
+//! features, invalid internal state, or I/O errors during the process.
+//! Therefore every method returns [`Result<Vec<u8>, VctrlError>`](crate::VctrlError).
+//!
+//! # Internal Mechanism
+//!
+//! A typical encoder implementation will access the fields of an object via
+//! its public accessor methods, format them according to the chosen wire
+//! format, and append them to a byte vector. The exact format is
+//! implementation-defined; the trait only defines the contract.
+//!
+//! # Examples
+//!
+//! A complete dummy encoder implementation:
+//!
+//! ```
+//! use libvctrl_handler::{Blob, Commit, Encoder, Hash, Tag, Tree, UserID, VctrlError};
+//!
+//! struct DummyEncoder;
+//!
+//! impl Encoder for DummyEncoder {
+//!     fn encode_blob(&self, blob: &Blob) -> Result<Vec<u8>, VctrlError> {
+//!         Ok(blob.data().to_vec())
+//!     }
+//!
+//!     fn encode_tree(&self, _tree: &Tree) -> Result<Vec<u8>, VctrlError> {
+//!         Ok(vec![])
+//!     }
+//!
+//!     fn encode_commit(&self, _commit: &Commit) -> Result<Vec<u8>, VctrlError> {
+//!         Ok(vec![])
+//!     }
+//!
+//!     fn encode_tag(&self, _tag: &Tag) -> Result<Vec<u8>, VctrlError> {
+//!         Ok(vec![])
+//!     }
+//! }
+//!
+//! let encoder = DummyEncoder;
+//! let blob = Blob::new(b"data".to_vec());
+//! assert_eq!(encoder.encode_blob(&blob).unwrap(), b"data");
+//! ```
 
 use crate::errors::VctrlError;
 use crate::types::blob::Blob;
@@ -11,28 +73,57 @@ use crate::types::tree::Tree;
 /// # Purpose
 ///
 /// An `Encoder` translates in-memory data structures like [`Blob`] and
-/// [`Commit`] into byte vectors suitable for storage in an [`ObjectStore`]
-/// or transmission via a [`Transport`].
+/// [`Commit`] into byte vectors suitable for storage in an
+/// [`ObjectStore`](crate::ObjectStore) or transmission via a
+/// [`Transport`](crate::Transport).
 ///
 /// # Design Rationale
 ///
 /// The trait provides separate methods for each object type rather than a
-/// generic `encode<T>(&self, obj: &T)` to avoid requiring objects to implement
-/// a shared trait, keeping the data structs pure and decoupled.
+/// generic `encode<T>(&self, obj: &T)` to avoid requiring objects to
+/// implement a shared trait, keeping the data structs pure and decoupled.
+/// This design also permits specialized formatting for each object type.
+///
+/// # Why `&self`?
+///
+/// The methods take `&self` to allow a single encoder instance to be reused
+/// for multiple encoding operations. Implementations may hold internal
+/// buffers or configuration, and borrowing prevents unnecessary cloning of
+/// the encoder itself.
+///
+/// # How It Works Internally
+///
+/// An implementation retrieves the necessary fields from the object via
+/// accessor methods (e.g., [`Blob::data`](crate::Blob::data),
+/// [`Commit::tree`](crate::Commit::tree)), formats them according to the
+/// chosen serialization format, and writes the resulting bytes into a
+/// [`Vec<u8>`]. The exact binary layout is not specified by this trait.
 ///
 /// # Examples
 ///
+/// A complete dummy encoder implementation:
+///
 /// ```
-/// use libvctrl_handler::{Blob, Commit, Encoder, Tag, Tree, VctrlError};
+/// use libvctrl_handler::{Blob, Commit, Encoder, Hash, Tag, Tree, UserID, VctrlError};
 ///
 /// struct DummyEncoder;
+///
 /// impl Encoder for DummyEncoder {
 ///     fn encode_blob(&self, blob: &Blob) -> Result<Vec<u8>, VctrlError> {
 ///         Ok(blob.data().to_vec())
 ///     }
-///     fn encode_tree(&self, _tree: &Tree) -> Result<Vec<u8>, VctrlError> { Ok(vec![]) }
-///     fn encode_commit(&self, _commit: &Commit) -> Result<Vec<u8>, VctrlError> { Ok(vec![]) }
-///     fn encode_tag(&self, _tag: &Tag) -> Result<Vec<u8>, VctrlError> { Ok(vec![]) }
+///
+///     fn encode_tree(&self, _tree: &Tree) -> Result<Vec<u8>, VctrlError> {
+///         Ok(vec![])
+///     }
+///
+///     fn encode_commit(&self, _commit: &Commit) -> Result<Vec<u8>, VctrlError> {
+///         Ok(vec![])
+///     }
+///
+///     fn encode_tag(&self, _tag: &Tag) -> Result<Vec<u8>, VctrlError> {
+///         Ok(vec![])
+///     }
 /// }
 ///
 /// let encoder = DummyEncoder;
@@ -40,12 +131,18 @@ use crate::types::tree::Tree;
 /// assert_eq!(encoder.encode_blob(&blob).unwrap(), b"data");
 /// ```
 pub trait Encoder {
-    /// Encodes a [`Blob`] into its serialized byte representation.
+    /// Encodes a [`Blob`](crate::Blob) into its serialized byte representation.
+    ///
+    /// # Purpose
+    ///
+    /// Converts a [`Blob`] into a byte vector. The simplest implementation
+    /// simply copies the blob's data; more complex formats may include
+    /// headers or length prefixes.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::SerializationError`] if the encoder fails to
-    /// serialize the blob.
+    /// Returns [`VctrlError::SerializationError`](crate::VctrlError::SerializationError)
+    /// if the encoder fails to serialize the blob.
     ///
     /// # Examples
     ///
@@ -64,12 +161,18 @@ pub trait Encoder {
     /// ```
     fn encode_blob(&self, blob: &Blob) -> Result<Vec<u8>, VctrlError>;
 
-    /// Encodes a [`Tree`] into its serialized byte representation.
+    /// Encodes a [`Tree`](crate::Tree) into its serialized byte representation.
+    ///
+    /// # Purpose
+    ///
+    /// Converts a [`Tree`] into a byte vector. The implementation must walk
+    /// the tree's entries and serialize each one according to the wire
+    /// format.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::SerializationError`] if the encoder fails to
-    /// serialize the tree.
+    /// Returns [`VctrlError::SerializationError`](crate::VctrlError::SerializationError)
+    /// if the encoder fails to serialize the tree.
     ///
     /// # Examples
     ///
@@ -88,12 +191,18 @@ pub trait Encoder {
     /// ```
     fn encode_tree(&self, tree: &Tree) -> Result<Vec<u8>, VctrlError>;
 
-    /// Encodes a [`Commit`] into its serialized byte representation.
+    /// Encodes a [`Commit`](crate::Commit) into its serialized byte representation.
+    ///
+    /// # Purpose
+    ///
+    /// Converts a [`Commit`] into a byte vector. The implementation must
+    /// serialize the root tree hash, parent hashes, author and committer
+    /// information, message, and optional metadata.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::SerializationError`] if the encoder fails to
-    /// serialize the commit.
+    /// Returns [`VctrlError::SerializationError`](crate::VctrlError::SerializationError)
+    /// if the encoder fails to serialize the commit.
     ///
     /// # Examples
     ///
@@ -114,12 +223,18 @@ pub trait Encoder {
     /// ```
     fn encode_commit(&self, commit: &Commit) -> Result<Vec<u8>, VctrlError>;
 
-    /// Encodes a [`Tag`] into its serialized byte representation.
+    /// Encodes a [`Tag`](crate::Tag) into its serialized byte representation.
+    ///
+    /// # Purpose
+    ///
+    /// Converts a [`Tag`] into a byte vector. The implementation must
+    /// serialize the tag name, target hash, optional tagger information,
+    /// message, and metadata.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::SerializationError`] if the encoder fails to
-    /// serialize the tag.
+    /// Returns [`VctrlError::SerializationError`](crate::VctrlError::SerializationError)
+    /// if the encoder fails to serialize the tag.
     ///
     /// # Examples
     ///
