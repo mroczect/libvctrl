@@ -538,7 +538,7 @@ dependencies = [
 
 [[package]]
 name = "libvctrl"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "libvctrl_core",
  "libvctrl_handler",
