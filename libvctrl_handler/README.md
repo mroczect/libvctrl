@@ -1,6 +1,6 @@
 # libvctrl_handler
 
-**Version:** 4.4.0  
+**Version:** 4.4.1
 **Crate type:** Rust library (contracts only)  
 **Workspace:** libvcrtl
 
