@@ -306,6 +306,7 @@ pub use traits::core::{
     diff::{Change, TreeDiffer},
     encoder::Encoder,
     hasher::Hasher,
+    index::Index,
     object_store::ObjectStore,
     ref_store::RefStore,
     revwalk::RevWalk,
@@ -313,7 +314,6 @@ pub use traits::core::{
     transport::Transport,
     verifier::Verifier,
 };
-
 /// Re-exports of the core data structures.
 ///
 /// All version-control objects (`crate::Blob`, `crate::Tree`,

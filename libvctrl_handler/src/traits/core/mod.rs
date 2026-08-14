@@ -19,6 +19,7 @@
 //! - `RefStore` – stores and retrieves named references such as branches
 //!   and tags.
 //! - `RevWalk` – traverses the commit graph by retrieving parent commits.
+//! - `Index` – represents a staging area for index operations.
 //! - `Signer` – produces cryptographic signatures over data.
 //! - `Transport` – abstracts remote object synchronization.
 //! - `Verifier` – verifies cryptographic signatures.
@@ -349,3 +350,4 @@ pub mod verifier;
 
 pub mod config;
 pub mod diff;
+pub mod index;
