@@ -142,14 +142,14 @@ use std::fmt;
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum VctrlError {
-    /// Occurs when constructing a [`Hash`](crate::Hash) from a byte slice
+    /// Occurs when constructing a `Hash`(crate::Hash) from a byte slice
     /// whose length does not equal
     /// [`HASH_LENGTH`](crate::constants::HASH_LENGTH).
     ///
     /// # Purpose
     ///
-    /// This variant protects the [`Hash`] invariant that exactly 64 bytes are
-    /// required. Any attempt to create a [`Hash`] from a slice of incorrect
+    /// This variant protects the `Hash` invariant that exactly 64 bytes are
+    /// required. Any attempt to create a `Hash` from a slice of incorrect
     /// length yields this error.
     ///
     /// # Examples
@@ -169,8 +169,8 @@ pub enum VctrlError {
     /// # Purpose
     ///
     /// Names are validated by internal constructors such as
-    /// [`UserID::new`](crate::UserID::new) and
-    /// [`Tag::new`](crate::Tag::new). This variant prevents empty or
+    /// [`UserID::new`] and
+    /// [`Tag::new`]. This variant prevents empty or
     /// excessively long names from entering the system.
     ///
     /// # Examples
@@ -202,12 +202,12 @@ pub enum VctrlError {
     InvalidEmail(String),
 
     /// Occurs when an object is requested from the
-    /// [`ObjectStore`](crate::ObjectStore) but cannot be found.
+    /// [`ObjectStore`] but cannot be found.
     ///
     /// # Purpose
     ///
     /// This variant signals a content-addressed lookup miss. It carries the
-    /// [`Hash`] of the requested object so that callers can inspect or
+    /// `Hash` of the requested object so that callers can inspect or
     /// re-request it if necessary.
     ///
     /// # Examples
@@ -222,7 +222,7 @@ pub enum VctrlError {
     ObjectNotFound(Hash),
 
     /// Occurs when a reference is requested from the
-    /// [`RefStore`](crate::RefStore) but cannot be found.
+    /// [`RefStore`] but cannot be found.
     ///
     /// # Purpose
     ///
@@ -245,7 +245,7 @@ pub enum VctrlError {
     ///
     /// # Purpose
     ///
-    /// This variant is returned by [`Decoder`](crate::Decoder) implementations
+    /// This variant is returned by [`Decoder`] implementations
     /// when byte representations are malformed or logically inconsistent.
     ///
     /// # Examples
@@ -281,7 +281,7 @@ pub enum VctrlError {
     ///
     /// # Purpose
     ///
-    /// This variant is used by [`Encoder`](crate::Encoder) implementations when
+    /// This variant is used by [`Encoder`] implementations when
     /// an object cannot be transformed into its byte representation.
     ///
     /// # Examples
@@ -409,7 +409,7 @@ impl std::error::Error for VctrlError {
 ///
 /// - [`InvalidHashLength`](VctrlError::InvalidHashLength) is compared by
 ///   numeric value.
-/// - [`ObjectNotFound`](VctrlError::ObjectNotFound) is compared by [`Hash`].
+/// - [`ObjectNotFound`](VctrlError::ObjectNotFound) is compared by `Hash`.
 /// - [`IoError`](VctrlError::IoError) is compared by [`std::io::ErrorKind`]
 ///   and its display string, rather than exact OS error identity.
 /// - All string-bearing variants are compared by their string payload.
