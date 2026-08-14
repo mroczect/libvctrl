@@ -73,7 +73,6 @@
 // Nursery lints are unstable; we only warn so that toolchain updates do not
 // suddenly break the build. See crate-level documentation for rationale.
 #![warn(clippy::nursery)]
-
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(rustdoc::private_intra_doc_links)]
 #![allow(rustdoc::redundant_explicit_links)]
