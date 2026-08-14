@@ -301,10 +301,12 @@ pub use errors::VctrlError;
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub use traits::core::{
+    config::ConfigStore,
     decoder::Decoder,
     diff::{Change, TreeDiffer},
     encoder::Encoder,
     hasher::Hasher,
+    index::Index,
     object_store::ObjectStore,
     ref_store::RefStore,
     revwalk::RevWalk,
