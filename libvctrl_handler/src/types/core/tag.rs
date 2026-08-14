@@ -2,7 +2,7 @@
 //!
 //! # Purpose
 //!
-//! A [`Tag`] associates a human-readable name with a target object
+//! A `Tag` associates a human-readable name with a target object
 //! (typically a commit), along with optional metadata such as tagger,
 //! message, timestamp, and encoding. It is the mechanism used to mark
 //! releases, milestones, or other significant states in a version control
@@ -16,23 +16,23 @@
 //!   ever being stored.
 //! - **Optional tagger**: Unlike commits, a tag does not require an author
 //!   or committer. Lightweight tags omit the tagger entirely.
-//! - **Reuse of [`CommitMeta`]**: To avoid duplication, the optional
+//! - **Reuse of `CommitMeta`**: To avoid duplication, the optional
 //!   timestamp and encoding information is passed via `CommitMeta`.
 //! - **Immutable by design**: All fields are private; once created, a tag
 //!   cannot be altered. This preserves the integrity of the tag's hash.
 //!
 //! # Relationship to Other Types
 //!
-//! A [`Tag`] points to any object (commonly a [`Commit`])
-//! identified by its `Hash`. It uses [`UserID`] for the
-//! optional tagger identity and [`CommitMeta`] for
+//! A `Tag` points to any object (commonly a `Commit`)
+//! identified by its `Hash`. It uses `UserID` for the
+//! optional tagger identity and `CommitMeta` for
 //! timestamp and encoding information, ensuring consistency with commits.
 //!
 //! # Memory Layout
 //!
-//! The struct owns all its fields: a [`String`] for the name, a `Hash`
-//! (64 bytes) for the target, an [`Option`] containing a [`UserID`] for the
-//! tagger, a [`String`] for the message, and scalar metadata fields. The
+//! The struct owns all its fields: a `String` for the name, a `Hash`
+//! (64 bytes) for the target, an `Option` containing a `UserID` for the
+//! tagger, a `String` for the message, and scalar metadata fields. The
 //! struct is not `Copy` because it owns heap-allocated data; cloning
 //! performs a deep copy.
 //!
@@ -59,7 +59,7 @@ use crate::types::validate_name;
 ///
 /// # Purpose
 ///
-/// A `Tag` points to any object (commonly a [`Commit`])
+/// A `Tag` points to any object (commonly a `Commit`)
 /// identified by its `Hash`. It records who created the tag, an optional
 /// message, and the usual timestamp/offset metadata. Tags are often used to
 /// mark releases or important milestones, providing a stable, human-readable
@@ -69,13 +69,13 @@ use crate::types::validate_name;
 ///
 /// - The `name` field is validated at construction to ensure it is non-empty
 ///   and within length limits.
-/// - The `tagger` field is an [`Option`] to support lightweight tags (no
+/// - The `tagger` field is an `Option` to support lightweight tags (no
 ///   tagger) and annotated tags (with tagger).
 /// - The `target` field is a `Hash` rather than a concrete object reference
 ///   to keep the tag independent of the object's type and storage location.
 /// - The `message` field allows a tag to carry an annotation.
 /// - The `timestamp`, `timezone_offset`, and `encoding` fields are optional
-///   metadata, provided via [`CommitMeta`] for the full constructor.
+///   metadata, provided via `CommitMeta` for the full constructor.
 ///
 /// # Immutability
 ///
@@ -88,9 +88,9 @@ use crate::types::validate_name;
 ///
 /// Two constructors are provided:
 ///
-/// - [`new`](Self::new) - creates a tag with zeroed timestamp/offset and no
+/// - `new` - creates a tag with zeroed timestamp/offset and no
 ///   encoding.
-/// - [`with_meta`](Self::with_meta) - accepts a [`CommitMeta`] for full
+/// - `with_meta` - accepts a `CommitMeta` for full
 ///   control over the metadata.
 ///
 /// # Examples
@@ -146,12 +146,12 @@ impl Tag {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::InvalidName`] if `name` is empty or exceeds
+    /// Returns `VctrlError::InvalidName` if `name` is empty or exceeds
     /// the maximum allowed length.
     ///
     /// # Why Fallible?
     ///
-    /// The constructor returns a [`Result`] to force callers to handle
+    /// The constructor returns a `Result` to force callers to handle
     /// invalid names immediately, preventing malformed tags from entering
     /// the system. This is consistent with other constructors in the crate.
     ///
@@ -212,8 +212,8 @@ impl Tag {
 
     /// Creates a new tag with the given metadata.
     ///
-    /// This constructor is identical to [`new`] except that it also accepts a
-    /// [`CommitMeta`], which supplies the timestamp, timezone offset, and
+    /// This constructor is identical to `new` except that it also accepts a
+    /// `CommitMeta`, which supplies the timestamp, timezone offset, and
     /// encoding. The `name` is validated in the same way.
     ///
     /// # Arguments
@@ -222,12 +222,12 @@ impl Tag {
     /// * `target` - The `Hash` of the object being tagged.
     /// * `tagger` - Optional identity of the person creating the tag.
     /// * `message` - An optional annotation message (can be empty).
-    /// * `meta` - A [`CommitMeta`] containing timestamp, timezone offset,
+    /// * `meta` - A `CommitMeta` containing timestamp, timezone offset,
     ///   and encoding.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::InvalidName`] if `name` is invalid.
+    /// Returns `VctrlError::InvalidName` if `name` is invalid.
     ///
     /// # Why Use `with_meta`?
     ///
@@ -239,7 +239,7 @@ impl Tag {
     /// # How It Works Internally
     ///
     /// 1. Calls `validate_name` on the provided name.
-    /// 2. Constructs the `Tag` using the provided [`CommitMeta`] fields.
+    /// 2. Constructs the `Tag` using the provided `CommitMeta` fields.
     /// 3. Wraps the result in `Ok`.
     ///
     /// # Examples
@@ -330,7 +330,7 @@ impl Tag {
     ///
     /// # Returns
     ///
-    /// An [`Option`] containing a reference to the [`UserID`] of the tagger
+    /// An `Option` containing a reference to the `UserID` of the tagger
     /// if this is an annotated tag, or `None` for lightweight tags.
     ///
     /// # Examples
@@ -420,7 +420,7 @@ impl Tag {
     ///
     /// # Returns
     ///
-    /// An [`Option<&str>`] containing the encoding name if present.
+    /// An `Option<&str>` containing the encoding name if present.
     ///
     /// # Examples
     ///
