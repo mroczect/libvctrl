@@ -351,3 +351,4 @@ pub mod verifier;
 pub mod config;
 pub mod diff;
 pub mod index;
+pub mod pack;
