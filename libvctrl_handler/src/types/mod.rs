@@ -14,7 +14,7 @@
 //!
 //! The module is organised into two layers:
 //!
-//! - [`core`](self::core): the internal submodule where each type is defined
+//! - `core`: the internal submodule where each type is defined
 //!   in its own file. This keeps compilation units small and dependencies
 //!   explicit.
 //! - Re-exports: `pub use core::*` lifts every type to the `types`
@@ -26,7 +26,7 @@
 //! Grouping type definitions in `core` provides a clean separation between
 //! the internal module layout and the public API. The public path remains
 //! stable even if the internal file organisation changes. This mirrors the
-//! pattern used by the [`traits`] module.
+//! pattern used by the `traits` module.
 //!
 //! ## Validation helpers
 //!
@@ -40,8 +40,8 @@
 //!
 //! Both are `pub(crate)` because name validation is an internal invariant.
 //! External users should never be able to inject a name that bypasses these
-//! checks; constructors like [`Tag::new`] and
-//! [`TreeEntry::new`] call them automatically.
+//! checks; constructors like `Tag::new` and
+//! `TreeEntry::new` call them automatically.
 //!
 //! # Design Rationale
 //!
@@ -78,8 +78,8 @@
 /// # Purpose
 ///
 /// This submodule defines the fundamental building blocks of the version
-/// control system: [`Blob`], [`Tree`], [`Commit`], [`Tag`], `Hash`, and
-/// supporting types like [`UserID`], [`CommitMeta`], and [`TreeEntry`].
+/// control system: `Blob`, `Tree`, `Commit`, `Tag`, `Hash`, and
+/// supporting types like `UserID`, `CommitMeta`, and `TreeEntry`.
 /// Each type is designed as a plain-old-data struct with immutable fields,
 /// mirroring the content-addressable storage philosophy.
 ///
@@ -141,7 +141,7 @@ pub use core::*;
 /// length constraints.
 ///
 /// Names are required to be non-empty and not exceed
-/// [`MAX_NAME_LENGTH`](crate::constants::MAX_NAME_LENGTH) bytes.
+/// `MAX_NAME_LENGTH` bytes.
 ///
 /// # Purpose
 ///
@@ -158,7 +158,7 @@ pub use core::*;
 ///
 /// # Errors
 ///
-/// Returns [`VctrlError::InvalidName`] with a descriptive message when the
+/// Returns `VctrlError::InvalidName` with a descriptive message when the
 /// name is empty or too long.
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) fn validate_name(name: &str) -> Result<(), VctrlError> {
@@ -199,7 +199,7 @@ pub(crate) fn validate_name(name: &str) -> Result<(), VctrlError> {
 ///
 /// # Errors
 ///
-/// Returns [`VctrlError::InvalidName`] if the name is empty, too long, or
+/// Returns `VctrlError::InvalidName` if the name is empty, too long, or
 /// contains forbidden characters or names.
 pub(crate) fn validate_tree_entry_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
