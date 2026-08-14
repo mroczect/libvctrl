@@ -2,12 +2,12 @@
 //!
 //! # Purpose
 //!
-//! This module defines the [`Transport`] trait, which abstracts the
+//! This module defines the `Transport` trait, which abstracts the
 //! communication layer required to synchronize version control objects
 //! between a local repository and a remote endpoint. A transport is
 //! responsible for two fundamental operations:
 //!
-//! - Fetching an object identified by its [`Hash`] from a remote.
+//! - Fetching an object identified by its `Hash` from a remote.
 //! - Pushing a locally available object to a remote.
 //!
 //! The trait intentionally focuses only on object movement. It does not
@@ -17,7 +17,7 @@
 //! # Design Rationale
 //!
 //! The transport layer is separated from the local object store
-//! ([`ObjectStore`](crate::ObjectStore)) for several reasons:
+//! (`ObjectStore`) for several reasons:
 //!
 //! - **Different lifecycles**: A local store is typically long-lived and
 //!   disk-backed, while a transport represents a short-lived network session.
@@ -32,33 +32,33 @@
 //!
 //! # Method Signature Rationale
 //!
-//! - [`fetch_object`](Transport::fetch_object) takes `&Hash` rather than an
-//!   owned [`Hash`] to avoid copying the 64-byte key on the stack. It
-//!   returns the object bytes as a [`Vec<u8>`] because the complete remote
+//! - `fetch_object` takes `&Hash` rather than an
+//!   owned `Hash` to avoid copying the 64-byte key on the stack. It
+//!   returns the object bytes as a `Vec<u8>` because the complete remote
 //!   object is needed locally.
-//! - [`push_object`](Transport::push_object) takes `&Hash` and `&[u8]` to
+//! - `push_object` takes `&Hash` and `&[u8]` to
 //!   avoid unnecessary ownership transfer. The hash identifies the object on
 //!   the remote, while the byte slice carries the raw serialized content.
 //!
 //! # Error Handling
 //!
-//! Both methods return [`Result<_, VctrlError>`] to provide a unified error
+//! Both methods return `Result<_, VctrlError>` to provide a unified error
 //! surface. Common error variants include:
 //!
-//! - [`VctrlError::ObjectNotFound`](crate::VctrlError::ObjectNotFound) when
+//! - `VctrlError::ObjectNotFound` when
 //!   the remote does not have the requested object.
-//! - [`VctrlError::IoError`](crate::VctrlError::IoError) for network and
+//! - `VctrlError::IoError` for network and
 //!   transport-level failures.
-//! - [`VctrlError::Other`](crate::VctrlError::Other) for protocol-specific
+//! - `VctrlError::Other` for protocol-specific
 //!   or remote-rejection errors.
 //!
 //! # Internal Mechanism
 //!
 //! A concrete transport implementation will typically maintain some form of
 //! connection state (socket, HTTP client, or in-memory map). The
-//! [`fetch_object`](Transport::fetch_object) method sends a request for the
+//! `fetch_object` method sends a request for the
 //! hash and returns the received bytes. The
-//! [`push_object`](Transport::push_object) method sends the hash and data to
+//! `push_object` method sends the hash and data to
 //! the remote for storage. The exact wire format is implementation-defined.
 //!
 //! # Examples
@@ -101,7 +101,7 @@ use crate::types::hash::Hash;
 ///
 /// A `Transport` abstracts the network or inter-process communication layer
 /// required to fetch and push version control objects between a local
-/// [`ObjectStore`](crate::ObjectStore) and a remote endpoint. It is the
+/// `ObjectStore` and a remote endpoint. It is the
 /// bridge that enables distributed version control operations such as clone,
 /// fetch, push, and pull.
 ///
@@ -114,27 +114,27 @@ use crate::types::hash::Hash;
 ///   as `&[u8]` and the hash as `&Hash`. The hash tells the remote where to
 ///   store the object, and the slice carries the payload. Borrowing avoids
 ///   unnecessary moves.
-/// - **Distinct from [`ObjectStore`]**: The local object store is optimized
+/// - **Distinct from `ObjectStore`**: The local object store is optimized
 ///   for persistent, content-addressed storage, while a transport is a
 ///   communication channel. Keeping them separate allows the local store to
 ///   be disk-based while the transport is purely network-oriented.
 ///
 /// # Why Not Streaming?
 ///
-/// Unlike [`ObjectStore::get`](crate::ObjectStore::get), which returns a
-/// streaming reader, [`fetch_object`](Transport::fetch_object) returns a
-/// complete [`Vec<u8>`]. This choice simplifies remote protocol interactions
+/// Unlike `ObjectStore::get`, which returns a
+/// streaming reader, `fetch_object` returns a
+/// complete `Vec<u8>`. This choice simplifies remote protocol interactions
 /// where the entire object must be received before it can be validated or
 /// stored. Streaming transport protocols can still be implemented internally
 /// by the concrete transport.
 ///
 /// # Error Handling
 ///
-/// All methods return [`Result<_, VctrlError>`] to preserve the crate's
+/// All methods return `Result<_, VctrlError>` to preserve the crate's
 /// unified error model. Implementations should map network and protocol
 /// errors to the appropriate variants, especially
-/// [`VctrlError::IoError`](crate::VctrlError::IoError) and
-/// [`VctrlError::Other`](crate::VctrlError::Other).
+/// `VctrlError::IoError` and
+/// `VctrlError::Other`.
 ///
 /// # Internal Mechanism
 ///
@@ -195,8 +195,8 @@ pub trait Transport {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::ObjectNotFound`] if the remote does not have
-    /// the requested object. Returns [`VctrlError::IoError`] on network
+    /// Returns `VctrlError::ObjectNotFound` if the remote does not have
+    /// the requested object. Returns `VctrlError::IoError` on network
     /// failures such as timeouts, connection resets, or DNS errors.
     ///
     /// # How It Works Internally
@@ -204,7 +204,7 @@ pub trait Transport {
     /// The implementation sends a request for the hash over its
     /// communication channel. If the remote responds with the object data,
     /// the bytes are returned to the caller. If the remote reports that the
-    /// object is missing, an [`ObjectNotFound`](VctrlError::ObjectNotFound)
+    /// object is missing, an `ObjectNotFound`
     /// error is returned.
     ///
     /// # Examples
@@ -248,7 +248,7 @@ pub trait Transport {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::IoError`] on network failures or if the remote
+    /// Returns `VctrlError::IoError` on network failures or if the remote
     /// rejects the object. A rejection may occur if the remote considers the
     /// object invalid or if the push is not permitted by access control.
     ///

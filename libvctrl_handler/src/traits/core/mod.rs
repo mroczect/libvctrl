@@ -15,19 +15,19 @@
 //!
 //! The following traits are defined in this module:
 //!
-//! - [`Decoder`](crate::Decoder) – deserializes version control objects from
+//! - `Decoder` – deserializes version control objects from
 //!   byte slices.
-//! - [`Encoder`](crate::Encoder) – serializes version control objects into
+//! - `Encoder` – serializes version control objects into
 //!   byte vectors.
-//! - [`Hasher`](crate::Hasher) – computes cryptographic hashes for content
+//! - `Hasher` – computes cryptographic hashes for content
 //!   addressing.
-//! - [`ObjectStore`](crate::ObjectStore) – manages content-addressable
+//! - `ObjectStore` – manages content-addressable
 //!   storage of raw objects.
-//! - [`RefStore`](crate::RefStore) – stores and retrieves named references
+//! - `RefStore` – stores and retrieves named references
 //!   such as branches and tags.
-//! - [`Signer`](crate::Signer) – produces cryptographic signatures over data.
-//! - [`Transport`](crate::Transport) – abstracts remote object synchronization.
-//! - [`Verifier`](crate::Verifier) – verifies cryptographic signatures.
+//! - `Signer` – produces cryptographic signatures over data.
+//! - `Transport` – abstracts remote object synchronization.
+//! - `Verifier` – verifies cryptographic signatures.
 //!
 //! # Design Rationale
 //!
@@ -80,10 +80,10 @@
 ///
 /// # Purpose
 ///
-/// The [`Decoder`](crate::Decoder) trait provides the contract for converting
+/// The `Decoder` trait provides the contract for converting
 /// byte slices back into in-memory version control objects like
-/// [`Blob`](crate::Blob), [`Tree`](crate::Tree), [`Commit`](crate::Commit),
-/// and [`Tag`](crate::Tag).
+/// `Blob`, `Tree`, `Commit`,
+/// and `Tag`.
 ///
 /// # Why a separate module
 ///
@@ -112,7 +112,7 @@ pub mod decoder;
 ///
 /// # Purpose
 ///
-/// The [`Encoder`](crate::Encoder) trait defines how version control objects
+/// The `Encoder` trait defines how version control objects
 /// are transformed into byte vectors suitable for storage or transport.
 ///
 /// # Why a separate module
@@ -142,7 +142,7 @@ pub mod encoder;
 ///
 /// # Purpose
 ///
-/// The [`Hasher`](crate::Hasher) trait provides the contract for computing
+/// The `Hasher` trait provides the contract for computing
 /// cryptographic hashes from raw data, which is fundamental to
 /// content-addressable storage.
 ///
@@ -173,8 +173,8 @@ pub mod hasher;
 ///
 /// # Purpose
 ///
-/// The [`ObjectStore`](crate::ObjectStore) trait defines how raw objects are
-/// stored and retrieved using their [`Hash`](crate::Hash) as the key. It
+/// The `ObjectStore` trait defines how raw objects are
+/// stored and retrieved using their `Hash` as the key. It
 /// supports streaming reads to avoid large allocations.
 ///
 /// # Why a separate module
@@ -203,7 +203,7 @@ pub mod object_store;
 ///
 /// # Purpose
 ///
-/// The [`RefStore`](crate::RefStore) trait manages human-readable names
+/// The `RefStore` trait manages human-readable names
 /// (like branch and tag names) that point to specific object hashes.
 ///
 /// # Why a separate module
@@ -233,7 +233,7 @@ pub mod ref_store;
 ///
 /// # Purpose
 ///
-/// The [`Signer`](crate::Signer) trait provides the ability to produce
+/// The `Signer` trait provides the ability to produce
 /// cryptographic signatures over arbitrary data, typically used for commit
 /// or tag signing.
 ///
@@ -264,7 +264,7 @@ pub mod signer;
 ///
 /// # Purpose
 ///
-/// The [`Transport`](crate::Transport) trait abstracts the network layer used
+/// The `Transport` trait abstracts the network layer used
 /// to fetch and push objects between repositories.
 ///
 /// # Why a separate module
@@ -294,7 +294,7 @@ pub mod transport;
 ///
 /// # Purpose
 ///
-/// The [`Verifier`](crate::Verifier) trait provides the capability to verify
+/// The `Verifier` trait provides the capability to verify
 /// cryptographic signatures against data, ensuring authenticity and
 /// integrity.
 ///

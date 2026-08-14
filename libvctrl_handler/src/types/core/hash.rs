@@ -2,7 +2,7 @@
 //!
 //! # Purpose
 //!
-//! This module defines [`Hash`], a fixed-size cryptographic digest that
+//! This module defines `Hash`, a fixed-size cryptographic digest that
 //! uniquely identifies objects in the version-control system. The hash is
 //! stored as an owned array of bytes (`[u8; HASH_LENGTH]`) and provides
 //! fallible construction, byte-level access, and human-readable formatting.
@@ -20,10 +20,10 @@
 //! - **Immutability**: Since the hash depends on the content, objects
 //!   cannot be mutated without changing their identity.
 //!
-//! The [`Hash`] type is intentionally simple. It is a thin wrapper around a
+//! The `Hash` type is intentionally simple. It is a thin wrapper around a
 //! fixed-size byte array, offering no cryptographic operations itself.
-//! Hashing is performed by implementations of the [`Hasher`](crate::Hasher)
-//! trait; [`Hash`] merely represents the result.
+//! Hashing is performed by implementations of the `Hasher`
+//! trait; `Hash` merely represents the result.
 //!
 //! # Why a fixed-size array?
 //!
@@ -40,30 +40,30 @@
 //!
 //! # Memory Layout
 //!
-//! A [`Hash`] occupies exactly 64 bytes on the stack (assuming
-//! [`HASH_LENGTH`](crate::constants::HASH_LENGTH) is 64). It contains no
-//! pointers and no heap references. The type derives [`Copy`], so assigning
+//! A `Hash` occupies exactly 64 bytes on the stack (assuming
+//! `HASH_LENGTH` is 64). It contains no
+//! pointers and no heap references. The type derives `Copy`, so assigning
 //! or passing a hash by value is a cheap bitwise copy.
 //!
 //! # Derived Traits
 //!
 //! The struct derives several standard traits:
 //!
-//! - [`Clone`] and [`Copy`]: enables cheap duplication.
-//! - [`PartialEq`] and [`Eq`]: allows equality comparisons.
-//! - [`Hash`]: permits use as a key in hash maps and sets.
-//! - [`PartialOrd`] and [`Ord`]: enables sorting of hashes, which is useful
+//! - `Clone` and `Copy`: enables cheap duplication.
+//! - `PartialEq` and `Eq`: allows equality comparisons.
+//! - `Hash`: permits use as a key in hash maps and sets.
+//! - `PartialOrd` and `Ord`: enables sorting of hashes, which is useful
 //!   for deterministic iteration over object collections.
 //!
 //! # Relationship to Other Types
 //!
-//! - [`Blob`](crate::Blob), [`Tree`](crate::Tree),
-//!   [`Commit`](crate::Commit), and [`Tag`](crate::Tag) all use [`Hash`]
+//! - `Blob`, `Tree`,
+//!   `Commit`, and `Tag` all use `Hash`
 //!   to reference other objects.
-//! - [`TreeEntry`](crate::TreeEntry) stores the hash of the object it
+//! - `TreeEntry` stores the hash of the object it
 //!   points to.
-//! - [`Hasher`](crate::Hasher) produces [`Hash`] values from raw bytes.
-//! - [`ObjectStore`](crate::ObjectStore) uses [`Hash`] as the primary key
+//! - `Hasher` produces `Hash` values from raw bytes.
+//! - `ObjectStore` uses `Hash` as the primary key
 //!   for storing and retrieving objects.
 //!
 //! # Examples
@@ -96,27 +96,27 @@ use std::fmt;
 /// # Overview
 ///
 /// `Hash` is a newtype over a fixed-size byte array of length
-/// [`HASH_LENGTH`](crate::constants::HASH_LENGTH). It represents a
+/// `HASH_LENGTH`. It represents a
 /// cryptographic digest that uniquely identifies a version control object.
 /// The struct is deliberately minimal, exposing only byte-level access and
 /// formatting; all actual hashing is the responsibility of the
-/// [`Hasher`](crate::Hasher) trait.
+/// `Hasher` trait.
 ///
 /// # Design Rationale
 ///
 /// Internally the hash is stored as a byte array of length
-/// [`HASH_LENGTH`](crate::constants::HASH_LENGTH). This design ensures:
+/// `HASH_LENGTH`. This design ensures:
 ///
 /// - **Stack allocation**: No heap overhead, trivially `Copy`.
 /// - **Efficient comparison**: Equality checks are constant-time and
 ///   inlined by the compiler.
 /// - **No lifetime parameters**: The struct owns its data, simplifying
-///   storage in other types like [`Commit`](crate::Commit) and
-///   [`Tree`](crate::Tree).
+///   storage in other types like `Commit` and
+///   `Tree`.
 ///
 /// The public fields are intentionally hidden behind the private array to
 /// enforce the length invariant. The only way to construct a `Hash` is via
-/// [`Hash::from_bytes`], which validates the input length.
+/// `Hash::from_bytes`, which validates the input length.
 ///
 /// # Examples
 ///
@@ -144,8 +144,8 @@ pub struct Hash([u8; HASH_LENGTH]);
 impl Hash {
     /// Attempts to create a `Hash` from a byte slice.
     ///
-    /// The slice must have exactly [`HASH_LENGTH`](crate::constants::HASH_LENGTH)
-    /// bytes, otherwise a [`VctrlError::InvalidHashLength`] is returned.
+    /// The slice must have exactly `HASH_LENGTH`
+    /// bytes, otherwise a `VctrlError::InvalidHashLength` is returned.
     ///
     /// # Why not `new`?
     ///
@@ -159,8 +159,8 @@ impl Hash {
     /// # How It Works Internally
     ///
     /// The method first checks the input length. If it is not exactly
-    /// [`HASH_LENGTH`](crate::constants::HASH_LENGTH), it returns
-    /// [`VctrlError::InvalidHashLength`] with the actual length. If the
+    /// `HASH_LENGTH`, it returns
+    /// `VctrlError::InvalidHashLength` with the actual length. If the
     /// length is valid, the bytes are copied into a stack-allocated array
     /// using a manual `while` loop. A `while` loop is used instead of a
     /// `for` loop because this is a `const fn` and the loop is guaranteed
@@ -168,7 +168,7 @@ impl Hash {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::InvalidHashLength`] if
+    /// Returns `VctrlError::InvalidHashLength` if
     /// `bytes.len() != HASH_LENGTH`.
     ///
     /// # Examples
@@ -211,7 +211,7 @@ impl Hash {
     /// # Returns
     ///
     /// A reference to the internal byte array of length
-    /// [`HASH_LENGTH`](crate::constants::HASH_LENGTH).
+    /// `HASH_LENGTH`.
     ///
     /// # Why a fixed-size array reference?
     ///
@@ -294,7 +294,7 @@ impl fmt::Debug for Hash {
 /// The implementation iterates over every byte in the internal array and
 /// writes it as two lowercase hexadecimal digits using the `{:02x}` format
 /// specifier. The resulting string has exactly
-/// [`HASH_LENGTH`](crate::constants::HASH_LENGTH) * 2 characters.
+/// `HASH_LENGTH` * 2 characters.
 ///
 /// # Examples
 ///

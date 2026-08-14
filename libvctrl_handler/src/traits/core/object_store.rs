@@ -2,12 +2,12 @@
 //!
 //! # Purpose
 //!
-//! This module defines the [`ObjectStore`] trait, which represents the
+//! This module defines the `ObjectStore` trait, which represents the
 //! persistence layer for raw, serialized version control objects. An object
-//! store is a key-value database where the key is a [`Hash`] (the content
+//! store is a key-value database where the key is a `Hash` (the content
 //! address) and the value is the raw byte representation of a
-//! [`Blob`](crate::Blob), [`Tree`](crate::Tree), [`Commit`](crate::Commit),
-//! or [`Tag`](crate::Tag).
+//! `Blob`, `Tree`, `Commit`,
+//! or `Tag`.
 //!
 //! # Design Rationale
 //!
@@ -18,15 +18,15 @@
 //!   system.
 //! - **Testability**: Dummy or in-memory stores simplify unit testing of
 //!   higher-level components.
-//! - **Streaming efficiency**: The [`ObjectStore::get`] method returns a
-//!   reader instead of a [`Vec<u8>`], enabling large objects to be consumed
+//! - **Streaming efficiency**: The `ObjectStore::get` method returns a
+//!   reader instead of a `Vec<u8>`, enabling large objects to be consumed
 //!   incrementally without allocating their full contents at once.
 //! - **Immutability focus**: Objects are content-addressed and therefore
 //!   immutable once written. The trait does not expose update operations.
 //!
 //! # Streaming Semantics
 //!
-//! The [`ObjectStore::get`] method returns a [`Box<dyn std::io::Read>`].
+//! The `ObjectStore::get` method returns a `Box<dyn std::io::Read>`.
 //! This design allows callers to stream the object bytes directly from the
 //! backing store. The reader is tied to the lifetime of `&self`, meaning the
 //! store cannot be mutated while a reader is alive. This is enforced by
@@ -34,13 +34,13 @@
 //!
 //! # How It Works Internally
 //!
-//! An implementation stores byte vectors under [`Hash`] keys. When
-//! [`ObjectStore::put`] is called, the implementation should copy or move
+//! An implementation stores byte vectors under `Hash` keys. When
+//! `ObjectStore::put` is called, the implementation should copy or move
 //! the provided `data` into its internal storage. When
-//! [`ObjectStore::get`] is called, the implementation looks up the hash and
+//! `ObjectStore::get` is called, the implementation looks up the hash and
 //! returns a reader over the stored bytes, or
-//! [`VctrlError::ObjectNotFound`] if the hash does not exist. The
-//! [`ObjectStore::delete`] and [`ObjectStore::exists`] methods provide
+//! `VctrlError::ObjectNotFound` if the hash does not exist. The
+//! `ObjectStore::delete` and `ObjectStore::exists` methods provide
 //! additional lifecycle management.
 //!
 //! # Examples
@@ -99,20 +99,20 @@ use std::io::Read;
 ///
 /// An `ObjectStore` is responsible for storing and retrieving raw,
 /// serialized version control objects (blobs, trees, commits, tags) using
-/// their [`Hash`] as the primary key. This trait is the low-level
+/// their `Hash` as the primary key. This trait is the low-level
 /// persistence contract that all storage backends must implement.
 ///
 /// # Design Rationale
 ///
-/// - **`&Hash` lookups**: The trait uses borrowed [`Hash`] references for
-///   lookups rather than owned values. A [`Hash`] is 64 bytes; borrowing
+/// - **`&Hash` lookups**: The trait uses borrowed `Hash` references for
+///   lookups rather than owned values. A `Hash` is 64 bytes; borrowing
 ///   avoids unnecessary stack copies and permits the store to implement
 ///   efficient in-place key comparisons.
 /// - **`&[u8]` for `put`**: The `put` method accepts a byte slice instead of
-///   a [`Vec<u8>`] to avoid forcing ownership transfer. The implementation
+///   a `Vec<u8>` to avoid forcing ownership transfer. The implementation
 ///   may choose to copy, move, or stream the data into its internal storage.
 /// - **Streaming reads**: The `get` method returns a
-///   [`Box<dyn Read>`](std::io::Read) rather than a concrete byte vector.
+///   `Box<dyn Read>` rather than a concrete byte vector.
 ///   This enables callers to process large objects incrementally and
 ///   prevents large contiguous allocations when only a portion of the data
 ///   is needed.
@@ -128,16 +128,16 @@ use std::io::Read;
 /// so the store cannot be mutated (e.g., via `put` or `delete`) while a
 /// reader exists. This is enforced by Rust's borrow checker. Callers must
 /// consume the reader (e.g., via
-/// [`Read::read_to_end`](std::io::Read::read_to_end)) to obtain the raw
+/// `Read::read_to_end`) to obtain the raw
 /// bytes.
 ///
 /// # Error Handling
 ///
-/// All methods return a [`Result`] with [`VctrlError`]. This unifies error
+/// All methods return a `Result` with `VctrlError`. This unifies error
 /// handling across all backends and allows callers to match on specific
 /// failure conditions such as
-/// [`ObjectNotFound`](VctrlError::ObjectNotFound) or
-/// [`IoError`](VctrlError::IoError).
+/// `ObjectNotFound` or
+/// `IoError`.
 ///
 /// # Examples
 ///
@@ -192,7 +192,7 @@ pub trait ObjectStore {
     ///
     /// This method writes the serialized bytes of an object into the store
     /// and associates them with the provided content hash. After this
-    /// operation completes successfully, [`ObjectStore::get`] with the same
+    /// operation completes successfully, `ObjectStore::get` with the same
     /// hash must return the exact data that was stored.
     ///
     /// # Arguments
@@ -202,8 +202,8 @@ pub trait ObjectStore {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::IoError`] if the underlying storage fails to
-    /// write. Returns [`VctrlError::Other`] for implementation-specific
+    /// Returns `VctrlError::IoError` if the underlying storage fails to
+    /// write. Returns `VctrlError::Other` for implementation-specific
     /// failures such as quota exceeded or invalid data length.
     ///
     /// # How It Works Internally
@@ -245,13 +245,13 @@ pub trait ObjectStore {
     /// Retrieves a raw object from the database by its hash.
     ///
     /// The returned reader provides streaming access to the object bytes.
-    /// Use [`Read::read_to_end`](std::io::Read::read_to_end) or other
-    /// [`Read`](std::io::Read) methods to consume the data incrementally.
+    /// Use `Read::read_to_end` or other
+    /// `Read` methods to consume the data incrementally.
     ///
     /// # Purpose
     ///
     /// This method performs the primary read operation of an object store.
-    /// It returns an object that implements [`Read`], allowing the caller
+    /// It returns an object that implements `Read`, allowing the caller
     /// to stream the stored bytes without forcing a full allocation.
     ///
     /// # Arguments
@@ -260,8 +260,8 @@ pub trait ObjectStore {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::ObjectNotFound`] if no object exists for the
-    /// hash. Returns [`VctrlError::IoError`] if the underlying storage
+    /// Returns `VctrlError::ObjectNotFound` if no object exists for the
+    /// hash. Returns `VctrlError::IoError` if the underlying storage
     /// fails to read, for example due to permission errors or hardware
     /// failure.
     ///
@@ -269,7 +269,7 @@ pub trait ObjectStore {
     ///
     /// The implementation looks up the hash in its internal storage. If
     /// found, it constructs a reader over the stored bytes. In the example
-    /// above, a [`std::io::Cursor`] is used to provide a reader over an
+    /// above, a `std::io::Cursor` is used to provide a reader over an
     /// in-memory byte vector. For on-disk stores, the reader may be a file
     /// handle or a decompression reader.
     ///
@@ -316,14 +316,14 @@ pub trait ObjectStore {
     /// # Purpose
     ///
     /// Removes the object associated with the given hash from the store.
-    /// After this operation, [`ObjectStore::get`] with the same hash must
-    /// return [`VctrlError::ObjectNotFound`]. Deletion is useful for
+    /// After this operation, `ObjectStore::get` with the same hash must
+    /// return `VctrlError::ObjectNotFound`. Deletion is useful for
     /// garbage collection and repository maintenance, although in a purely
     /// content-addressed system, objects are often kept indefinitely.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::IoError`] if the underlying storage fails to
+    /// Returns `VctrlError::IoError` if the underlying storage fails to
     /// delete, such as when the file is locked or the disk is read-only.
     ///
     /// # How It Works Internally
@@ -371,7 +371,7 @@ pub trait ObjectStore {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::IoError`] if the underlying storage fails to
+    /// Returns `VctrlError::IoError` if the underlying storage fails to
     /// perform the existence check, for example due to directory access
     /// errors.
     ///

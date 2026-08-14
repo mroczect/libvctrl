@@ -21,23 +21,23 @@
 //!
 //! ## Module Structure
 //!
-//! Each trait resides in its own file under the [`core`] submodule to
-//! improve maintainability and reduce merge conflicts. The [`core`] module
+//! Each trait resides in its own file under the `core` submodule to
+//! improve maintainability and reduce merge conflicts. The `core` module
 //! contains the following submodules:
 //!
-//! - [`decoder`](core::decoder)
-//! - [`encoder`](core::encoder)
-//! - [`hasher`](core::hasher)
-//! - [`object_store`](core::object_store)
-//! - [`ref_store`](core::ref_store)
-//! - [`signer`](core::signer)
-//! - [`transport`](core::transport)
-//! - [`verifier`](core::verifier)
+//! - `decoder`
+//! - `encoder`
+//! - `hasher`
+//! - `object_store`
+//! - `ref_store`
+//! - `signer`
+//! - `transport`
+//! - `verifier`
 //!
 //! ## Streaming and Memory Efficiency
 //!
-//! Starting from version 3.2, [`ObjectStore::get`](crate::ObjectStore::get)
-//! returns a [`Box<dyn std::io::Read>`] instead of a [`Vec<u8>`]. This
+//! Starting from version 3.2, `ObjectStore::get`
+//! returns a `Box<dyn std::io::Read>` instead of a `Vec<u8>`. This
 //! enables streaming of object data directly from the backing store without
 //! forcing large contiguous allocations. The reader is borrowed from `&self`,
 //! so the store cannot be mutated while a reader exists. This invariant is
@@ -47,7 +47,7 @@
 //!
 //! Each trait is re-exported at the crate root. To implement a trait, import
 //! it from `libvctrl_handler` and provide the required methods. For example,
-//! implementing [`Hasher`](crate::Hasher):
+//! implementing `Hasher`:
 //!
 //! ```
 //! use libvctrl_handler::{Hash, Hasher, VctrlError};
@@ -67,7 +67,7 @@
 //!
 //! ## Implementing an Object Store
 //!
-//! A complete in-memory implementation of [`ObjectStore`](crate::ObjectStore)
+//! A complete in-memory implementation of `ObjectStore`
 //! demonstrates the streaming read API:
 //!
 //! ```
@@ -115,8 +115,8 @@
 //! ## Using Multiple Traits Together
 //!
 //! The trait separation encourages composition. A typical backend might use
-//! one struct to implement both [`Encoder`](crate::Encoder) and
-//! [`Hasher`](crate::Hasher), while another handles storage. This modularity
+//! one struct to implement both `Encoder` and
+//! `Hasher`, while another handles storage. This modularity
 //! allows the same core data types to be used with different concrete
 //! backends without modification.
 
@@ -134,18 +134,18 @@
 /// Grouping traits under `core` provides a clear internal structure while
 /// allowing the parent `traits` module to re-export them at a higher level.
 /// This pattern is repeated elsewhere in the crate (for example, in
-/// [`types`](crate::types)).
+/// `types`).
 ///
 /// # List of Traits
 ///
-/// - [`Decoder`](crate::Decoder): deserializes objects from byte slices.
-/// - [`Encoder`](crate::Encoder): serializes objects into byte vectors.
-/// - [`Hasher`](crate::Hasher): computes cryptographic hashes.
-/// - [`ObjectStore`](crate::ObjectStore): stores and retrieves raw objects.
-/// - [`RefStore`](crate::RefStore): manages named references.
-/// - [`Signer`](crate::Signer): signs data cryptographically.
-/// - [`Transport`](crate::Transport): fetches and pushes objects remotely.
-/// - [`Verifier`](crate::Verifier): verifies cryptographic signatures.
+/// - `Decoder`: deserializes objects from byte slices.
+/// - `Encoder`: serializes objects into byte vectors.
+/// - `Hasher`: computes cryptographic hashes.
+/// - `ObjectStore`: stores and retrieves raw objects.
+/// - `RefStore`: manages named references.
+/// - `Signer`: signs data cryptographically.
+/// - `Transport`: fetches and pushes objects remotely.
+/// - `Verifier`: verifies cryptographic signatures.
 ///
 /// # Examples
 ///

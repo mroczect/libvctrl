@@ -2,8 +2,8 @@
 //!
 //! # Purpose
 //!
-//! A [`Tree`] stores a sorted list of [`TreeEntry`] items, each associating
-//! a file or directory name with its [`Hash`] and the kind of object it
+//! A `Tree` stores a sorted list of `TreeEntry` items, each associating
+//! a file or directory name with its `Hash` and the kind of object it
 //! points to (blob or subtree). Trees are the backbone of the
 //! content-addressable filesystem model: they encode the structure of a
 //! directory at a specific point in time.
@@ -15,7 +15,7 @@
 //!   that the same directory contents always produce the identical tree
 //!   object and thus the same hash.
 //! - **Name validation**: Each entry name is validated via
-//!   [`validate_tree_entry_name`](crate::types::validate_tree_entry_name),
+//!   `validate_tree_entry_name`,
 //!   which forbids `/`, `.`, and `..`. This enforces flat, simple names and
 //!   prevents path-traversal bugs.
 //! - **Immutability**: Once a tree is created, its entries cannot be changed.
@@ -23,18 +23,18 @@
 //!
 //! # Relationship to Other Types
 //!
-//! A [`Tree`] is a node in the repository object graph. Each [`TreeEntry`]
-//! points to either a [`Blob`](crate::Blob) (representing file content) or
-//! another [`Tree`] (representing a subdirectory). The [`Hash`] stored in
+//! A `Tree` is a node in the repository object graph. Each `TreeEntry`
+//! points to either a `Blob` (representing file content) or
+//! another `Tree` (representing a subdirectory). The `Hash` stored in
 //! each entry is the content address of the referenced object. This forms a
 //! Merkle DAG, where the tree's own hash is derived from its entries, which
 //! in turn reference child objects.
 //!
 //! # Memory Layout
 //!
-//! A [`Tree`] owns a [`Vec<TreeEntry>`], which is a heap-allocated buffer
-//! containing the entries. Each [`TreeEntry`] owns a [`String`] for the name,
-//! stores an [`EntryKind`] discriminant (one byte), and a [`Hash`] (64 bytes).
+//! A `Tree` owns a `Vec<TreeEntry>`, which is a heap-allocated buffer
+//! containing the entries. Each `TreeEntry` owns a `String` for the name,
+//! stores an `EntryKind` discriminant (one byte), and a `Hash` (64 bytes).
 //! The tree is not `Copy` because it owns heap-allocated data; cloning
 //! performs a deep copy of the entry list and all names.
 //!
@@ -72,12 +72,12 @@ use crate::enums::EntryKind;
 use crate::errors::VctrlError;
 use crate::types::validate_tree_entry_name;
 
-/// A single entry in a [`Tree`], representing a file or subdirectory.
+/// A single entry in a `Tree`, representing a file or subdirectory.
 ///
 /// # Purpose
 ///
 /// Each entry binds a **name**, a **kind** (blob or tree), and the **hash**
-/// of the referenced object. A [`TreeEntry`] is the fundamental link between
+/// of the referenced object. A `TreeEntry` is the fundamental link between
 /// a pathname in a directory and the content-addressable object that backs
 /// it.
 ///
@@ -91,15 +91,15 @@ use crate::types::validate_tree_entry_name;
 /// ## Why not public fields?
 ///
 /// If fields were public, a caller could mutate an entry after it was placed
-/// in a [`Tree`], breaking the tree's canonical ordering or changing the
+/// in a `Tree`, breaking the tree's canonical ordering or changing the
 /// referenced object. Private fields with a validated constructor ensure
 /// that an entry is always well-formed.
 ///
 /// ## Relationship to Unix mode bits
 ///
-/// The [`EntryKind`] stored in this struct is the logical object kind. The
+/// The `EntryKind` stored in this struct is the logical object kind. The
 /// raw Unix mode bits used during serialization are defined in
-/// [`crate::constants::entry_mode`]. Decoder and encoder implementations
+/// `crate::constants::entry_mode`. Decoder and encoder implementations
 /// translate between the two representations.
 ///
 /// # Examples
@@ -133,23 +133,23 @@ impl TreeEntry {
     ///
     /// * `name` - The entry name (e.g., `"README.md"`). It is moved into
     ///   the entry.
-    /// * `kind` - The [`EntryKind`] of the object this entry points to.
-    /// * `hash` - The [`Hash`] of the referenced object.
+    /// * `kind` - The `EntryKind` of the object this entry points to.
+    /// * `hash` - The `Hash` of the referenced object.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::InvalidName`] if the name fails validation.
+    /// Returns `VctrlError::InvalidName` if the name fails validation.
     ///
     /// # Why Fallible?
     ///
     /// Tree entry names are security-sensitive. They must be flat and simple
     /// to prevent path traversal and to ensure correct serialization. The
-    /// constructor returns a [`Result`] to force callers to handle invalid
+    /// constructor returns a `Result` to force callers to handle invalid
     /// input immediately.
     ///
     /// # How It Works Internally
     ///
-    /// 1. Calls [`validate_tree_entry_name`] on the provided name.
+    /// 1. Calls `validate_tree_entry_name` on the provided name.
     /// 2. If validation fails, returns an error.
     /// 3. Otherwise, constructs the entry with the validated name, kind,
     ///    and hash, and wraps it in `Ok`.
@@ -206,12 +206,12 @@ impl TreeEntry {
         &self.name
     }
 
-    /// Returns the [`EntryKind`] of this entry (blob, executable, symlink,
+    /// Returns the `EntryKind` of this entry (blob, executable, symlink,
     /// tree, or submodule).
     ///
     /// # Returns
     ///
-    /// The logical object kind of the referenced object. This is a [`Copy`]
+    /// The logical object kind of the referenced object. This is a `Copy`
     /// type, so the returned value is independent of the entry.
     ///
     /// # Examples
@@ -234,7 +234,7 @@ impl TreeEntry {
     ///
     /// # Returns
     ///
-    /// A reference to the [`Hash`] of the referenced object. The reference
+    /// A reference to the `Hash` of the referenced object. The reference
     /// is borrowed from the entry, so it lives as long as the entry.
     ///
     /// # Examples
@@ -254,12 +254,12 @@ impl TreeEntry {
     }
 }
 
-/// A sorted list of [`TreeEntry`] representing a directory snapshot.
+/// A sorted list of `TreeEntry` representing a directory snapshot.
 ///
 /// # Purpose
 ///
 /// A `Tree` is the version-control equivalent of a directory. It contains
-/// zero or more entries, each referencing a file ([`Blob`](crate::Blob)) or
+/// zero or more entries, each referencing a file (`Blob`) or
 /// subdirectory (another `Tree`). The entries are kept in lexicographic
 /// order by name, enforced at construction time.
 ///
@@ -268,11 +268,11 @@ impl TreeEntry {
 /// - **Immutability**: The entries vector is private and cannot be mutated
 ///   after construction. This ensures the tree's hash remains stable.
 /// - **Sorted order**: Strict sorting by name is enforced in
-///   [`Tree::new`]. This is essential for deterministic hashing and
+///   `Tree::new`. This is essential for deterministic hashing and
 ///   efficient binary search during lookups.
 /// - **Validation**: Each entry is individually validated by
-///   [`TreeEntry::new`], and the vector as a whole is validated for ordering
-///   in [`Tree::new`].
+///   `TreeEntry::new`, and the vector as a whole is validated for ordering
+///   in `Tree::new`.
 ///
 /// # Why Sorted?
 ///
@@ -315,12 +315,12 @@ impl Tree {
     ///
     /// # Arguments
     ///
-    /// * `entries` - A vector of [`TreeEntry`] items in strict ascending
+    /// * `entries` - A vector of `TreeEntry` items in strict ascending
     ///   lexicographic order by name.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::InvalidName`] if any two adjacent entries are
+    /// Returns `VctrlError::InvalidName` if any two adjacent entries are
     /// not in strict ascending lexicographic order (i.e., the latter is not
     /// strictly greater than the former).
     ///
@@ -337,7 +337,7 @@ impl Tree {
     /// 2. For each adjacent pair, it compares the names using the `>=`
     ///    operator on `&str`.
     /// 3. If an out-of-order or duplicate pair is found, it returns an
-    ///    [`VctrlError::InvalidName`] with a descriptive message.
+    ///    `VctrlError::InvalidName` with a descriptive message.
     /// 4. If all pairs are strictly increasing, it constructs the tree and
     ///    returns `Ok`.
     ///
@@ -391,7 +391,7 @@ impl Tree {
     ///
     /// # Returns
     ///
-    /// A slice of all [`TreeEntry`] items in the tree, in sorted order. The
+    /// A slice of all `TreeEntry` items in the tree, in sorted order. The
     /// slice borrows from the tree; no copying occurs.
     ///
     /// # Examples

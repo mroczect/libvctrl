@@ -2,42 +2,42 @@
 //!
 //! # Purpose
 //!
-//! This module defines [`VctrlError`], the unified error type returned by all
+//! This module defines `VctrlError`, the unified error type returned by all
 //! fallible operations within the crate. It encapsulates various failure modes
 //! ranging from invalid input data to storage and serialization failures. Every
-//! public API that can fail returns a [`Result<T, VctrlError>`], enabling
+//! public API that can fail returns a `Result<T, VctrlError>`, enabling
 //! callers to match on specific variants or propagate errors upward.
 //!
 //! # Design Rationale
 //!
-//! - **Error chain preservation**: The [`IoError`](VctrlError::IoError) variant
-//!   stores the original [`std::io::Error`], and the implementation of
-//!   [`std::error::Error::source`] returns it, preserving the causal chain.
+//! - **Error chain preservation**: The `IoError` variant
+//!   stores the original `std::io::Error`, and the implementation of
+//!   `std::error::Error::source` returns it, preserving the causal chain.
 //!   This enables full interoperability with error-reporting crates like
 //!   `anyhow` and `eyre`, and allows programmatic matching on
-//!   [`std::io::ErrorKind`].
-//! - **Cloning capability**: A manual [`Clone`] implementation reconstructs the
+//!   `std::io::ErrorKind`.
+//! - **Cloning capability**: A manual `Clone` implementation reconstructs the
 //!   I/O error from its kind and message, ensuring the error type remains
 //!   clonable for testing and state comparison without requiring
-//!   `std::io::Error` itself to be [`Clone`].
+//!   `std::io::Error` itself to be `Clone`.
 //! - **Forward Compatibility**: The enum is marked `#[non_exhaustive]`. This
 //!   prevents downstream crates from exhaustively matching against it,
 //!   allowing new error variants to be added in future minor versions without
 //!   breaking the API.
 //! - **`no_std` Readiness**: By avoiding heap-allocated trait objects for
-//!   non-I/O variants and relying on plain data (e.g., [`String`] for
+//!   non-I/O variants and relying on plain data (e.g., `String` for
 //!   messages), the design keeps the door open for future `#![no_std]`
-//!   compatibility (provided an allocator for [`String`] is available).
+//!   compatibility (provided an allocator for `String` is available).
 //!
 //! # Internal Mechanism
 //!
-//! [`VctrlError`] is a plain enum. The [`Display`] implementation formats each
+//! `VctrlError` is a plain enum. The `Display` implementation formats each
 //! variant into a human-readable message, often including the offending value
-//! (e.g., hash, name). The [`std::error::Error`] implementation delegates
-//! `source()` exclusively to the [`IoError`](VctrlError::IoError) variant,
+//! (e.g., hash, name). The `std::error::Error` implementation delegates
+//! `source()` exclusively to the `IoError` variant,
 //! because only I/O errors carry an underlying cause worth propagating. For
-//! comparison purposes, a manual [`PartialEq`] implementation treats
-//! [`IoError`](VctrlError::IoError) instances as equal if their error kind and
+//! comparison purposes, a manual `PartialEq` implementation treats
+//! `IoError` instances as equal if their error kind and
 //! display message match, while all string-bearing variants are compared by
 //! their payload. This design ensures that errors can be compared in tests
 //! without requiring a byte-for-byte match on potentially non-deterministic
@@ -86,28 +86,28 @@ use std::fmt;
 ///
 /// The variants are deliberately designed around the crate's core domains:
 ///
-/// - **Validation failures** ([`InvalidName`](Self::InvalidName),
-///   [`InvalidEmail`](Self::InvalidEmail),
-///   [`InvalidHashLength`](Self::InvalidHashLength)) capture malformed inputs
+/// - **Validation failures** (`InvalidName`,
+///   `InvalidEmail`,
+///   `InvalidHashLength`) capture malformed inputs
 ///   before they enter the storage layer.
-/// - **Storage failures** ([`ObjectNotFound`](Self::ObjectNotFound),
-///   [`RefNotFound`](Self::RefNotFound)) cover lookups that miss.
-/// - **Serialization failures** ([`CorruptedData`](Self::CorruptedData),
-///   [`SerializationError`](Self::SerializationError)) handle byte-level and
+/// - **Storage failures** (`ObjectNotFound`,
+///   `RefNotFound`) cover lookups that miss.
+/// - **Serialization failures** (`CorruptedData`,
+///   `SerializationError`) handle byte-level and
 ///   encoding/decoding problems.
-/// - **Infrastructure failures** ([`IoError`](Self::IoError),
-///   [`Other`](Self::Other)) wrap lower-level I/O and catch-all conditions.
+/// - **Infrastructure failures** (`IoError`,
+///   `Other`) wrap lower-level I/O and catch-all conditions.
 ///
-/// The manual [`Clone`] implementation is required because
-/// [`std::io::Error`] does not implement [`Clone`]. Instead of cloning the
+/// The manual `Clone` implementation is required because
+/// `std::io::Error` does not implement `Clone`. Instead of cloning the
 /// exact OS-level error object, we reconstruct a semantically equivalent
-/// [`std::io::Error`] from its [`std::io::ErrorKind`] and message string.
+/// `std::io::Error` from its `std::io::ErrorKind` and message string.
 ///
 /// # Internal Mechanism
 ///
-/// Internally, the enum is a tagged union. The [`Display`] implementation
+/// Internally, the enum is a tagged union. The `Display` implementation
 /// converts each variant into a human-readable string, while
-/// [`std::error::Error::source`] exposes only the wrapped I/O error as the
+/// `std::error::Error::source` exposes only the wrapped I/O error as the
 /// root cause. For equality, a helper function generated by the
 /// `string_payload_variants!` macro extracts the string payload from all
 /// string-bearing variants. This enables comparing errors without requiring
@@ -142,14 +142,14 @@ use std::fmt;
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum VctrlError {
-    /// Occurs when constructing a [`Hash`](crate::Hash) from a byte slice
+    /// Occurs when constructing a `Hash` from a byte slice
     /// whose length does not equal
-    /// [`HASH_LENGTH`](crate::constants::HASH_LENGTH).
+    /// `HASH_LENGTH`.
     ///
     /// # Purpose
     ///
-    /// This variant protects the [`Hash`] invariant that exactly 64 bytes are
-    /// required. Any attempt to create a [`Hash`] from a slice of incorrect
+    /// This variant protects the `Hash` invariant that exactly 64 bytes are
+    /// required. Any attempt to create a `Hash` from a slice of incorrect
     /// length yields this error.
     ///
     /// # Examples
@@ -164,13 +164,13 @@ pub enum VctrlError {
 
     /// Occurs when a name (e.g., branch, tag, file entry) fails validation
     /// due to being empty or exceeding
-    /// [`MAX_NAME_LENGTH`](crate::constants::MAX_NAME_LENGTH).
+    /// `MAX_NAME_LENGTH`.
     ///
     /// # Purpose
     ///
     /// Names are validated by internal constructors such as
-    /// [`UserID::new`](crate::UserID::new) and
-    /// [`Tag::new`](crate::Tag::new). This variant prevents empty or
+    /// `UserID::new` and
+    /// `Tag::new`. This variant prevents empty or
     /// excessively long names from entering the system.
     ///
     /// # Examples
@@ -188,7 +188,7 @@ pub enum VctrlError {
     /// # Purpose
     ///
     /// This variant was added to enforce a minimum email format check. Unlike
-    /// [`InvalidName`](Self::InvalidName), it focuses specifically on email
+    /// `InvalidName`, it focuses specifically on email
     /// fields, enabling callers to provide targeted feedback.
     ///
     /// # Examples
@@ -202,12 +202,12 @@ pub enum VctrlError {
     InvalidEmail(String),
 
     /// Occurs when an object is requested from the
-    /// [`ObjectStore`](crate::ObjectStore) but cannot be found.
+    /// `ObjectStore` but cannot be found.
     ///
     /// # Purpose
     ///
     /// This variant signals a content-addressed lookup miss. It carries the
-    /// [`Hash`] of the requested object so that callers can inspect or
+    /// `Hash` of the requested object so that callers can inspect or
     /// re-request it if necessary.
     ///
     /// # Examples
@@ -222,7 +222,7 @@ pub enum VctrlError {
     ObjectNotFound(Hash),
 
     /// Occurs when a reference is requested from the
-    /// [`RefStore`](crate::RefStore) but cannot be found.
+    /// `RefStore` but cannot be found.
     ///
     /// # Purpose
     ///
@@ -245,7 +245,7 @@ pub enum VctrlError {
     ///
     /// # Purpose
     ///
-    /// This variant is returned by [`Decoder`](crate::Decoder) implementations
+    /// This variant is returned by `Decoder` implementations
     /// when byte representations are malformed or logically inconsistent.
     ///
     /// # Examples
@@ -262,8 +262,8 @@ pub enum VctrlError {
     ///
     /// # Purpose
     ///
-    /// This variant preserves the original [`std::io::Error`] so that callers
-    /// can inspect [`std::io::ErrorKind`] and other I/O-specific details.
+    /// This variant preserves the original `std::io::Error` so that callers
+    /// can inspect `std::io::ErrorKind` and other I/O-specific details.
     ///
     /// # Examples
     ///
@@ -281,7 +281,7 @@ pub enum VctrlError {
     ///
     /// # Purpose
     ///
-    /// This variant is used by [`Encoder`](crate::Encoder) implementations when
+    /// This variant is used by `Encoder` implementations when
     /// an object cannot be transformed into its byte representation.
     ///
     /// # Examples
@@ -297,7 +297,7 @@ pub enum VctrlError {
     /// A catch-all variant for unexpected or miscellaneous errors not covered
     /// by the other variants.
     ///
-    /// This is typically constructed via the [`vctrl_error_other!`](crate::vctrl_error_other)
+    /// This is typically constructed via the `vctrl_error_other!`
     /// macro, which mimics `format!` syntax.
     ///
     /// # Examples
@@ -311,21 +311,21 @@ pub enum VctrlError {
     Other(String),
 }
 
-/// Manual [`Clone`] implementation for [`VctrlError`].
+/// Manual `Clone` implementation for `VctrlError`.
 ///
 /// # Why manual
 ///
-/// [`std::io::Error`] does not implement [`Clone`]. To make
-/// [`VctrlError`] clonable, the [`IoError`](VctrlError::IoError) variant is
-/// reconstructed from the original error's [`std::io::ErrorKind`] and display
+/// `std::io::Error` does not implement `Clone`. To make
+/// `VctrlError` clonable, the `IoError` variant is
+/// reconstructed from the original error's `std::io::ErrorKind` and display
 /// message. This preserves enough semantic information for testing and
 /// comparison while avoiding the need for byte-for-byte OS error fidelity.
 ///
 /// # How it works
 ///
-/// All variants except [`IoError`](VctrlError::IoError) are cloned by cloning
-/// their primitive or owned payload. For [`IoError`](VctrlError::IoError),
-/// a fresh [`std::io::Error`] is created with the same kind and message.
+/// All variants except `IoError` are cloned by cloning
+/// their primitive or owned payload. For `IoError`,
+/// a fresh `std::io::Error` is created with the same kind and message.
 impl Clone for VctrlError {
     fn clone(&self) -> Self {
         match self {
@@ -342,7 +342,7 @@ impl Clone for VctrlError {
     }
 }
 
-/// Human-readable formatting for [`VctrlError`].
+/// Human-readable formatting for `VctrlError`.
 ///
 /// # Purpose
 ///
@@ -352,8 +352,8 @@ impl Clone for VctrlError {
 ///
 /// # How it works
 ///
-/// The implementation matches on each variant and uses [`write!`] to build
-/// the final message. For example, [`InvalidHashLength`](VctrlError::InvalidHashLength)
+/// The implementation matches on each variant and uses `write!` to build
+/// the final message. For example, `InvalidHashLength`
 /// includes both the expected and actual length.
 impl fmt::Display for VctrlError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -379,14 +379,14 @@ impl fmt::Display for VctrlError {
 ///
 /// # Purpose
 ///
-/// Implementing [`std::error::Error`] allows [`VctrlError`] to be used with
+/// Implementing `std::error::Error` allows `VctrlError` to be used with
 /// error-reporting crates such as `anyhow` and `eyre`, and to be propagated
-/// through [`Box<dyn Error>`](std::error::Error).
+/// through `Box<dyn Error>`.
 ///
 /// # How it works
 ///
-/// The [`source`](std::error::Error::source) method returns `Some` only for
-/// the [`IoError`](VctrlError::IoError) variant, because that is the only
+/// The `source` method returns `Some` only for
+/// the `IoError` variant, because that is the only
 /// variant that wraps an underlying standard library error. All other
 /// variants are leaf errors.
 impl std::error::Error for VctrlError {
@@ -398,7 +398,7 @@ impl std::error::Error for VctrlError {
     }
 }
 
-/// Value equality for [`VctrlError`].
+/// Value equality for `VctrlError`.
 ///
 /// # Purpose
 ///
@@ -407,10 +407,10 @@ impl std::error::Error for VctrlError {
 ///
 /// # How it works
 ///
-/// - [`InvalidHashLength`](VctrlError::InvalidHashLength) is compared by
+/// - `InvalidHashLength` is compared by
 ///   numeric value.
-/// - [`ObjectNotFound`](VctrlError::ObjectNotFound) is compared by [`Hash`].
-/// - [`IoError`](VctrlError::IoError) is compared by [`std::io::ErrorKind`]
+/// - `ObjectNotFound` is compared by `Hash`.
+/// - `IoError` is compared by `std::io::ErrorKind`
 ///   and its display string, rather than exact OS error identity.
 /// - All string-bearing variants are compared by their string payload.
 ///
@@ -442,8 +442,8 @@ impl PartialEq for VctrlError {
     }
 }
 
-/// Marker trait indicating that [`VctrlError`] has a total equality relation.
+/// Marker trait indicating that `VctrlError` has a total equality relation.
 ///
 /// This is valid because all payload types used in the variants implement
-/// [`Eq`].
+/// `Eq`.
 impl Eq for VctrlError {}

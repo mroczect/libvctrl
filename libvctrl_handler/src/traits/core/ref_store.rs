@@ -2,17 +2,17 @@
 //!
 //! # Purpose
 //!
-//! This module defines the [`RefStore`] trait, which abstracts the storage
+//! This module defines the `RefStore` trait, which abstracts the storage
 //! of named references in a version control system. A named reference is a
 //! human-readable string (such as `"HEAD"`, `"refs/heads/main"`, or
-//! `"refs/tags/v1.0.0"`) that maps to a specific [`Hash`] value. References
+//! `"refs/tags/v1.0.0"`) that maps to a specific `Hash` value. References
 //! are the mechanism by which mutable pointers to immutable objects are
 //! maintained.
 //!
 //! # Design Rationale
 //!
 //! References are stored separately from the object database
-//! ([`ObjectStore`](crate::ObjectStore)) because they have fundamentally
+//! (`ObjectStore`) because they have fundamentally
 //! different lifecycle and mutability characteristics:
 //!
 //! - **Objects are immutable**: Once an object is written, its content hash
@@ -29,13 +29,13 @@
 //!
 //! # Associated Type: `RefsIterator`
 //!
-//! The [`RefStore`] trait defines an associated type `RefsIterator` that
-//! must implement [`Iterator<Item = Result<String, VctrlError>>`]. This
+//! The `RefStore` trait defines an associated type `RefsIterator` that
+//! must implement `Iterator<Item = Result<String, VctrlError>>`. This
 //! design allows implementations to choose the most appropriate iterator
 //! type for their storage backend:
 //!
 //! - A simple in-memory implementation may use
-//!   [`std::vec::IntoIter`].
+//!   `std::vec::IntoIter`.
 //! - A disk-backed implementation may stream directory entries lazily.
 //! - A database-backed implementation may return a custom iterator over
 //!   rows.
@@ -47,18 +47,18 @@
 //!
 //! The trait methods mirror typical key-value operations:
 //!
-//! - [`set_ref`](RefStore::set_ref) inserts or overwrites a name-to-hash
+//! - `set_ref` inserts or overwrites a name-to-hash
 //!   mapping.
-//! - [`get_ref`](RefStore::get_ref) looks up the hash for a name, returning
-//!   [`VctrlError::RefNotFound`] if absent.
-//! - [`delete_ref`](RefStore::delete_ref) removes a mapping.
-//! - [`list_refs`](RefStore::list_refs) enumerates all available names.
+//! - `get_ref` looks up the hash for a name, returning
+//!   `VctrlError::RefNotFound` if absent.
+//! - `delete_ref` removes a mapping.
+//! - `list_refs` enumerates all available names.
 //!
 //! # Error Handling
 //!
-//! All methods return [`Result<_, VctrlError>`] so that callers can handle
+//! All methods return `Result<_, VctrlError>` so that callers can handle
 //! failures uniformly. The most important error variant for this trait is
-//! [`VctrlError::RefNotFound`](crate::VctrlError::RefNotFound), which
+//! `VctrlError::RefNotFound`, which
 //! signals that a requested reference does not exist.
 //!
 //! # Examples
@@ -113,14 +113,14 @@ use crate::types::hash::Hash;
 /// # Purpose
 ///
 /// A `RefStore` maps human-readable names (e.g., `"HEAD"`,
-/// `"refs/heads/main"`) to specific [`Hash`] values. This allows tracking
+/// `"refs/heads/main"`) to specific `Hash` values. This allows tracking
 /// branches and tags without scanning the entire object database. The trait
 /// is the persistence contract for the mutable pointer layer of a version
 /// control system.
 ///
 /// # Design Rationale
 ///
-/// References are stored separately from the [`ObjectStore`](crate::ObjectStore)
+/// References are stored separately from the `ObjectStore`
 /// because they are mutable and frequently updated, whereas objects are
 /// immutable and content-addressed. This separation avoids coupling the
 /// write-heavy reference updates with the append-oriented object storage.
@@ -132,34 +132,34 @@ use crate::types::hash::Hash;
 ///
 /// # Why `&str` for Names?
 ///
-/// Methods accept `&str` rather than an owned [`String`] for name parameters.
+/// Methods accept `&str` rather than an owned `String` for name parameters.
 /// This design allows callers to pass string literals or borrowed substrings
 /// without allocation. Implementations that need ownership can convert the
-/// borrowed slice to a [`String`] internally.
+/// borrowed slice to a `String` internally.
 ///
 /// # Why `&Hash` for Values?
 ///
-/// Methods accept [`Hash`] references to avoid copying a 64-byte value on
+/// Methods accept `Hash` references to avoid copying a 64-byte value on
 /// every call. The borrowed hash can be dereferenced and copied only when
 /// the implementation actually needs to store it, minimizing stack traffic.
 ///
 /// # Error Handling
 ///
-/// Each method returns [`Result<_, VctrlError>`] to maintain a unified error
+/// Each method returns `Result<_, VctrlError>` to maintain a unified error
 /// surface. The most common error conditions are:
 ///
-/// - [`VctrlError::RefNotFound`](crate::VctrlError::RefNotFound) when a
+/// - `VctrlError::RefNotFound` when a
 ///   requested name does not exist.
-/// - [`VctrlError::IoError`](crate::VctrlError::IoError) when the underlying
+/// - `VctrlError::IoError` when the underlying
 ///   storage fails.
 ///
 /// # Internal Mechanism
 ///
-/// A typical implementation stores mappings in a [`HashMap`] or similar
-/// structure. [`set_ref`](Self::set_ref) inserts or updates a mapping.
-/// [`get_ref`](Self::get_ref) performs a lookup and returns the hash if
-/// present. [`delete_ref`](Self::delete_ref) removes the mapping.
-/// [`list_refs`](Self::list_refs) returns an iterator over all names,
+/// A typical implementation stores mappings in a `HashMap` or similar
+/// structure. `set_ref` inserts or updates a mapping.
+/// `get_ref` performs a lookup and returns the hash if
+/// present. `delete_ref` removes the mapping.
+/// `list_refs` returns an iterator over all names,
 /// usually in a deterministic order for testability.
 ///
 /// # Examples
@@ -212,14 +212,14 @@ pub trait RefStore {
     /// # Purpose
     ///
     /// This associated type defines the iterator type returned by
-    /// [`list_refs`](RefStore::list_refs). It is constrained to yield
+    /// `list_refs`. It is constrained to yield
     /// fallible results so that implementations can propagate I/O errors
     /// encountered while enumerating references.
     ///
     /// # Why an Associated Type?
     ///
     /// Different storage backends have different natural iterator types. A
-    /// memory-backed store may use [`std::vec::IntoIter`], while a database
+    /// memory-backed store may use `std::vec::IntoIter`, while a database
     /// store may stream rows from a cursor. By exposing this as an
     /// associated type, the trait remains generic over the specific
     /// iterator while keeping the method signatures unified.
@@ -227,8 +227,8 @@ pub trait RefStore {
     /// # Requirements
     ///
     /// The iterator must implement
-    /// [`Iterator<Item = Result<String, VctrlError>>`](Iterator). Each item
-    /// is a reference name as a [`String`], or an error if enumeration
+    /// `Iterator<Item = Result<String, VctrlError>>`. Each item
+    /// is a reference name as a `String`, or an error if enumeration
     /// fails partway.
     ///
     /// # Examples
@@ -277,14 +277,14 @@ pub trait RefStore {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::IoError`] if the underlying storage fails to
+    /// Returns `VctrlError::IoError` if the underlying storage fails to
     /// write the reference, such as when the disk is full or the file is
     /// read-only.
     ///
     /// # How It Works Internally
     ///
     /// The implementation typically converts the borrowed `name` into an
-    /// owned [`String`] and inserts it into a map with a copy of the hash.
+    /// owned `String` and inserts it into a map with a copy of the hash.
     /// If the name already exists, the previous value is replaced. The
     /// method returns `Ok(())` when the mapping is successfully stored.
     ///
@@ -334,19 +334,19 @@ pub trait RefStore {
     /// # Returns
     ///
     /// Returns `Ok(hash)` if the reference exists, or
-    /// [`VctrlError::RefNotFound`] if it does not.
+    /// `VctrlError::RefNotFound` if it does not.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::RefNotFound`] if the reference does not exist.
-    /// Returns [`VctrlError::IoError`] if the underlying storage fails to
+    /// Returns `VctrlError::RefNotFound` if the reference does not exist.
+    /// Returns `VctrlError::IoError` if the underlying storage fails to
     /// read, for example because the file is unreadable.
     ///
     /// # How It Works Internally
     ///
     /// The implementation looks up the name in its internal storage. For an
     /// in-memory store, this is a simple map lookup. The hash is copied
-    /// (cheaply, because [`Hash`] is `Copy`) and returned.
+    /// (cheaply, because `Hash` is `Copy`) and returned.
     ///
     /// # Examples
     ///
@@ -384,8 +384,8 @@ pub trait RefStore {
     /// # Purpose
     ///
     /// Removes a name-to-hash mapping from the store. After a successful
-    /// delete, subsequent calls to [`get_ref`](Self::get_ref) with the same
-    /// name must return [`VctrlError::RefNotFound`].
+    /// delete, subsequent calls to `get_ref` with the same
+    /// name must return `VctrlError::RefNotFound`.
     ///
     /// # Arguments
     ///
@@ -393,7 +393,7 @@ pub trait RefStore {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::IoError`] if the underlying storage fails to
+    /// Returns `VctrlError::IoError` if the underlying storage fails to
     /// delete the reference, such as when the file is locked or the disk is
     /// read-only.
     ///
@@ -448,12 +448,12 @@ pub trait RefStore {
     /// # Returns
     ///
     /// Returns `Ok(iterator)` where `iterator` yields
-    /// [`Result<String, VctrlError>`] items, or an error if the initial
+    /// `Result<String, VctrlError>` items, or an error if the initial
     /// listing fails.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::IoError`] if the underlying storage fails to
+    /// Returns `VctrlError::IoError` if the underlying storage fails to
     /// read the list of references.
     ///
     /// # How It Works Internally

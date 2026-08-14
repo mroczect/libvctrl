@@ -2,7 +2,7 @@
 //!
 //! # Purpose
 //!
-//! This module defines the [`Verifier`] trait, which abstracts the process
+//! This module defines the `Verifier` trait, which abstracts the process
 //! of checking whether a given byte slice and a cryptographic signature are
 //! valid according to a specific public key or verification context. In a
 //! version control system, signature verification is used to confirm the
@@ -25,7 +25,7 @@
 //!
 //! # Why `Result<bool>`?
 //!
-//! The [`Verifier::verify`] method returns `Result<bool, VctrlError>` rather
+//! The `Verifier::verify` method returns `Result<bool, VctrlError>` rather
 //! than a plain `bool` to allow distinguishing between:
 //!
 //! - A valid signature (`Ok(true)`).
@@ -45,9 +45,9 @@
 //! cryptographic check. The exact steps depend on the algorithm, but the
 //! trait ensures a uniform interface.
 //!
-//! # Relationship to [`Signer`](crate::Signer)
+//! # Relationship to `Signer`
 //!
-//! A [`Signer`](crate::Signer) produces signatures, and a [`Verifier`]
+//! A `Signer` produces signatures, and a `Verifier`
 //! checks them. They are designed as separate traits to reflect real-world
 //! security practices where signing and verification use different keys and
 //! often different software components.
@@ -80,7 +80,7 @@ use crate::errors::VctrlError;
 ///
 /// A `Verifier` checks whether a given byte slice and signature pair are
 /// valid according to a specific cryptographic key or verification context.
-/// It is the counterpart to [`Signer`](crate::Signer), which produces
+/// It is the counterpart to `Signer`, which produces
 /// signatures. Verification is used to confirm that data has not been
 /// altered and was indeed signed by the claimed entity.
 ///
@@ -99,7 +99,7 @@ use crate::errors::VctrlError;
 /// operation. A verifier holds a public key or verification context that can
 /// be safely shared and reused. This also allows a single verifier instance
 /// to be used concurrently across threads if the implementation is
-/// [`Sync`].
+/// `Sync`.
 ///
 /// # Why `&[u8]` for Data and Signature?
 ///
@@ -140,10 +140,10 @@ pub trait Verifier {
     ///
     /// # Purpose
     ///
-    /// This method is the core contract of the [`Verifier`] trait. It checks
+    /// This method is the core contract of the `Verifier` trait. It checks
     /// whether the given `signature` is valid for the given `data` according
     /// to the verifier's cryptographic key. The result is a boolean
-    /// indicating validity, wrapped in a [`Result`] to allow reporting
+    /// indicating validity, wrapped in a `Result` to allow reporting
     /// verification failures separately from an invalid signature.
     ///
     /// # Arguments
@@ -151,7 +151,7 @@ pub trait Verifier {
     /// * `data` - The raw bytes that were signed. This is typically the
     ///   serialized representation of a version control object.
     /// * `signature` - The signature bytes to verify, in the format produced
-    ///   by the corresponding [`Signer`](crate::Signer).
+    ///   by the corresponding `Signer`.
     ///
     /// # Returns
     ///
@@ -164,7 +164,7 @@ pub trait Verifier {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::Other`] if the verification process encounters
+    /// Returns `VctrlError::Other` if the verification process encounters
     /// an internal error, such as a malformed signature, an invalid public
     /// key, or an algorithm-specific failure. The error message should
     /// provide diagnostic context.
@@ -175,7 +175,7 @@ pub trait Verifier {
     /// its public key or verification state, and performs the cryptographic
     /// verification. On success it returns `Ok(true)`; on a signature
     /// mismatch it returns `Ok(false)`; on any error that prevents
-    /// verification it returns an appropriate [`VctrlError`].
+    /// verification it returns an appropriate `VctrlError`.
     ///
     /// # Examples
     ///
