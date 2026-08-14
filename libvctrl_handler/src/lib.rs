@@ -334,6 +334,6 @@ pub use traits::core::{
 /// assert_eq!(blob.size(), 3);
 /// ```
 pub use types::{
-    Blob, ChangeKind, Commit, CommitMeta, FileDelta, Hash, ReflogEntry, Tag, Tree, TreeDelta,
-    TreeEntry, UserID,
+    Blob, ChangeKind, Commit, CommitMeta, Conflict, FileDelta, Hash, MergeResult, ReflogEntry, Tag,
+    Tree, TreeDelta, TreeEntry, UserID,
 };
