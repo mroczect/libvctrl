@@ -1,4 +1,4 @@
-//! Definition of the [`EntryKind`] enum.
+//! Definition of the `EntryKind` enum.
 //!
 //! Logical object type enumerations for `libvctrl_handler`.
 //!
@@ -7,13 +7,13 @@
 //! This module defines high-level, discriminative types that categorize the
 //! logical kind of an object in the version control system. Rather than
 //! exposing raw filesystem mode bits, it provides a semantic enum
-//! ([`EntryKind`]) that distinguishes between regular files, executable
+//! (`EntryKind`) that distinguishes between regular files, executable
 //! files, symbolic links, subdirectories, and submodule references.
 //!
 //! # Design Rationale
 //!
 //! The enum is kept separate from the low-level mode constants (like those
-//! in [`crate::constants::entry_mode`]) to decouple the abstract data model
+//! in `crate::constants::entry_mode`) to decouple the abstract data model
 //! ("what kind of object is this?") from the serialized Unix-style
 //! representation ("what permission bits does this object have?"). This
 //! allows different backends to map their own mode systems to a uniform set
@@ -46,9 +46,9 @@
 ///
 /// # Purpose
 ///
-/// A [`TreeEntry`] must describe whether it points to
+/// A `TreeEntry` must describe whether it points to
 /// regular file content, an executable file, a symbolic link, a
-/// subdirectory, or a submodule commit. [`EntryKind`] provides that
+/// subdirectory, or a submodule commit. `EntryKind` provides that
 /// discrimination without tying the type to specific filesystem permission
 /// bits.
 ///
@@ -65,7 +65,7 @@
 /// - **`Hash` and `Eq`**: Enables entries to be grouped, compared, or used
 ///   as keys in hash maps, e.g., when indexing trees by entry kind.
 /// - **Separation from mode bits**: The mapping from raw mode constants
-///   (like `0o100644` or `0o120000`) to [`EntryKind`] is performed by
+///   (like `0o100644` or `0o120000`) to `EntryKind` is performed by
 ///   higher-level decoder implementations. This keeps the core crate
 ///   independent of any particular serialization format.
 ///
@@ -74,7 +74,7 @@
 /// This is a standard C-like enum. Rust guarantees it occupies the minimum
 /// required memory (a single byte on most platforms). No data is attached
 /// to any variant, so the size is constant and predictable. The derived
-/// [`PartialEq`] and [`Eq`] implementations compare variant tags, which are
+/// `PartialEq` and `Eq` implementations compare variant tags, which are
 /// represented as small integers internally. The derived `Hash`
 /// implementation hashes this tag value.
 ///
@@ -82,13 +82,13 @@
 ///
 /// Because the enum has only five variants, the Rust compiler will typically
 /// use a single byte to store the discriminant. This ensures that
-/// [`EntryKind`] is as cheap to copy as a `u8`, making it suitable for use
+/// `EntryKind` is as cheap to copy as a `u8`, making it suitable for use
 /// in high-frequency tree traversal loops.
 ///
 /// # Relationship to `entry_mode`
 ///
 /// The raw serialized form uses Unix mode bits defined in
-/// [`crate::constants::entry_mode`]. Mapping between [`EntryKind`] and those
+/// `crate::constants::entry_mode`. Mapping between `EntryKind` and those
 /// constants is the responsibility of encoder and decoder implementations.
 /// This decoupling permits the same logical model to be used with non-Unix
 /// backends.
@@ -142,7 +142,7 @@
 /// assert_eq!(describe(EntryKind::Submodule), "submodule");
 /// ```
 ///
-/// Using `EntryKind` as a key in a [`HashMap`](std::collections::HashMap):
+/// Using `EntryKind` as a key in a `HashMap`:
 ///
 /// ```
 /// use libvctrl_handler::EntryKind;
@@ -158,7 +158,7 @@
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EntryKind {
-    /// The entry points to a [`Blob`] containing regular
+    /// The entry points to a `Blob` containing regular
     /// (non-executable) file content.
     ///
     /// This is the default kind for files stored in the version control
@@ -174,8 +174,8 @@ pub enum EntryKind {
     /// # How It Is Represented
     ///
     /// The variant tag is encoded as a single byte by the compiler. The
-    /// associated [`Blob`] content is stored separately in the object
-    /// database, referenced by a `Hash`(crate::Hash).
+    /// associated `Blob` content is stored separately in the object
+    /// database, referenced by a `Hash`.
     ///
     /// # Examples
     ///
@@ -185,12 +185,12 @@ pub enum EntryKind {
     /// ```
     Blob,
 
-    /// The entry points to a [`Blob`] whose content is marked
+    /// The entry points to a `Blob` whose content is marked
     /// as executable.
     ///
     /// On Unix-like systems, this indicates the file should have the
     /// executable permission bit set (e.g., mode `100755`). The underlying
-    /// data is still a [`Blob`]; the executable flag is stored at the tree
+    /// data is still a `Blob`; the executable flag is stored at the tree
     /// entry level so that the object store remains agnostic to permissions.
     ///
     /// # Design Rationale
@@ -198,13 +198,13 @@ pub enum EntryKind {
     /// The distinction between regular and executable files is important for
     /// checkouts, but it does not alter the content-addressing scheme. By
     /// separating the executable bit into the tree entry kind, the same
-    /// [`Blob`] can be referenced by both executable and non-executable
+    /// `Blob` can be referenced by both executable and non-executable
     /// entries without duplicating content.
     ///
     /// # How It Is Represented
     ///
     /// This variant uses the same underlying tag representation as
-    /// [`EntryKind::Blob`], but with a different discriminant value. It is
+    /// `EntryKind::Blob`, but with a different discriminant value. It is
     /// still one byte in size.
     ///
     /// # Examples
@@ -215,7 +215,7 @@ pub enum EntryKind {
     /// ```
     Executable,
 
-    /// The entry points to a [`Blob`] representing a symbolic
+    /// The entry points to a `Blob` representing a symbolic
     /// link.
     ///
     /// The blob content is the target path of the symlink. The version
@@ -232,8 +232,8 @@ pub enum EntryKind {
     /// # How It Is Represented
     ///
     /// The symlink kind is stored as a separate discriminant. The target
-    /// path is stored in a [`Blob`] object, referenced by the entry's
-    /// `Hash`(crate::Hash).
+    /// path is stored in a `Blob` object, referenced by the entry's
+    /// `Hash`.
     ///
     /// # Examples
     ///
@@ -243,7 +243,7 @@ pub enum EntryKind {
     /// ```
     Symlink,
 
-    /// The entry points to another [`Tree`] (a subdirectory).
+    /// The entry points to another `Tree` (a subdirectory).
     ///
     /// This is the only entry kind that introduces hierarchy. During
     /// checkout, the tree object referenced by this entry will be
@@ -259,8 +259,8 @@ pub enum EntryKind {
     /// # How It Is Represented
     ///
     /// The variant is stored as a single byte discriminant. The referenced
-    /// [`Tree`] is identified by its `Hash`(crate::Hash), which is stored
-    /// separately in the [`TreeEntry`].
+    /// `Tree` is identified by its `Hash`, which is stored
+    /// separately in the `TreeEntry`.
     ///
     /// # Examples
     ///
@@ -274,7 +274,7 @@ pub enum EntryKind {
     /// repository.
     ///
     /// Submodules are identified by a commit hash stored in a special
-    /// [`Blob`] (the submodule's HEAD). The tree entry marks
+    /// `Blob` (the submodule's HEAD). The tree entry marks
     /// the path as a submodule so that tools can initialise or update the
     /// nested repository accordingly.
     ///
@@ -289,8 +289,8 @@ pub enum EntryKind {
     /// # How It Is Represented
     ///
     /// The variant is a single byte discriminant. The referenced commit is
-    /// stored as a [`Blob`] containing the commit hash, and the entry
-    /// carries that blob's `Hash`(crate::Hash).
+    /// stored as a `Blob` containing the commit hash, and the entry
+    /// carries that blob's `Hash`.
     ///
     /// # Examples
     ///
