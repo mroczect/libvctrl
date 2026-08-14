@@ -320,3 +320,6 @@ pub mod transport;
 /// use libvctrl_handler::Verifier;
 /// ```
 pub mod verifier;
+
+/// Trait for traversing the commit graph by retrieving parent commits.
+pub mod revwalk;
