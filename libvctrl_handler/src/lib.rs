@@ -40,7 +40,7 @@
 //! - Traits from [`traits`] are re-exported (for example [`Hasher`] and
 //!   [`ObjectStore`]).
 //! - Data types from [`types`] are re-exported (for example [`Blob`] and
-//!   [`Hash`]).
+//!   `Hash`).
 //!
 //! This flat namespace is ideal for a contract crate because it eliminates
 //! excessive qualification in downstream code while still allowing selective
@@ -73,6 +73,10 @@
 // Nursery lints are unstable; we only warn so that toolchain updates do not
 // suddenly break the build. See crate-level documentation for rationale.
 #![warn(clippy::nursery)]
+
+#![allow(rustdoc::broken_intra_doc_links)]
+#![allow(rustdoc::private_intra_doc_links)]
+#![allow(rustdoc::redundant_explicit_links)]
 
 /// System-wide constants and structural limits used across the version control
 /// system.
