@@ -3,7 +3,7 @@
 //! # Purpose
 //!
 //! A [`Tree`] stores a sorted list of [`TreeEntry`] items, each associating
-//! a file or directory name with its [`Hash`] and the kind of object it
+//! a file or directory name with its `Hash` and the kind of object it
 //! points to (blob or subtree). Trees are the backbone of the
 //! content-addressable filesystem model: they encode the structure of a
 //! directory at a specific point in time.
@@ -15,7 +15,7 @@
 //!   that the same directory contents always produce the identical tree
 //!   object and thus the same hash.
 //! - **Name validation**: Each entry name is validated via
-//!   [`validate_tree_entry_name`](crate::types::validate_tree_entry_name),
+//!   `validate_tree_entry_name`,
 //!   which forbids `/`, `.`, and `..`. This enforces flat, simple names and
 //!   prevents path-traversal bugs.
 //! - **Immutability**: Once a tree is created, its entries cannot be changed.
@@ -24,8 +24,8 @@
 //! # Relationship to Other Types
 //!
 //! A [`Tree`] is a node in the repository object graph. Each [`TreeEntry`]
-//! points to either a [`Blob`](crate::Blob) (representing file content) or
-//! another [`Tree`] (representing a subdirectory). The [`Hash`] stored in
+//! points to either a [`Blob`] (representing file content) or
+//! another [`Tree`] (representing a subdirectory). The `Hash` stored in
 //! each entry is the content address of the referenced object. This forms a
 //! Merkle DAG, where the tree's own hash is derived from its entries, which
 //! in turn reference child objects.
@@ -34,7 +34,7 @@
 //!
 //! A [`Tree`] owns a [`Vec<TreeEntry>`], which is a heap-allocated buffer
 //! containing the entries. Each [`TreeEntry`] owns a [`String`] for the name,
-//! stores an [`EntryKind`] discriminant (one byte), and a [`Hash`] (64 bytes).
+//! stores an [`EntryKind`] discriminant (one byte), and a `Hash` (64 bytes).
 //! The tree is not `Copy` because it owns heap-allocated data; cloning
 //! performs a deep copy of the entry list and all names.
 //!
@@ -134,7 +134,7 @@ impl TreeEntry {
     /// * `name` - The entry name (e.g., `"README.md"`). It is moved into
     ///   the entry.
     /// * `kind` - The [`EntryKind`] of the object this entry points to.
-    /// * `hash` - The [`Hash`] of the referenced object.
+    /// * `hash` - The `Hash` of the referenced object.
     ///
     /// # Errors
     ///
@@ -149,7 +149,7 @@ impl TreeEntry {
     ///
     /// # How It Works Internally
     ///
-    /// 1. Calls [`validate_tree_entry_name`] on the provided name.
+    /// 1. Calls `validate_tree_entry_name` on the provided name.
     /// 2. If validation fails, returns an error.
     /// 3. Otherwise, constructs the entry with the validated name, kind,
     ///    and hash, and wraps it in `Ok`.
@@ -234,7 +234,7 @@ impl TreeEntry {
     ///
     /// # Returns
     ///
-    /// A reference to the [`Hash`] of the referenced object. The reference
+    /// A reference to the `Hash` of the referenced object. The reference
     /// is borrowed from the entry, so it lives as long as the entry.
     ///
     /// # Examples
@@ -259,7 +259,7 @@ impl TreeEntry {
 /// # Purpose
 ///
 /// A `Tree` is the version-control equivalent of a directory. It contains
-/// zero or more entries, each referencing a file ([`Blob`](crate::Blob)) or
+/// zero or more entries, each referencing a file ([`Blob`]) or
 /// subdirectory (another `Tree`). The entries are kept in lexicographic
 /// order by name, enforced at construction time.
 ///
