@@ -26,22 +26,22 @@
 //! Grouping type definitions in `core` provides a clean separation between
 //! the internal module layout and the public API. The public path remains
 //! stable even if the internal file organisation changes. This mirrors the
-//! pattern used by the [`traits`](crate::traits) module.
+//! pattern used by the [`traits`] module.
 //!
 //! ## Validation helpers
 //!
 //! Two validation functions are provided:
 //!
-//! - [`validate_name`]: checks general-purpose names (branches, tags, etc.)
+//! - `validate_name`: checks general-purpose names (branches, tags, etc.)
 //!   for non-emptiness and maximum length.
-//! - [`validate_tree_entry_name`]: extends [`validate_name`] with extra
+//! - `validate_tree_entry_name`: extends `validate_name` with extra
 //!   checks for tree entry names to prevent path traversal and reserved
 //!   names.
 //!
 //! Both are `pub(crate)` because name validation is an internal invariant.
 //! External users should never be able to inject a name that bypasses these
-//! checks; constructors like [`Tag::new`](crate::Tag::new) and
-//! [`TreeEntry::new`](crate::TreeEntry::new) call them automatically.
+//! checks; constructors like [`Tag::new`] and
+//! [`TreeEntry::new`] call them automatically.
 //!
 //! # Design Rationale
 //!
@@ -78,7 +78,7 @@
 /// # Purpose
 ///
 /// This submodule defines the fundamental building blocks of the version
-/// control system: [`Blob`], [`Tree`], [`Commit`], [`Tag`], [`Hash`], and
+/// control system: [`Blob`], [`Tree`], [`Commit`], [`Tag`], `Hash`, and
 /// supporting types like [`UserID`], [`CommitMeta`], and [`TreeEntry`].
 /// Each type is designed as a plain-old-data struct with immutable fields,
 /// mirroring the content-addressable storage philosophy.
@@ -178,7 +178,7 @@ pub(crate) fn validate_name(name: &str) -> Result<(), VctrlError> {
 ///
 /// # Purpose
 ///
-/// In addition to the checks performed by [`validate_name`], this function
+/// In addition to the checks performed by `validate_name`, this function
 /// forbids:
 ///
 /// - Slash characters (`/`), which would interfere with path parsing.
@@ -193,7 +193,7 @@ pub(crate) fn validate_name(name: &str) -> Result<(), VctrlError> {
 ///
 /// # How It Works
 ///
-/// 1. Calls [`validate_name`] to enforce basic constraints.
+/// 1. Calls `validate_name` to enforce basic constraints.
 /// 2. Checks for `/`, `.`, and `..`.
 /// 3. Returns `Ok(())` if all checks pass.
 ///
