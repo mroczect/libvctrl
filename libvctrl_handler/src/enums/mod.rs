@@ -44,7 +44,7 @@
 //!
 //! # How It Relates to Other Crate Items
 //!
-//! - [`EntryKind`] is used by [`TreeEntry`](crate::TreeEntry) to describe
+//! - [`EntryKind`] is used by [`TreeEntry`] to describe
 //!   whether an entry points to a blob or a tree.
 //! - The `entry_mode` constants in
 //!   [`crate::constants::entry_mode`] define the raw Unix mode bits that
