@@ -279,4 +279,7 @@ pub mod user_id;
 /// assert_eq!(user.name(), "Alice");
 /// assert_eq!(user.email(), "alice@example.com");
 /// ```
+pub mod delta;
 pub use user_id::UserID;
+
+pub use delta::{ChangeKind, FileDelta, TreeDelta};

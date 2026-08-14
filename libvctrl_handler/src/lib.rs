@@ -333,4 +333,6 @@ pub use traits::core::{
 /// let blob = Blob::new(vec![1, 2, 3]);
 /// assert_eq!(blob.size(), 3);
 /// ```
-pub use types::{Blob, Commit, CommitMeta, Hash, Tag, Tree, TreeEntry, UserID};
+pub use types::{
+    Blob, ChangeKind, Commit, CommitMeta, FileDelta, Hash, Tag, Tree, TreeDelta, TreeEntry, UserID,
+};
