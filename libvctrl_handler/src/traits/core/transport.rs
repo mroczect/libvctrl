@@ -7,7 +7,7 @@
 //! between a local repository and a remote endpoint. A transport is
 //! responsible for two fundamental operations:
 //!
-//! - Fetching an object identified by its [`Hash`] from a remote.
+//! - Fetching an object identified by its `Hash` from a remote.
 //! - Pushing a locally available object to a remote.
 //!
 //! The trait intentionally focuses only on object movement. It does not
@@ -17,7 +17,7 @@
 //! # Design Rationale
 //!
 //! The transport layer is separated from the local object store
-//! ([`ObjectStore`](crate::ObjectStore)) for several reasons:
+//! ([`ObjectStore`]) for several reasons:
 //!
 //! - **Different lifecycles**: A local store is typically long-lived and
 //!   disk-backed, while a transport represents a short-lived network session.
@@ -33,7 +33,7 @@
 //! # Method Signature Rationale
 //!
 //! - [`fetch_object`](Transport::fetch_object) takes `&Hash` rather than an
-//!   owned [`Hash`] to avoid copying the 64-byte key on the stack. It
+//!   owned `Hash` to avoid copying the 64-byte key on the stack. It
 //!   returns the object bytes as a [`Vec<u8>`] because the complete remote
 //!   object is needed locally.
 //! - [`push_object`](Transport::push_object) takes `&Hash` and `&[u8]` to
@@ -45,11 +45,11 @@
 //! Both methods return [`Result<_, VctrlError>`] to provide a unified error
 //! surface. Common error variants include:
 //!
-//! - [`VctrlError::ObjectNotFound`](crate::VctrlError::ObjectNotFound) when
+//! - [`VctrlError::ObjectNotFound`] when
 //!   the remote does not have the requested object.
-//! - [`VctrlError::IoError`](crate::VctrlError::IoError) for network and
+//! - [`VctrlError::IoError`] for network and
 //!   transport-level failures.
-//! - [`VctrlError::Other`](crate::VctrlError::Other) for protocol-specific
+//! - [`VctrlError::Other`] for protocol-specific
 //!   or remote-rejection errors.
 //!
 //! # Internal Mechanism
@@ -101,7 +101,7 @@ use crate::types::hash::Hash;
 ///
 /// A `Transport` abstracts the network or inter-process communication layer
 /// required to fetch and push version control objects between a local
-/// [`ObjectStore`](crate::ObjectStore) and a remote endpoint. It is the
+/// [`ObjectStore`] and a remote endpoint. It is the
 /// bridge that enables distributed version control operations such as clone,
 /// fetch, push, and pull.
 ///
@@ -121,7 +121,7 @@ use crate::types::hash::Hash;
 ///
 /// # Why Not Streaming?
 ///
-/// Unlike [`ObjectStore::get`](crate::ObjectStore::get), which returns a
+/// Unlike [`ObjectStore::get`], which returns a
 /// streaming reader, [`fetch_object`](Transport::fetch_object) returns a
 /// complete [`Vec<u8>`]. This choice simplifies remote protocol interactions
 /// where the entire object must be received before it can be validated or
@@ -133,8 +133,8 @@ use crate::types::hash::Hash;
 /// All methods return [`Result<_, VctrlError>`] to preserve the crate's
 /// unified error model. Implementations should map network and protocol
 /// errors to the appropriate variants, especially
-/// [`VctrlError::IoError`](crate::VctrlError::IoError) and
-/// [`VctrlError::Other`](crate::VctrlError::Other).
+/// [`VctrlError::IoError`] and
+/// [`VctrlError::Other`].
 ///
 /// # Internal Mechanism
 ///
