@@ -301,8 +301,15 @@ pub use errors::VctrlError;
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub use traits::core::{
-    decoder::Decoder, encoder::Encoder, hasher::Hasher, object_store::ObjectStore,
-    ref_store::RefStore, revwalk::RevWalk, signer::Signer, transport::Transport,
+    decoder::Decoder,
+    diff::{Change, TreeDiffer},
+    encoder::Encoder,
+    hasher::Hasher,
+    object_store::ObjectStore,
+    ref_store::RefStore,
+    revwalk::RevWalk,
+    signer::Signer,
+    transport::Transport,
     verifier::Verifier,
 };
 

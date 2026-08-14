@@ -344,3 +344,5 @@ pub mod transport;
 /// use libvctrl_handler::Verifier;
 /// ```
 pub mod verifier;
+
+pub mod diff;
