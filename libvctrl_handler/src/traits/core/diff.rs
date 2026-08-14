@@ -120,9 +120,6 @@ pub trait TreeDiffer {
     ///
     /// Returns an error if either tree cannot be found or if its
     /// contents cannot be decoded.
-    fn diff_trees(
-        &self,
-        old: &Self::TreeId,
-        new: &Self::TreeId,
-    ) -> Result<Vec<Change>, VctrlError>;
+    fn diff_trees(&self, old: &Self::TreeId, new: &Self::TreeId)
+    -> Result<Vec<Change>, VctrlError>;
 }
