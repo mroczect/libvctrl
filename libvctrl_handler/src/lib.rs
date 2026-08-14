@@ -309,6 +309,7 @@ pub use traits::core::{
     index::Index,
     object_store::ObjectStore,
     ref_store::RefStore,
+    reflog::{ReflogEntry, ReflogStore},
     revwalk::RevWalk,
     signer::Signer,
     transport::Transport,
