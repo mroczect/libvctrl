@@ -283,3 +283,6 @@ pub mod delta;
 pub use user_id::UserID;
 
 pub use delta::{ChangeKind, FileDelta, TreeDelta};
+
+pub mod reflog;
+pub use reflog::ReflogEntry;

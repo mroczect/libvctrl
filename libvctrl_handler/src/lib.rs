@@ -311,7 +311,7 @@ pub use traits::core::{
     object_store::ObjectStore,
     pack::{PackReader, PackWriter},
     ref_store::RefStore,
-    reflog::{ReflogEntry, ReflogStore},
+    reflog::ReflogStore,
     remote::Remote,
     revwalk::RevWalk,
     signer::Signer,
@@ -334,5 +334,6 @@ pub use traits::core::{
 /// assert_eq!(blob.size(), 3);
 /// ```
 pub use types::{
-    Blob, ChangeKind, Commit, CommitMeta, FileDelta, Hash, Tag, Tree, TreeDelta, TreeEntry, UserID,
+    Blob, ChangeKind, Commit, CommitMeta, FileDelta, Hash, ReflogEntry, Tag, Tree, TreeDelta,
+    TreeEntry, UserID,
 };
