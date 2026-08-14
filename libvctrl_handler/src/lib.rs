@@ -308,6 +308,7 @@ pub use traits::core::{
     hasher::Hasher,
     index::Index,
     object_store::ObjectStore,
+    pack::{PackReader, PackWriter},
     ref_store::RefStore,
     reflog::{ReflogEntry, ReflogStore},
     revwalk::RevWalk,
