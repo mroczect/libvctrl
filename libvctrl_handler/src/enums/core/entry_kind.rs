@@ -46,7 +46,7 @@
 ///
 /// # Purpose
 ///
-/// A [`TreeEntry`](crate::TreeEntry) must describe whether it points to
+/// A [`TreeEntry`] must describe whether it points to
 /// regular file content, an executable file, a symbolic link, a
 /// subdirectory, or a submodule commit. [`EntryKind`] provides that
 /// discrimination without tying the type to specific filesystem permission
@@ -75,7 +75,7 @@
 /// required memory (a single byte on most platforms). No data is attached
 /// to any variant, so the size is constant and predictable. The derived
 /// [`PartialEq`] and [`Eq`] implementations compare variant tags, which are
-/// represented as small integers internally. The derived [`Hash`]
+/// represented as small integers internally. The derived `Hash`
 /// implementation hashes this tag value.
 ///
 /// # Memory Layout
@@ -158,7 +158,7 @@
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EntryKind {
-    /// The entry points to a [`Blob`](crate::Blob) containing regular
+    /// The entry points to a [`Blob`] containing regular
     /// (non-executable) file content.
     ///
     /// This is the default kind for files stored in the version control
@@ -175,7 +175,7 @@ pub enum EntryKind {
     ///
     /// The variant tag is encoded as a single byte by the compiler. The
     /// associated [`Blob`] content is stored separately in the object
-    /// database, referenced by a [`Hash`](crate::Hash).
+    /// database, referenced by a `Hash`(crate::Hash).
     ///
     /// # Examples
     ///
@@ -185,7 +185,7 @@ pub enum EntryKind {
     /// ```
     Blob,
 
-    /// The entry points to a [`Blob`](crate::Blob) whose content is marked
+    /// The entry points to a [`Blob`] whose content is marked
     /// as executable.
     ///
     /// On Unix-like systems, this indicates the file should have the
@@ -215,7 +215,7 @@ pub enum EntryKind {
     /// ```
     Executable,
 
-    /// The entry points to a [`Blob`](crate::Blob) representing a symbolic
+    /// The entry points to a [`Blob`] representing a symbolic
     /// link.
     ///
     /// The blob content is the target path of the symlink. The version
@@ -233,7 +233,7 @@ pub enum EntryKind {
     ///
     /// The symlink kind is stored as a separate discriminant. The target
     /// path is stored in a [`Blob`] object, referenced by the entry's
-    /// [`Hash`](crate::Hash).
+    /// `Hash`(crate::Hash).
     ///
     /// # Examples
     ///
@@ -243,7 +243,7 @@ pub enum EntryKind {
     /// ```
     Symlink,
 
-    /// The entry points to another [`Tree`](crate::Tree) (a subdirectory).
+    /// The entry points to another [`Tree`] (a subdirectory).
     ///
     /// This is the only entry kind that introduces hierarchy. During
     /// checkout, the tree object referenced by this entry will be
@@ -259,8 +259,8 @@ pub enum EntryKind {
     /// # How It Is Represented
     ///
     /// The variant is stored as a single byte discriminant. The referenced
-    /// [`Tree`] is identified by its [`Hash`](crate::Hash), which is stored
-    /// separately in the [`TreeEntry`](crate::TreeEntry).
+    /// [`Tree`] is identified by its `Hash`(crate::Hash), which is stored
+    /// separately in the [`TreeEntry`].
     ///
     /// # Examples
     ///
@@ -274,7 +274,7 @@ pub enum EntryKind {
     /// repository.
     ///
     /// Submodules are identified by a commit hash stored in a special
-    /// [`Blob`](crate::Blob) (the submodule's HEAD). The tree entry marks
+    /// [`Blob`] (the submodule's HEAD). The tree entry marks
     /// the path as a submodule so that tools can initialise or update the
     /// nested repository accordingly.
     ///
@@ -290,7 +290,7 @@ pub enum EntryKind {
     ///
     /// The variant is a single byte discriminant. The referenced commit is
     /// stored as a [`Blob`] containing the commit hash, and the entry
-    /// carries that blob's [`Hash`](crate::Hash).
+    /// carries that blob's `Hash`(crate::Hash).
     ///
     /// # Examples
     ///
