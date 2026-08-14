@@ -73,7 +73,7 @@
 //! assert_eq!(data, b"object data");
 //! ```
 
-use crate::{Hash, VctrlError};
+use crate::VctrlError;
 
 /// Trait for writing objects to a packfile stream.
 ///
@@ -85,7 +85,7 @@ use crate::{Hash, VctrlError};
 ///
 /// # Associated Types
 ///
-/// - `ObjectId`: the type used to identify an object (e.g., [`Hash`]).
+/// - `ObjectId`: the type used to identify an object (e.g., `Hash`).
 ///
 /// # Examples
 ///
@@ -153,7 +153,7 @@ pub trait PackWriter {
 ///
 /// # Associated Types
 ///
-/// - `ObjectId`: the type used to identify an object (e.g., [`Hash`]).
+/// - `ObjectId`: the type used to identify an object (e.g., `Hash`).
 ///
 /// # Examples
 ///
