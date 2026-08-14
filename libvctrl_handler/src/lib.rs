@@ -12,8 +12,8 @@
 //!
 //! The crate enforces a strict separation between data and behavior:
 //!
-//! - Data is represented by immutable structs in [`types`].
-//! - Behavior is defined by traits in [`traits`].
+//! - Data is represented by immutable structs in `types`.
+//! - Behavior is defined by traits in `traits`.
 //!
 //! This decoupling allows downstream applications to mix and match backends
 //! (for example, an in-memory store with a binary encoder and Ed25519
@@ -34,12 +34,12 @@
 //! entire contract surface. The re-exports mirror the internal module
 //! structure:
 //!
-//! - Constants from [`constants`] are re-exported directly.
-//! - Enums from [`enums`] are re-exported as [`EntryKind`].
-//! - Error types from [`errors`] are re-exported as [`VctrlError`].
-//! - Traits from [`traits`] are re-exported (for example [`Hasher`] and
-//!   [`ObjectStore`]).
-//! - Data types from [`types`] are re-exported (for example [`Blob`] and
+//! - Constants from `constants` are re-exported directly.
+//! - Enums from `enums` are re-exported as `EntryKind`.
+//! - Error types from `errors` are re-exported as `VctrlError`.
+//! - Traits from `traits` are re-exported (for example `Hasher` and
+//!   `ObjectStore`).
+//! - Data types from `types` are re-exported (for example `Blob` and
 //!   `Hash`).
 //!
 //! This flat namespace is ideal for a contract crate because it eliminates
@@ -72,18 +72,14 @@
 )]
 // Nursery lints are unstable; we only warn so that toolchain updates do not
 // suddenly break the build. See crate-level documentation for rationale.
-#![warn(clippy::nursery)]
-#![allow(rustdoc::broken_intra_doc_links)]
-#![allow(rustdoc::private_intra_doc_links)]
-#![allow(rustdoc::redundant_explicit_links)]
 
 /// System-wide constants and structural limits used across the version control
 /// system.
 ///
 /// # Purpose
 ///
-/// This module centralizes all numeric constants (for example [`HASH_LENGTH`]
-/// and [`MAX_NAME_LENGTH`]) so that they can be used consistently by every
+/// This module centralizes all numeric constants (for example `HASH_LENGTH`
+/// and `MAX_NAME_LENGTH`) so that they can be used consistently by every
 /// other module and by downstream crates. Changing a constant here
 /// automatically propagates to all dependent code.
 ///
@@ -106,14 +102,14 @@ pub mod constants;
 ///
 /// # Purpose
 ///
-/// The [`EntryKind`] enum is used throughout the system to differentiate
+/// The `EntryKind` enum is used throughout the system to differentiate
 /// between a file (blob) and a directory (tree). It is deliberately kept
 /// small to facilitate exhaustive matching.
 ///
 /// # Design note
 ///
-/// By using a C-like enum (no data attached), we ensure [`EntryKind`] is
-/// [`Copy`], lightweight, and easy to embed in other structures without
+/// By using a C-like enum (no data attached), we ensure `EntryKind` is
+/// `Copy`, lightweight, and easy to embed in other structures without
 /// lifetime concerns.
 ///
 /// # Examples
@@ -128,7 +124,7 @@ pub mod enums;
 ///
 /// # Purpose
 ///
-/// The [`errors`] module exports the [`crate::VctrlError`] enum, which is the
+/// The `errors` module exports the `crate::VctrlError` enum, which is the
 /// single error type used by every trait method in this crate. This
 /// unification simplifies error propagation and pattern matching for
 /// consumers.
@@ -148,7 +144,7 @@ pub mod errors;
 /// # Purpose
 ///
 /// The `vctrl_error_other!` macro provides a concise way to create
-/// [`crate::VctrlError::Other`] variants with formatted messages, mimicking
+/// `crate::VctrlError::Other` variants with formatted messages, mimicking
 /// the `format!` syntax.
 ///
 /// # Examples
@@ -175,19 +171,19 @@ pub mod macros;
 ///
 /// Every trait follows the single responsibility principle:
 ///
-/// - [`crate::ObjectStore`] handles object retrieval and storage.
-/// - [`crate::RefStore`] manages named references (branches, tags).
-/// - [`crate::Hasher`] computes cryptographic hashes.
-/// - [`crate::Encoder`] and [`crate::Decoder`] serialize and deserialize objects.
-/// - [`crate::Signer`] and [`crate::Verifier`] handle digital signatures.
-/// - [`crate::Transport`] abstracts the network layer.
+/// - `crate::ObjectStore` handles object retrieval and storage.
+/// - `crate::RefStore` manages named references (branches, tags).
+/// - `crate::Hasher` computes cryptographic hashes.
+/// - `crate::Encoder` and `crate::Decoder` serialize and deserialize objects.
+/// - `crate::Signer` and `crate::Verifier` handle digital signatures.
+/// - `crate::Transport` abstracts the network layer.
 ///
 /// This separation allows a user to swap, for example, the hash algorithm
 /// without touching any other component.
 ///
 /// # Examples
 ///
-/// Implementing a dummy [`crate::Hasher`]:
+/// Implementing a dummy `crate::Hasher`:
 ///
 /// ```
 /// use libvctrl_handler::{Hash, Hasher, VctrlError};
@@ -210,9 +206,9 @@ pub mod traits;
 ///
 /// # Purpose
 ///
-/// The [`types`] module contains all the domain models: [`crate::Blob`],
-/// [`crate::Tree`], [`crate::Commit`], [`crate::Tag`], and supporting types
-/// like [`crate::Hash`] and [`crate::UserID`]. These structs are intentionally
+/// The `types` module contains all the domain models: `crate::Blob`,
+/// `crate::Tree`, `crate::Commit`, `crate::Tag`, and supporting types
+/// like `crate::Hash` and `crate::UserID`. These structs are intentionally
 /// immutable after construction to simplify reasoning about state and to
 /// guarantee thread safety.
 ///
@@ -226,7 +222,7 @@ pub mod traits;
 /// ```
 pub mod types;
 
-/// Re-exports of fundamental system constants like [`HASH_LENGTH`] and
+/// Re-exports of fundamental system constants like `HASH_LENGTH` and
 /// maximum size limits.
 ///
 /// # Purpose
@@ -245,9 +241,9 @@ pub use constants::{
     HASH_LENGTH, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, MAX_TREE_ENTRIES,
 };
 
-/// Re-export of the [`EntryKind`] enum.
+/// Re-export of the `EntryKind` enum.
 ///
-/// [`EntryKind`] is the only public enum in the crate, and re-exporting it
+/// `EntryKind` is the only public enum in the crate, and re-exporting it
 /// at the root reinforces its role as a fundamental building block.
 ///
 /// # Examples
@@ -258,12 +254,12 @@ pub use constants::{
 /// ```
 pub use enums::EntryKind;
 
-/// Re-export of the unified [`VctrlError`] type.
+/// Re-export of the unified `VctrlError` type.
 ///
 /// # Purpose
 ///
 /// Every fallible operation in this crate returns `Result<_, VctrlError>`.
-/// Making [`VctrlError`] available at the crate root streamlines error
+/// Making `VctrlError` available at the crate root streamlines error
 /// handling for downstream code.
 ///
 /// # Examples
@@ -280,12 +276,12 @@ pub use errors::VctrlError;
 ///
 /// This includes:
 ///
-/// - [`crate::ObjectStore`]
-/// - [`crate::RefStore`]
-/// - [`crate::Hasher`]
-/// - [`crate::Encoder`] and [`crate::Decoder`]
-/// - [`crate::Signer`] and [`crate::Verifier`]
-/// - [`crate::Transport`]
+/// - `crate::ObjectStore`
+/// - `crate::RefStore`
+/// - `crate::Hasher`
+/// - `crate::Encoder` and `crate::Decoder`
+/// - `crate::Signer` and `crate::Verifier`
+/// - `crate::Transport`
 ///
 /// # Examples
 ///
@@ -311,10 +307,10 @@ pub use traits::core::{
 
 /// Re-exports of the core data structures.
 ///
-/// All version-control objects ([`crate::Blob`], [`crate::Tree`],
-/// [`crate::Commit`], [`crate::Tag`]) and their supporting types
-/// ([`crate::Hash`], [`crate::UserID`], [`crate::CommitMeta`],
-/// [`crate::TreeEntry`]) are available directly from the crate root.
+/// All version-control objects (`crate::Blob`, `crate::Tree`,
+/// `crate::Commit`, `crate::Tag`) and their supporting types
+/// (`crate::Hash`, `crate::UserID`, `crate::CommitMeta`,
+/// `crate::TreeEntry`) are available directly from the crate root.
 ///
 /// # Examples
 ///
