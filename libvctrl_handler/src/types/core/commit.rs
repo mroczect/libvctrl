@@ -29,7 +29,7 @@
 //!
 //! - A [`Commit`] points to a [`Tree`] via its root tree hash.
 //! - The author and committer are [`UserID`] instances.
-//! - Parent commits are stored as a slice of `Hash`(crate::Hash) values.
+//! - Parent commits are stored as a slice of `Hash`(`crate::Hash`) values.
 //! - Metadata is encapsulated in [`CommitMeta`], which is also used by
 //!   [`Tag`].
 //!
