@@ -14,7 +14,7 @@
 //! Commits are central to version control. They represent immutable points
 //! in the history graph. A commit captures:
 //!
-//! - The root [`Tree`](crate::Tree) that describes the repository content.
+//! - The root [`Tree`] that describes the repository content.
 //! - Zero or more parent commits, forming the history DAG.
 //! - The identity of the author and committer.
 //! - A human-readable message describing the change.
@@ -27,15 +27,15 @@
 //!
 //! # Relationship to Other Types
 //!
-//! - A [`Commit`] points to a [`Tree`](crate::Tree) via its root tree hash.
-//! - The author and committer are [`UserID`](crate::UserID) instances.
-//! - Parent commits are stored as a slice of [`Hash`](crate::Hash) values.
+//! - A [`Commit`] points to a [`Tree`] via its root tree hash.
+//! - The author and committer are [`UserID`] instances.
+//! - Parent commits are stored as a slice of `Hash`(crate::Hash) values.
 //! - Metadata is encapsulated in [`CommitMeta`], which is also used by
-//!   [`Tag`](crate::Tag).
+//!   [`Tag`].
 //!
 //! # Memory Layout
 //!
-//! A `Commit` owns its fields: a [`Hash`] (64 bytes), a [`Vec`] of parent
+//! A `Commit` owns its fields: a `Hash` (64 bytes), a [`Vec`] of parent
 //! hashes (heap-allocated), two [`UserID`] values (each owning two
 //! [`String`]s), a [`String`] for the message, and a few scalar metadata
 //! fields. The struct is not `Copy` because it owns heap-allocated data;
@@ -86,7 +86,7 @@ use super::user_id::UserID;
 ///   the metadata without accessor boilerplate.
 /// - The struct derives [`Default`], allowing zeroed timestamp, zero offset,
 ///   and no encoding as sensible defaults.
-/// - Reusing this struct in both [`Commit`] and [`Tag`](crate::Tag) avoids
+/// - Reusing this struct in both [`Commit`] and [`Tag`] avoids
 ///   duplicating the same three fields across multiple objects.
 ///
 /// # Field Semantics
@@ -127,7 +127,7 @@ pub struct CommitMeta {
 /// # Purpose
 ///
 /// A commit captures the state of the repository at a specific moment by
-/// pointing to the root [`Tree`](crate::Tree) via its `tree` hash,
+/// pointing to the root [`Tree`] via its `tree` hash,
 /// recording the author and committer, and optionally linking to parent
 /// commits through `parents`. The commit message describes the change.
 ///
@@ -335,7 +335,7 @@ impl Commit {
     ///
     /// # Returns
     ///
-    /// A reference to the [`Hash`] of the root tree.
+    /// A reference to the `Hash` of the root tree.
     ///
     /// # Examples
     ///
