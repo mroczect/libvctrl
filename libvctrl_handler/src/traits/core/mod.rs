@@ -23,6 +23,8 @@
 //! - `Signer` – produces cryptographic signatures over data.
 //! - `Transport` – abstracts remote object synchronization.
 //! - `Verifier` – verifies cryptographic signatures.
+//! - `TreeDiffer` - Contract for diffing two tree objects and producing a list of changes
+//! - `ConfigStore` – provides access to configuration values.
 //!
 //! # Design Rationale
 //!
@@ -346,5 +348,6 @@ pub mod transport;
 /// ```
 pub mod verifier;
 
+pub mod config;
 pub mod diff;
 pub mod index;
