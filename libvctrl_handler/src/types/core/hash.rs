@@ -2,7 +2,7 @@
 //!
 //! # Purpose
 //!
-//! This module defines [`Hash`], a fixed-size cryptographic digest that
+//! This module defines `Hash`, a fixed-size cryptographic digest that
 //! uniquely identifies objects in the version-control system. The hash is
 //! stored as an owned array of bytes (`[u8; HASH_LENGTH]`) and provides
 //! fallible construction, byte-level access, and human-readable formatting.
@@ -20,10 +20,10 @@
 //! - **Immutability**: Since the hash depends on the content, objects
 //!   cannot be mutated without changing their identity.
 //!
-//! The [`Hash`] type is intentionally simple. It is a thin wrapper around a
+//! The `Hash` type is intentionally simple. It is a thin wrapper around a
 //! fixed-size byte array, offering no cryptographic operations itself.
-//! Hashing is performed by implementations of the [`Hasher`](crate::Hasher)
-//! trait; [`Hash`] merely represents the result.
+//! Hashing is performed by implementations of the [`Hasher`]
+//! trait; `Hash` merely represents the result.
 //!
 //! # Why a fixed-size array?
 //!
@@ -40,7 +40,7 @@
 //!
 //! # Memory Layout
 //!
-//! A [`Hash`] occupies exactly 64 bytes on the stack (assuming
+//! A `Hash` occupies exactly 64 bytes on the stack (assuming
 //! [`HASH_LENGTH`](crate::constants::HASH_LENGTH) is 64). It contains no
 //! pointers and no heap references. The type derives [`Copy`], so assigning
 //! or passing a hash by value is a cheap bitwise copy.
@@ -51,19 +51,19 @@
 //!
 //! - [`Clone`] and [`Copy`]: enables cheap duplication.
 //! - [`PartialEq`] and [`Eq`]: allows equality comparisons.
-//! - [`Hash`]: permits use as a key in hash maps and sets.
+//! - `Hash`: permits use as a key in hash maps and sets.
 //! - [`PartialOrd`] and [`Ord`]: enables sorting of hashes, which is useful
 //!   for deterministic iteration over object collections.
 //!
 //! # Relationship to Other Types
 //!
-//! - [`Blob`](crate::Blob), [`Tree`](crate::Tree),
-//!   [`Commit`](crate::Commit), and [`Tag`](crate::Tag) all use [`Hash`]
+//! - [`Blob`], [`Tree`],
+//!   [`Commit`], and [`Tag`] all use `Hash`
 //!   to reference other objects.
-//! - [`TreeEntry`](crate::TreeEntry) stores the hash of the object it
+//! - [`TreeEntry`] stores the hash of the object it
 //!   points to.
-//! - [`Hasher`](crate::Hasher) produces [`Hash`] values from raw bytes.
-//! - [`ObjectStore`](crate::ObjectStore) uses [`Hash`] as the primary key
+//! - [`Hasher`] produces `Hash` values from raw bytes.
+//! - [`ObjectStore`] uses `Hash` as the primary key
 //!   for storing and retrieving objects.
 //!
 //! # Examples
@@ -100,7 +100,7 @@ use std::fmt;
 /// cryptographic digest that uniquely identifies a version control object.
 /// The struct is deliberately minimal, exposing only byte-level access and
 /// formatting; all actual hashing is the responsibility of the
-/// [`Hasher`](crate::Hasher) trait.
+/// [`Hasher`] trait.
 ///
 /// # Design Rationale
 ///
@@ -111,8 +111,8 @@ use std::fmt;
 /// - **Efficient comparison**: Equality checks are constant-time and
 ///   inlined by the compiler.
 /// - **No lifetime parameters**: The struct owns its data, simplifying
-///   storage in other types like [`Commit`](crate::Commit) and
-///   [`Tree`](crate::Tree).
+///   storage in other types like [`Commit`] and
+///   [`Tree`].
 ///
 /// The public fields are intentionally hidden behind the private array to
 /// enforce the length invariant. The only way to construct a `Hash` is via
