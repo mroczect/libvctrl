@@ -314,7 +314,6 @@ pub use traits::core::{
     transport::Transport,
     verifier::Verifier,
 };
-
 /// Re-exports of the core data structures.
 ///
 /// All version-control objects (`crate::Blob`, `crate::Tree`,
