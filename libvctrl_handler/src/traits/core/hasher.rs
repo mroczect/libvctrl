@@ -30,19 +30,19 @@
 //! - Keyed hashing algorithms that may fail if no key is configured.
 //! - Future extensions where hashing may involve fallible resources.
 //!
-//! The error type is [`VctrlError`](crate::VctrlError), preserving a unified
+//! The error type is [`VctrlError`], preserving a unified
 //! error surface across the crate.
 //!
 //! # Internal Mechanism
 //!
 //! A typical implementation receives a byte slice, feeds it to the selected
 //! hash function, and then wraps the resulting fixed-size digest in a
-//! [`Hash`]. The [`Hash`] type enforces a constant length via
+//! `Hash`. The `Hash` type enforces a constant length via
 //! [`HASH_LENGTH`](crate::constants::HASH_LENGTH); the hasher is responsible
 //! for producing exactly that many bytes. If the underlying algorithm
 //! produces a digest of a different length, the implementation must either
 //! truncate, extend, or return
-//! [`VctrlError::InvalidHashLength`](crate::VctrlError::InvalidHashLength).
+//! [`VctrlError::InvalidHashLength`].
 //!
 //! # Examples
 //!
@@ -67,13 +67,13 @@
 use crate::errors::VctrlError;
 use crate::types::hash::Hash;
 
-/// Defines the interface for hashing raw data into a [`Hash`].
+/// Defines the interface for hashing raw data into a `Hash`.
 ///
 /// # Purpose
 ///
 /// A `Hasher` implements the specific content-addressing algorithm (e.g.,
 /// SHA-256, BLAKE3) used to identify objects in the system. The output is
-/// always a [`Hash`], which is a fixed-size byte array of
+/// always a `Hash`, which is a fixed-size byte array of
 /// [`HASH_LENGTH`](crate::constants::HASH_LENGTH) bytes.
 ///
 /// # Design Rationale
@@ -88,20 +88,20 @@ use crate::types::hash::Hash;
 ///
 /// # Why Not `Hash::from_bytes` Directly?
 ///
-/// The [`Hash`] constructor validates length, but it does not compute a
+/// The `Hash` constructor validates length, but it does not compute a
 /// digest. The `Hasher` trait is responsible for the actual cryptographic
 /// operation. This separation allows the rest of the crate to depend only on
 /// the contract, not on a concrete algorithm.
 ///
 /// # How It Works Internally
 ///
-/// An implementation receives raw bytes and returns a [`Hash`]. It must
+/// An implementation receives raw bytes and returns a `Hash`. It must
 /// guarantee that the produced hash has exactly
 /// [`HASH_LENGTH`](crate::constants::HASH_LENGTH) bytes. Most implementations
 /// will call [`Hash::from_bytes`] on the digest produced by the underlying
 /// hash function. If the digest length is not exactly 64 bytes, the
 /// implementation must handle the mismatch, typically by returning
-/// [`VctrlError::InvalidHashLength`](crate::VctrlError::InvalidHashLength).
+/// [`VctrlError::InvalidHashLength`].
 ///
 /// # Examples
 ///
@@ -123,12 +123,12 @@ use crate::types::hash::Hash;
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub trait Hasher {
-    /// Computes a cryptographic [`Hash`] from the provided byte slice.
+    /// Computes a cryptographic `Hash` from the provided byte slice.
     ///
     /// # Purpose
     ///
     /// This method is the core contract of the [`Hasher`] trait. It takes an
-    /// arbitrary byte slice and returns its content address as a [`Hash`].
+    /// arbitrary byte slice and returns its content address as a `Hash`.
     /// The same input must always produce the same output for a given
     /// hasher instance.
     ///
@@ -139,7 +139,7 @@ pub trait Hasher {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError`](crate::VctrlError) if the hashing operation
+    /// Returns [`VctrlError`] if the hashing operation
     /// fails internally. Common failure modes include:
     ///
     /// - `InvalidHashLength`: The underlying algorithm produced a digest of
@@ -150,7 +150,7 @@ pub trait Hasher {
     /// # How It Works
     ///
     /// The implementation feeds `data` to the underlying hash function,
-    /// obtains the digest, and wraps it in a [`Hash`] via
+    /// obtains the digest, and wraps it in a `Hash` via
     /// [`Hash::from_bytes`]. If the digest length is correct, the call
     /// succeeds; otherwise, an error is returned.
     ///
@@ -176,7 +176,7 @@ pub trait Hasher {
     /// ```
     ///
     /// Using a hasher to produce a content address for a
-    /// [`Blob`](crate::Blob):
+    /// [`Blob`]:
     ///
     /// ```
     /// use libvctrl_handler::{Blob, Hash, Hasher, VctrlError};
