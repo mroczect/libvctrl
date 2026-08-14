@@ -17,14 +17,14 @@
 //!   aligning with SHA-512 or BLAKE3 (extended) outputs.
 //! - **Wire Format Separation**: The [`entry_mode`] submodule isolates raw
 //!   Unix-style mode bits used in the serialized tree format from the
-//!   high-level [`EntryKind`](crate::EntryKind) enum.
+//!   high-level [`EntryKind`] enum.
 //!
 //! # How Constants Are Used
 //!
 //! These constants are referenced by validators such as
-//! [`validate_name`](crate::types::validate_name),
-//! [`validate_tree_entry_name`](crate::types::validate_tree_entry_name), and
-//! by constructors like [`Hash::from_bytes`](crate::Hash::from_bytes).
+//! `validate_name`,
+//! `validate_tree_entry_name`, and
+//! by constructors like [`Hash::from_bytes`].
 //! Keeping them as plain `pub const` items makes them eligible for
 //! compile-time evaluation and ensures zero runtime overhead.
 //!
@@ -48,7 +48,7 @@
 //! assert_eq!(MAX_MESSAGE_LENGTH, 1024 * 1024);
 //! ```
 
-/// The expected length of a [`Hash`](crate::Hash) in bytes (64 bytes = 512 bits).
+/// The expected length of a `Hash`(crate::Hash) in bytes (64 bytes = 512 bits).
 ///
 /// # Design Rationale
 ///
@@ -59,8 +59,8 @@
 ///
 /// # How It Is Used
 ///
-/// This constant is used by [`Hash::from_bytes`](crate::Hash::from_bytes) to
-/// validate slice lengths, and by [`Hash`](crate::Hash) itself as the size of
+/// This constant is used by [`Hash::from_bytes`] to
+/// validate slice lengths, and by `Hash`(crate::Hash) itself as the size of
 /// its internal byte array.
 ///
 /// # Examples
@@ -83,8 +83,8 @@ pub const HASH_LENGTH: usize = 64;
 ///
 /// # How It Is Used
 ///
-/// This constant is checked by [`validate_name`](crate::types::validate_name)
-/// and [`validate_tree_entry_name`](crate::types::validate_tree_entry_name).
+/// This constant is checked by `validate_name`
+/// and `validate_tree_entry_name`.
 ///
 /// # Examples
 ///
@@ -95,7 +95,7 @@ pub const HASH_LENGTH: usize = 64;
 /// ```
 pub const MAX_NAME_LENGTH: u64 = 255;
 
-/// The maximum allowed size in bytes for a single [`Blob`](crate::Blob).
+/// The maximum allowed size in bytes for a single [`Blob`].
 ///
 /// # Design Rationale
 ///
@@ -108,7 +108,7 @@ pub const MAX_NAME_LENGTH: u64 = 255;
 ///
 /// Backends that accept raw blob data should enforce this limit before
 /// storing the object. This constant is a contract-level bound; concrete
-/// [`ObjectStore`](crate::ObjectStore) implementations may choose stricter
+/// [`ObjectStore`] implementations may choose stricter
 /// limits if necessary.
 ///
 /// # Examples
@@ -120,7 +120,7 @@ pub const MAX_NAME_LENGTH: u64 = 255;
 /// ```
 pub const MAX_BLOB_SIZE: u64 = 100 * 1024 * 1024;
 
-/// The maximum number of entries allowed in a single [`Tree`](crate::Tree).
+/// The maximum number of entries allowed in a single [`Tree`].
 ///
 /// # Design Rationale
 ///
@@ -131,8 +131,8 @@ pub const MAX_BLOB_SIZE: u64 = 100 * 1024 * 1024;
 ///
 /// # How It Is Used
 ///
-/// Implementations of [`Encoder`](crate::Encoder) and
-/// [`Decoder`](crate::Decoder) may consult this constant when validating
+/// Implementations of [`Encoder`] and
+/// [`Decoder`] may consult this constant when validating
 /// input or output sizes.
 ///
 /// # Examples
@@ -154,7 +154,7 @@ pub const MAX_TREE_ENTRIES: u64 = 100_000;
 ///
 /// # How It Is Used
 ///
-/// Constructors for [`Commit`](crate::Commit) and [`Tag`](crate::Tag)
+/// Constructors for [`Commit`] and [`Tag`]
 /// may consult this limit to reject oversized messages before they enter
 /// the object database.
 ///
@@ -179,9 +179,9 @@ pub const MAX_MESSAGE_LENGTH: u64 = 1024 * 1024;
 ///
 /// These constants are separated into their own module to keep the global
 /// namespace clean. They represent the *wire format* and storage format,
-/// distinct from the logical [`EntryKind`](crate::EntryKind) enum used in
+/// distinct from the logical [`EntryKind`] enum used in
 /// Rust memory. An encoder or decoder implementation will use these when
-/// translating between [`TreeEntry`](crate::TreeEntry) and raw bytes.
+/// translating between [`TreeEntry`] and raw bytes.
 ///
 /// # Internal Mechanism
 ///
@@ -253,7 +253,7 @@ pub mod entry_mode {
     ///
     /// Unix octal `040000`, which identifies a directory object. In a
     /// version control tree, this indicates that the entry points to another
-    /// [`Tree`](crate::Tree) rather than a [`Blob`](crate::Blob).
+    /// [`Tree`] rather than a [`Blob`].
     ///
     /// # Examples
     ///
