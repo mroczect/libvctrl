@@ -47,12 +47,12 @@
 //!
 //! # Relationship to Other Types
 //!
-//! - A [`TreeEntry`](crate::TreeEntry) references a blob by its
-//!   [`Hash`](crate::Hash) and an [`EntryKind`](crate::EntryKind) of
+//! - A [`TreeEntry`] references a blob by its
+//!   `Hash`(crate::Hash) and an [`EntryKind`] of
 //!   `Blob`, `Executable`, or `Symlink`.
-//! - The [`Hasher`](crate::Hasher) trait computes a blob's hash from
+//! - The [`Hasher`] trait computes a blob's hash from
 //!   [`data()`](Blob::data).
-//! - The [`Encoder`](crate::Encoder) trait serializes a blob into bytes for
+//! - The [`Encoder`] trait serializes a blob into bytes for
 //!   storage.
 //!
 //! # Examples
