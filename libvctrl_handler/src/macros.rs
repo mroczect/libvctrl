@@ -9,10 +9,10 @@
 //! # Design Rationale
 //!
 //! - **`vctrl_error_other!`** reduces boilerplate when constructing the
-//!   catch-all [`VctrlError::Other`] variant. It
-//!   mirrors the standard [`format!`] syntax, making call sites familiar.
+//!   catch-all `VctrlError::Other` variant. It
+//!   mirrors the standard `format!` syntax, making call sites familiar.
 //! - **`string_payload_variants!`** centralizes a repetitive `match` pattern
-//!   used by the [`PartialEq`] implementation of [`VctrlError`]. Instead of
+//!   used by the `PartialEq` implementation of `VctrlError`. Instead of
 //!   manually extracting string payloads from many variants, the macro
 //!   generates a private helper function.
 //!
@@ -24,10 +24,10 @@
 //!
 //! # Internal Mechanism
 //!
-//! [`vctrl_error_other!`] performs a standard token expansion: it wraps the
-//! result of `format!` directly in [`VctrlError::Other`].
+//! `vctrl_error_other!` performs a standard token expansion: it wraps the
+//! result of `format!` directly in `VctrlError::Other`.
 //!
-//! [`string_payload_variants!`] accepts a comma-separated list of variant
+//! `string_payload_variants!` accepts a comma-separated list of variant
 //! identifiers. It expands into a `const fn string_payload` that matches each
 //! listed variant and returns `Some(s.as_str())`. The generated function is
 //! scoped to the location where the macro is invoked, typically inside the
@@ -47,11 +47,11 @@
 //! );
 //! ```
 
-/// Creates a [`VctrlError::Other`] variant with a formatted message.
+/// Creates a `VctrlError::Other` variant with a formatted message.
 ///
 /// This macro is a shorthand for building miscellaneous errors without
 /// manually calling `format!`. It accepts the same arguments as `format!`
-/// and wraps the result in [`VctrlError::Other`].
+/// and wraps the result in `VctrlError::Other`.
 ///
 /// # Design Rationale
 ///
@@ -93,9 +93,9 @@
 /// assert_eq!(err.to_string(), "unexpected exit code 42");
 /// ```
 ///
-/// The returned value is a [`VctrlError`], so it can be
+/// The returned value is a `VctrlError`, so it can be
 /// propagated with the `?` operator in functions returning
-/// [`Result<T, VctrlError>`](crate::VctrlError):
+/// `Result<T, VctrlError>`:
 ///
 /// ```
 /// # use libvctrl_handler::{vctrl_error_other, VctrlError};
@@ -116,22 +116,22 @@ macro_rules! vctrl_error_other {
     };
 }
 
-/// Helper macro to generate the `string_payload` function for [`VctrlError`].
+/// Helper macro to generate the `string_payload` function for `VctrlError`.
 ///
-/// This macro is used inside the [`PartialEq`] implementation of
-/// [`VctrlError`] to extract the string payload from all
-/// variants that carry a [`String`]. It must be exported because it is
+/// This macro is used inside the `PartialEq` implementation of
+/// `VctrlError` to extract the string payload from all
+/// variants that carry a `String`. It must be exported because it is
 /// invoked from the `errors` module.
 ///
 /// # Design Rationale
 ///
-/// [`VctrlError`] has several string-bearing variants:
-/// [`InvalidName`](crate::VctrlError::InvalidName),
-/// [`InvalidEmail`](crate::VctrlError::InvalidEmail),
-/// [`RefNotFound`](crate::VctrlError::RefNotFound),
-/// [`CorruptedData`](crate::VctrlError::CorruptedData),
-/// [`SerializationError`](crate::VctrlError::SerializationError), and
-/// [`Other`](crate::VctrlError::Other). In the `eq` method, these variants
+/// `VctrlError` has several string-bearing variants:
+/// `InvalidName`,
+/// `InvalidEmail`,
+/// `RefNotFound`,
+/// `CorruptedData`,
+/// `SerializationError`, and
+/// `Other`. In the `eq` method, these variants
 /// must be compared by their string content. The macro avoids repeating the
 /// same `match` arm for every variant.
 ///
