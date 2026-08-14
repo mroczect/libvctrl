@@ -5,8 +5,8 @@
 //! This module defines the [`Signer`] trait, which abstracts the process of
 //! producing cryptographic signatures over arbitrary byte slices. In a
 //! version control system, signatures are typically used to attest to the
-//! authenticity and integrity of [`Commit`](crate::Commit) and
-//! [`Tag`](crate::Tag) objects, allowing users to verify that an object was
+//! authenticity and integrity of [`Commit`] and
+//! [`Tag`] objects, allowing users to verify that an object was
 //! indeed created by the claimed author.
 //!
 //! # Design Rationale
@@ -54,7 +54,7 @@
 //! The trait therefore returns [`Result<Vec<u8>, VctrlError>`], allowing
 //! implementations to report failures through the crate's unified error type.
 //! The most common error variant is
-//! [`VctrlError::Other`](crate::VctrlError::Other), which can carry a
+//! [`VctrlError::Other`], which can carry a
 //! descriptive message.
 //!
 //! # Internal Mechanism
@@ -96,8 +96,8 @@ use crate::errors::VctrlError;
 /// # Purpose
 ///
 /// A `Signer` produces a cryptographic signature over a byte slice, typically
-/// to attest to the authenticity of a [`Commit`](crate::Commit) or
-/// [`Tag`](crate::Tag). The trait is intentionally minimal: it only specifies
+/// to attest to the authenticity of a [`Commit`] or
+/// [`Tag`]. The trait is intentionally minimal: it only specifies
 /// the signing operation itself, leaving algorithm selection and key
 /// management to the implementation.
 ///
@@ -115,7 +115,7 @@ use crate::errors::VctrlError;
 /// The input is a plain byte slice rather than a generic type to keep the
 /// trait simple and avoid imposing serialization requirements on the data
 /// being signed. Callers are responsible for converting their objects to
-/// bytes (e.g., using an [`Encoder`](crate::Encoder)) before calling
+/// bytes (e.g., using an [`Encoder`]) before calling
 /// [`sign`](Signer::sign).
 ///
 /// # Why `Result<Vec<u8>>`?
@@ -161,13 +161,13 @@ pub trait Signer {
     /// This method is the core contract of the [`Signer`] trait. It takes an
     /// arbitrary byte slice and produces a cryptographic signature that can
     /// later be verified using a corresponding
-    /// [`Verifier`](crate::Verifier) implementation.
+    /// [`Verifier`] implementation.
     ///
     /// # Arguments
     ///
     /// * `data` - The raw bytes to sign. Typically this is the serialized
-    ///   representation of a [`Commit`](crate::Commit) or
-    ///   [`Tag`](crate::Tag), but any byte slice is accepted.
+    ///   representation of a [`Commit`] or
+    ///   [`Tag`], but any byte slice is accepted.
     ///
     /// # Returns
     ///
