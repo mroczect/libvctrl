@@ -2,7 +2,7 @@
 //!
 //! # Purpose
 //!
-//! This module defines the [`Hasher`] trait, which abstracts the
+//! This module defines the `Hasher` trait, which abstracts the
 //! content-addressing algorithm used to identify version control objects.
 //! Content addressing is the cornerstone of the object model: every object
 //! is identified by the cryptographic hash of its serialized bytes, ensuring
@@ -23,14 +23,14 @@
 //! # Why `Result`?
 //!
 //! Although most cryptographic hash functions are infallible for arbitrary
-//! byte slices, the `hash` method returns [`Result<Hash, VctrlError>`].
+//! byte slices, the `hash` method returns `Result<Hash, VctrlError>`.
 //! This design accounts for:
 //!
 //! - Hardware or library failures in exotic backends.
 //! - Keyed hashing algorithms that may fail if no key is configured.
 //! - Future extensions where hashing may involve fallible resources.
 //!
-//! The error type is [`VctrlError`], preserving a unified
+//! The error type is `VctrlError`, preserving a unified
 //! error surface across the crate.
 //!
 //! # Internal Mechanism
@@ -38,11 +38,11 @@
 //! A typical implementation receives a byte slice, feeds it to the selected
 //! hash function, and then wraps the resulting fixed-size digest in a
 //! `Hash`. The `Hash` type enforces a constant length via
-//! [`HASH_LENGTH`](crate::constants::HASH_LENGTH); the hasher is responsible
+//! `HASH_LENGTH`; the hasher is responsible
 //! for producing exactly that many bytes. If the underlying algorithm
 //! produces a digest of a different length, the implementation must either
 //! truncate, extend, or return
-//! [`VctrlError::InvalidHashLength`].
+//! `VctrlError::InvalidHashLength`.
 //!
 //! # Examples
 //!
@@ -74,7 +74,7 @@ use crate::types::hash::Hash;
 /// A `Hasher` implements the specific content-addressing algorithm (e.g.,
 /// SHA-256, BLAKE3) used to identify objects in the system. The output is
 /// always a `Hash`, which is a fixed-size byte array of
-/// [`HASH_LENGTH`](crate::constants::HASH_LENGTH) bytes.
+/// `HASH_LENGTH` bytes.
 ///
 /// # Design Rationale
 ///
@@ -83,7 +83,7 @@ use crate::types::hash::Hash;
 /// - The method takes `&[u8]` rather than `Vec<u8>` to avoid unnecessary
 ///   allocation and to accept any byte source (files, network buffers,
 ///   already-serialized objects).
-/// - The return type is [`Result<Hash, VctrlError>`] to accommodate
+/// - The return type is `Result<Hash, VctrlError>` to accommodate
 ///   fallible hashing backends while maintaining a unified error surface.
 ///
 /// # Why Not `Hash::from_bytes` Directly?
@@ -97,11 +97,11 @@ use crate::types::hash::Hash;
 ///
 /// An implementation receives raw bytes and returns a `Hash`. It must
 /// guarantee that the produced hash has exactly
-/// [`HASH_LENGTH`](crate::constants::HASH_LENGTH) bytes. Most implementations
-/// will call [`Hash::from_bytes`] on the digest produced by the underlying
+/// `HASH_LENGTH` bytes. Most implementations
+/// will call `Hash::from_bytes` on the digest produced by the underlying
 /// hash function. If the digest length is not exactly 64 bytes, the
 /// implementation must handle the mismatch, typically by returning
-/// [`VctrlError::InvalidHashLength`].
+/// `VctrlError::InvalidHashLength`.
 ///
 /// # Examples
 ///
@@ -127,7 +127,7 @@ pub trait Hasher {
     ///
     /// # Purpose
     ///
-    /// This method is the core contract of the [`Hasher`] trait. It takes an
+    /// This method is the core contract of the `Hasher` trait. It takes an
     /// arbitrary byte slice and returns its content address as a `Hash`.
     /// The same input must always produce the same output for a given
     /// hasher instance.
@@ -139,7 +139,7 @@ pub trait Hasher {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError`] if the hashing operation
+    /// Returns `VctrlError` if the hashing operation
     /// fails internally. Common failure modes include:
     ///
     /// - `InvalidHashLength`: The underlying algorithm produced a digest of
@@ -151,7 +151,7 @@ pub trait Hasher {
     ///
     /// The implementation feeds `data` to the underlying hash function,
     /// obtains the digest, and wraps it in a `Hash` via
-    /// [`Hash::from_bytes`]. If the digest length is correct, the call
+    /// `Hash::from_bytes`. If the digest length is correct, the call
     /// succeeds; otherwise, an error is returned.
     ///
     /// # Examples
@@ -176,7 +176,7 @@ pub trait Hasher {
     /// ```
     ///
     /// Using a hasher to produce a content address for a
-    /// [`Blob`]:
+    /// `Blob`:
     ///
     /// ```
     /// use libvctrl_handler::{Blob, Hash, Hasher, VctrlError};
