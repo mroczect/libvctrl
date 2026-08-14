@@ -26,7 +26,7 @@
 //!
 //! # Relationship to Other Types
 //!
-//! [`UserID`] is used by [`Commit`](crate::Commit) and [`Tag`](crate::Tag)
+//! [`UserID`] is used by [`Commit`] and [`Tag`]
 //! to record author, committer, and tagger identities.
 //!
 //! # Memory Layout
@@ -72,7 +72,7 @@ use crate::types::validate_name;
 /// # Invariants
 ///
 /// - `name` is non-empty and does not exceed the system's maximum name
-///   length (enforced by [`validate_name`]).
+///   length (enforced by `validate_name`).
 /// - `email` is non-empty. Full RFC-compliant email validation is not
 ///   performed; only a basic emptiness check is enforced.
 ///
@@ -116,7 +116,7 @@ impl UserID {
     ///
     /// # How It Works Internally
     ///
-    /// 1. Calls [`validate_name`] on the provided name. If invalid, returns
+    /// 1. Calls `validate_name` on the provided name. If invalid, returns
     ///    an error.
     /// 2. Checks whether the email is empty. If so, returns
     ///    [`VctrlError::InvalidEmail`].
