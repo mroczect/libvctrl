@@ -9,7 +9,7 @@
 //! # Design Rationale
 //!
 //! - **`vctrl_error_other!`** reduces boilerplate when constructing the
-//!   catch-all [`VctrlError::Other`](crate::VctrlError::Other) variant. It
+//!   catch-all [`VctrlError::Other`] variant. It
 //!   mirrors the standard [`format!`] syntax, making call sites familiar.
 //! - **`string_payload_variants!`** centralizes a repetitive `match` pattern
 //!   used by the [`PartialEq`] implementation of [`VctrlError`]. Instead of
@@ -93,7 +93,7 @@
 /// assert_eq!(err.to_string(), "unexpected exit code 42");
 /// ```
 ///
-/// The returned value is a [`VctrlError`](crate::VctrlError), so it can be
+/// The returned value is a [`VctrlError`], so it can be
 /// propagated with the `?` operator in functions returning
 /// [`Result<T, VctrlError>`](crate::VctrlError):
 ///
@@ -119,13 +119,13 @@ macro_rules! vctrl_error_other {
 /// Helper macro to generate the `string_payload` function for [`VctrlError`].
 ///
 /// This macro is used inside the [`PartialEq`] implementation of
-/// [`VctrlError`](crate::VctrlError) to extract the string payload from all
+/// [`VctrlError`] to extract the string payload from all
 /// variants that carry a [`String`]. It must be exported because it is
 /// invoked from the `errors` module.
 ///
 /// # Design Rationale
 ///
-/// [`VctrlError`](crate::VctrlError) has several string-bearing variants:
+/// [`VctrlError`] has several string-bearing variants:
 /// [`InvalidName`](crate::VctrlError::InvalidName),
 /// [`InvalidEmail`](crate::VctrlError::InvalidEmail),
 /// [`RefNotFound`](crate::VctrlError::RefNotFound),
