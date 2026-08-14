@@ -5,14 +5,14 @@
 //! This module defines the [`RefStore`] trait, which abstracts the storage
 //! of named references in a version control system. A named reference is a
 //! human-readable string (such as `"HEAD"`, `"refs/heads/main"`, or
-//! `"refs/tags/v1.0.0"`) that maps to a specific [`Hash`] value. References
+//! `"refs/tags/v1.0.0"`) that maps to a specific `Hash` value. References
 //! are the mechanism by which mutable pointers to immutable objects are
 //! maintained.
 //!
 //! # Design Rationale
 //!
 //! References are stored separately from the object database
-//! ([`ObjectStore`](crate::ObjectStore)) because they have fundamentally
+//! ([`ObjectStore`]) because they have fundamentally
 //! different lifecycle and mutability characteristics:
 //!
 //! - **Objects are immutable**: Once an object is written, its content hash
@@ -58,7 +58,7 @@
 //!
 //! All methods return [`Result<_, VctrlError>`] so that callers can handle
 //! failures uniformly. The most important error variant for this trait is
-//! [`VctrlError::RefNotFound`](crate::VctrlError::RefNotFound), which
+//! [`VctrlError::RefNotFound`], which
 //! signals that a requested reference does not exist.
 //!
 //! # Examples
@@ -113,14 +113,14 @@ use crate::types::hash::Hash;
 /// # Purpose
 ///
 /// A `RefStore` maps human-readable names (e.g., `"HEAD"`,
-/// `"refs/heads/main"`) to specific [`Hash`] values. This allows tracking
+/// `"refs/heads/main"`) to specific `Hash` values. This allows tracking
 /// branches and tags without scanning the entire object database. The trait
 /// is the persistence contract for the mutable pointer layer of a version
 /// control system.
 ///
 /// # Design Rationale
 ///
-/// References are stored separately from the [`ObjectStore`](crate::ObjectStore)
+/// References are stored separately from the [`ObjectStore`]
 /// because they are mutable and frequently updated, whereas objects are
 /// immutable and content-addressed. This separation avoids coupling the
 /// write-heavy reference updates with the append-oriented object storage.
@@ -139,7 +139,7 @@ use crate::types::hash::Hash;
 ///
 /// # Why `&Hash` for Values?
 ///
-/// Methods accept [`Hash`] references to avoid copying a 64-byte value on
+/// Methods accept `Hash` references to avoid copying a 64-byte value on
 /// every call. The borrowed hash can be dereferenced and copied only when
 /// the implementation actually needs to store it, minimizing stack traffic.
 ///
@@ -148,9 +148,9 @@ use crate::types::hash::Hash;
 /// Each method returns [`Result<_, VctrlError>`] to maintain a unified error
 /// surface. The most common error conditions are:
 ///
-/// - [`VctrlError::RefNotFound`](crate::VctrlError::RefNotFound) when a
+/// - [`VctrlError::RefNotFound`] when a
 ///   requested name does not exist.
-/// - [`VctrlError::IoError`](crate::VctrlError::IoError) when the underlying
+/// - [`VctrlError::IoError`] when the underlying
 ///   storage fails.
 ///
 /// # Internal Mechanism
@@ -346,7 +346,7 @@ pub trait RefStore {
     ///
     /// The implementation looks up the name in its internal storage. For an
     /// in-memory store, this is a simple map lookup. The hash is copied
-    /// (cheaply, because [`Hash`] is `Copy`) and returned.
+    /// (cheaply, because `Hash` is `Copy`) and returned.
     ///
     /// # Examples
     ///
