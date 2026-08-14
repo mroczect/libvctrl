@@ -311,6 +311,7 @@ pub use traits::core::{
     pack::{PackReader, PackWriter},
     ref_store::RefStore,
     reflog::{ReflogEntry, ReflogStore},
+    remote::Remote,
     revwalk::RevWalk,
     signer::Signer,
     transport::Transport,

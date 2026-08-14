@@ -23,6 +23,7 @@
 //! - `ReflogStore` – records changes to references for historical safety.
 //! - `Signer` – produces cryptographic signatures over data.
 //! - `Transport` – abstracts remote object synchronization.
+//! - `Remote` – abstracts interactions with a remote repository.
 //! - `Verifier` – verifies cryptographic signatures.
 //! - `TreeDiffer` - Contract for diffing two tree objects and producing a list of changes
 //! - `ConfigStore` – provides access to configuration values.
@@ -354,3 +355,4 @@ pub mod diff;
 pub mod index;
 pub mod pack;
 pub mod reflog;
+pub mod remote;
