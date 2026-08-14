@@ -1,8 +1,5 @@
 //! Core traits for the version control handler.
 //!
-//! Each submodule defines a single trait, keeping concerns separated.
-//! All traits are re-exported at the crate root for convenience.
-//!
 //! # Purpose
 //!
 //! This module is the internal home for all behavior contracts in the crate.
@@ -15,16 +12,13 @@
 //!
 //! The following traits are defined in this module:
 //!
-//! - `Decoder` – deserializes version control objects from
-//!   byte slices.
-//! - `Encoder` – serializes version control objects into
-//!   byte vectors.
-//! - `Hasher` – computes cryptographic hashes for content
-//!   addressing.
-//! - `ObjectStore` – manages content-addressable
-//!   storage of raw objects.
-//! - `RefStore` – stores and retrieves named references
-//!   such as branches and tags.
+//! - `Decoder` – deserializes version control objects from byte slices.
+//! - `Encoder` – serializes version control objects into byte vectors.
+//! - `Hasher` – computes cryptographic hashes for content addressing.
+//! - `ObjectStore` – manages content-addressable storage of raw objects.
+//! - `RefStore` – stores and retrieves named references such as branches
+//!   and tags.
+//! - `RevWalk` – traverses the commit graph by retrieving parent commits.
 //! - `Signer` – produces cryptographic signatures over data.
 //! - `Transport` – abstracts remote object synchronization.
 //! - `Verifier` – verifies cryptographic signatures.
@@ -82,8 +76,7 @@
 ///
 /// The `Decoder` trait provides the contract for converting
 /// byte slices back into in-memory version control objects like
-/// `Blob`, `Tree`, `Commit`,
-/// and `Tag`.
+/// `Blob`, `Tree`, `Commit`, and `Tag`.
 ///
 /// # Why a separate module
 ///
@@ -228,6 +221,37 @@ pub mod object_store;
 /// use libvctrl_handler::RefStore;
 /// ```
 pub mod ref_store;
+
+/// Defines the `RevWalk` trait for traversing commit graphs.
+///
+/// # Purpose
+///
+/// The `RevWalk` trait provides the contract for retrieving the parents of a
+/// commit, enabling reverse traversal of repository history. This is
+/// essential for operations like `rev-list`, `merge-base`, and `rev-parse`.
+///
+/// # Why a separate module
+///
+/// Graph traversal is a distinct responsibility from storage or encoding.
+/// Keeping the trait in its own file allows backends to provide different
+/// commit graph implementations without affecting other components.
+///
+/// # Examples
+///
+/// Importing the trait from this module:
+///
+/// ```
+/// use libvctrl_handler::traits::core::revwalk::RevWalk;
+///
+/// fn assert_revwalk<T: RevWalk>() {}
+/// ```
+///
+/// The crate root re-exports it:
+///
+/// ```
+/// use libvctrl_handler::RevWalk;
+/// ```
+pub mod revwalk;
 
 /// Defines the `Signer` trait for cryptographic signatures.
 ///

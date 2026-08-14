@@ -302,7 +302,8 @@ pub use errors::VctrlError;
 /// ```
 pub use traits::core::{
     decoder::Decoder, encoder::Encoder, hasher::Hasher, object_store::ObjectStore,
-    ref_store::RefStore, signer::Signer, transport::Transport, verifier::Verifier,
+    ref_store::RefStore, revwalk::RevWalk, signer::Signer, transport::Transport,
+    verifier::Verifier,
 };
 
 /// Re-exports of the core data structures.
