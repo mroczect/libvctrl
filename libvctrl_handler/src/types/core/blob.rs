@@ -22,8 +22,8 @@
 //!   parameters on the struct.
 //! - **Flexibility**: Callers can provide content from any source - file
 //!   reads, network buffers, or in-memory data - by passing a `Vec<u8>`.
-//! - **Efficiency**: Access via [`data()`](Blob::data) returns a `&[u8]`
-//!   with no allocation, and methods like [`size()`](Blob::size) are
+//! - **Efficiency**: Access via `data()` returns a `&[u8]`
+//!   with no allocation, and methods like `size()` are
 //!   `const` for compile-time evaluation.
 //!
 //! ## Immutability
@@ -47,12 +47,12 @@
 //!
 //! # Relationship to Other Types
 //!
-//! - A [`TreeEntry`] references a blob by its
-//!   `Hash`(crate::Hash) and an [`EntryKind`] of
+//! - A `TreeEntry` references a blob by its
+//!   `Hash` and an `EntryKind` of
 //!   `Blob`, `Executable`, or `Symlink`.
-//! - The [`Hasher`] trait computes a blob's hash from
-//!   [`data()`](Blob::data).
-//! - The [`Encoder`] trait serializes a blob into bytes for
+//! - The `Hasher` trait computes a blob's hash from
+//!   `data()`.
+//! - The `Encoder` trait serializes a blob into bytes for
 //!   storage.
 //!
 //! # Examples
@@ -84,14 +84,14 @@
 ///
 /// # Overview
 ///
-/// `Blob` is a wrapper around a private [`Vec<u8>`] that provides read-only
+/// `Blob` is a wrapper around a private `Vec<u8>` that provides read-only
 /// access to the bytes. It is the fundamental unit of file content in the
 /// version control system.
 ///
 /// # Design Rationale
 ///
 /// - The `data` field is private to enforce immutability after construction.
-/// - The struct derives [`Clone`], [`Debug`], [`PartialEq`], and [`Eq`],
+/// - The struct derives `Clone`, `Debug`, `PartialEq`, and `Eq`,
 ///   making it easy to duplicate, print, and compare blobs.
 /// - No `Default` implementation is provided because an empty blob should be
 ///   created explicitly, making the intent clear.
@@ -201,7 +201,7 @@ impl Blob {
     ///
     /// # Performance
     ///
-    /// The method simply delegates to [`Vec::len`], which is O(1) and does
+    /// The method simply delegates to `Vec::len`, which is O(1) and does
     /// not traverse the data.
     ///
     /// # Examples
