@@ -2,19 +2,19 @@
 //!
 //! # Purpose
 //!
-//! This module defines [`Commit`], a snapshot of the repository state at a
-//! particular point in history, and [`CommitMeta`], a separate struct for
+//! This module defines `Commit`, a snapshot of the repository state at a
+//! particular point in history, and `CommitMeta`, a separate struct for
 //! optional timestamp, timezone offset, and encoding information. The split
 //! allows constructing a commit with default metadata (zeroed timestamps)
-//! via [`Commit::new`], or with explicit metadata via
-//! [`Commit::with_meta`].
+//! via `Commit::new`, or with explicit metadata via
+//! `Commit::with_meta`.
 //!
 //! # Design Rationale
 //!
 //! Commits are central to version control. They represent immutable points
 //! in the history graph. A commit captures:
 //!
-//! - The root [`Tree`] that describes the repository content.
+//! - The root `Tree` that describes the repository content.
 //! - Zero or more parent commits, forming the history DAG.
 //! - The identity of the author and committer.
 //! - A human-readable message describing the change.
@@ -27,17 +27,17 @@
 //!
 //! # Relationship to Other Types
 //!
-//! - A [`Commit`] points to a [`Tree`] via its root tree hash.
-//! - The author and committer are [`UserID`] instances.
-//! - Parent commits are stored as a slice of `Hash`(`crate::Hash`) values.
-//! - Metadata is encapsulated in [`CommitMeta`], which is also used by
-//!   [`Tag`].
+//! - A `Commit` points to a `Tree` via its root tree hash.
+//! - The author and committer are `UserID` instances.
+//! - Parent commits are stored as a slice of `Hash` values.
+//! - Metadata is encapsulated in `CommitMeta`, which is also used by
+//!   `Tag`.
 //!
 //! # Memory Layout
 //!
-//! A `Commit` owns its fields: a `Hash` (64 bytes), a [`Vec`] of parent
-//! hashes (heap-allocated), two [`UserID`] values (each owning two
-//! [`String`]s), a [`String`] for the message, and a few scalar metadata
+//! A `Commit` owns its fields: a `Hash` (64 bytes), a `Vec` of parent
+//! hashes (heap-allocated), two `UserID` values (each owning two
+//! `String`s), a `String` for the message, and a few scalar metadata
 //! fields. The struct is not `Copy` because it owns heap-allocated data;
 //! cloning performs a deep copy.
 //!
@@ -77,16 +77,16 @@ use super::user_id::UserID;
 /// This struct bundles the optional metadata fields that accompany a commit:
 /// the creation timestamp, the timezone offset, and the character encoding
 /// used for the commit message. Separating this data into its own struct
-/// avoids clutter in [`Commit`] and makes it easy to apply default values
+/// avoids clutter in `Commit` and makes it easy to apply default values
 /// when no explicit metadata is supplied.
 ///
 /// # Design Rationale
 ///
 /// - All fields are public so that callers can freely construct and inspect
 ///   the metadata without accessor boilerplate.
-/// - The struct derives [`Default`], allowing zeroed timestamp, zero offset,
+/// - The struct derives `Default`, allowing zeroed timestamp, zero offset,
 ///   and no encoding as sensible defaults.
-/// - Reusing this struct in both [`Commit`] and [`Tag`] avoids
+/// - Reusing this struct in both `Commit` and `Tag` avoids
 ///   duplicating the same three fields across multiple objects.
 ///
 /// # Field Semantics
@@ -127,7 +127,7 @@ pub struct CommitMeta {
 /// # Purpose
 ///
 /// A commit captures the state of the repository at a specific moment by
-/// pointing to the root [`Tree`] via its `tree` hash,
+/// pointing to the root `Tree` via its `tree` hash,
 /// recording the author and committer, and optionally linking to parent
 /// commits through `parents`. The commit message describes the change.
 ///
@@ -140,13 +140,13 @@ pub struct CommitMeta {
 ///
 /// # Design Rationale
 ///
-/// - The constructor [`Commit::new`] provides a minimal commit with zeroed
+/// - The constructor `Commit::new` provides a minimal commit with zeroed
 ///   timestamps and no encoding, suitable for cases where metadata is not
 ///   yet known.
-/// - The alternative constructor [`Commit::with_meta`] accepts a
-///   [`CommitMeta`] for full control over timestamp, timezone offset, and
+/// - The alternative constructor `Commit::with_meta` accepts a
+///   `CommitMeta` for full control over timestamp, timezone offset, and
 ///   encoding.
-/// - Parent commits are stored in a [`Vec`] to allow zero or more parents.
+/// - Parent commits are stored in a `Vec` to allow zero or more parents.
 ///   An initial commit has an empty parent list; merge commits have multiple
 ///   parents.
 /// - The author and committer are separate identities to support cases
@@ -198,7 +198,7 @@ impl Commit {
     ///
     /// This constructor is useful when metadata is not yet known or when
     /// the caller intends to apply metadata later. For full control, use
-    /// [`with_meta`](Self::with_meta).
+    /// `with_meta`.
     ///
     /// # Arguments
     ///
@@ -276,7 +276,7 @@ impl Commit {
     /// * `author` - The person who authored the changes.
     /// * `committer` - The person who committed the changes.
     /// * `message` - The commit message.
-    /// * `meta` - A [`CommitMeta`] containing timestamp, timezone offset,
+    /// * `meta` - A `CommitMeta` containing timestamp, timezone offset,
     ///   and encoding.
     ///
     /// # Returns
@@ -357,7 +357,7 @@ impl Commit {
     ///
     /// # Returns
     ///
-    /// A reference to the internal [`Vec`] of parent hashes as a slice.
+    /// A reference to the internal `Vec` of parent hashes as a slice.
     ///
     /// # Examples
     ///
@@ -381,7 +381,7 @@ impl Commit {
     ///
     /// # Returns
     ///
-    /// A reference to the [`UserID`] of the author.
+    /// A reference to the `UserID` of the author.
     ///
     /// # Examples
     ///
@@ -404,7 +404,7 @@ impl Commit {
     ///
     /// # Returns
     ///
-    /// A reference to the [`UserID`] of the committer.
+    /// A reference to the `UserID` of the committer.
     ///
     /// # Examples
     ///
@@ -495,7 +495,7 @@ impl Commit {
     ///
     /// # Returns
     ///
-    /// An [`Option<&str>`] containing the encoding name if present.
+    /// An `Option<&str>` containing the encoding name if present.
     ///
     /// # Examples
     ///
