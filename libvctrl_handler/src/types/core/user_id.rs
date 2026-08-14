@@ -2,14 +2,14 @@
 //!
 //! # Purpose
 //!
-//! [`UserID`] captures the name and email of an actor (author or committer)
+//! `UserID` captures the name and email of an actor (author or committer)
 //! in the version control system. It enforces basic validity rules at
 //! construction to guarantee that stored identities are always well-formed.
 //!
 //! # Design Rationale
 //!
 //! Identity is essential for recording who authored or committed a change.
-//! A [`UserID`] is a small value object that bundles a display name and an
+//! A `UserID` is a small value object that bundles a display name and an
 //! email address. By validating these fields at construction, the rest of
 //! the system can rely on their invariants without repeated checks.
 //!
@@ -26,13 +26,13 @@
 //!
 //! # Relationship to Other Types
 //!
-//! [`UserID`] is used by [`Commit`] and [`Tag`]
+//! `UserID` is used by `Commit` and `Tag`
 //! to record author, committer, and tagger identities.
 //!
 //! # Memory Layout
 //!
-//! A [`UserID`] owns two heap-allocated [`String`]s. Its size is exactly
-//! two [`String`] sizes (48 bytes on 64-bit platforms). Cloning performs a
+//! A `UserID` owns two heap-allocated `String`s. Its size is exactly
+//! two `String` sizes (48 bytes on 64-bit platforms). Cloning performs a
 //! deep copy of both strings.
 //!
 //! # Examples
@@ -59,14 +59,14 @@ use crate::types::validate_name;
 ///
 /// # Design Rationale
 ///
-/// - **Validation at construction**: The constructor returns a [`Result`],
+/// - **Validation at construction**: The constructor returns a `Result`,
 ///   forcing callers to handle malformed input immediately. Once a `UserID`
 ///   exists, the system can rely on its invariants without repeated checks
 ///   elsewhere.
 /// - **Immutability**: The fields are private and no mutable accessors are
 ///   provided, preserving the identity's integrity.
-/// - **Cloneable and comparable**: The struct derives [`Clone`], [`Debug`],
-///   [`PartialEq`], and [`Eq`], making it easy to duplicate, print, and
+/// - **Cloneable and comparable**: The struct derives `Clone`, `Debug`,
+///   `PartialEq`, and `Eq`, making it easy to duplicate, print, and
 ///   compare identities.
 ///
 /// # Invariants
@@ -104,8 +104,8 @@ impl UserID {
     ///
     /// # Errors
     ///
-    /// - [`VctrlError::InvalidName`] if `name` is empty or too long.
-    /// - [`VctrlError::InvalidEmail`] if `email` is empty.
+    /// - `VctrlError::InvalidName` if `name` is empty or too long.
+    /// - `VctrlError::InvalidEmail` if `email` is empty.
     ///
     /// # Why only basic email validation?
     ///
@@ -119,7 +119,7 @@ impl UserID {
     /// 1. Calls `validate_name` on the provided name. If invalid, returns
     ///    an error.
     /// 2. Checks whether the email is empty. If so, returns
-    ///    [`VctrlError::InvalidEmail`].
+    ///    `VctrlError::InvalidEmail`.
     /// 3. Constructs and returns `Ok(Self { name, email })`.
     ///
     /// # Examples
