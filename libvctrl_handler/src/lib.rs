@@ -301,6 +301,7 @@ pub use errors::VctrlError;
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub use traits::core::{
+    blame::{Blame, BlameEntry},
     config::ConfigStore,
     decoder::Decoder,
     diff::{Change, TreeDiffer},

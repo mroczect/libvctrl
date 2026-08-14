@@ -27,6 +27,7 @@
 //! - `Verifier` – verifies cryptographic signatures.
 //! - `TreeDiffer` - Contract for diffing two tree objects and producing a list of changes
 //! - `ConfigStore` – provides access to configuration values.
+//! - `Blame` – abstracts line-by-line origin tracking for files.
 //!
 //! # Design Rationale
 //!
@@ -350,6 +351,7 @@ pub mod transport;
 /// ```
 pub mod verifier;
 
+pub mod blame;
 pub mod config;
 pub mod diff;
 pub mod index;
