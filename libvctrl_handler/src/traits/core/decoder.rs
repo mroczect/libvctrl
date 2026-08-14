@@ -3,9 +3,9 @@
 //! # Purpose
 //!
 //! This module defines the [`Decoder`] trait, which is the inverse of
-//! [`Encoder`](crate::Encoder). A decoder translates raw byte vectors back
-//! into high-level version control objects such as [`Blob`](crate::Blob),
-//! [`Tree`](crate::Tree), [`Commit`](crate::Commit), and [`Tag`](crate::Tag).
+//! [`Encoder`]. A decoder translates raw byte vectors back
+//! into high-level version control objects such as [`Blob`],
+//! [`Tree`], [`Commit`], and [`Tag`].
 //! The trait is intentionally abstract, allowing multiple serialization
 //! formats without coupling to any specific representation.
 //!
@@ -14,7 +14,7 @@
 //! Decoding is a fallible operation because byte slices may be corrupted,
 //! truncated, or malformed. Every method therefore returns
 //! [`Result<_, VctrlError>`](crate::VctrlError), with
-//! [`VctrlError::CorruptedData`](crate::VctrlError::CorruptedData) as the
+//! [`VctrlError::CorruptedData`] as the
 //! primary error variant for invalid input. This forces callers to handle
 //! failure explicitly and prevents invalid objects from entering the system.
 //!
@@ -81,7 +81,7 @@ use crate::types::tree::Tree;
 /// # Purpose
 ///
 /// A `Decoder` translates byte vectors back into in-memory data structures.
-/// It is the inverse of [`Encoder`](crate::Encoder). The trait is
+/// It is the inverse of [`Encoder`]. The trait is
 /// object-specialized: each method decodes exactly one object type, allowing
 /// implementations to handle type-specific parsing and validation.
 ///
@@ -103,10 +103,10 @@ use crate::types::tree::Tree;
 ///
 /// An implementation reads the byte slice and reconstructs the object.
 /// Validation is typically delegated to the object constructors (e.g.,
-/// [`Tree::new`](crate::Tree::new), [`Tag::new`](crate::Tag::new)), which
+/// [`Tree::new`], [`Tag::new`]), which
 /// enforce invariants such as name validity and sort order. If any
 /// validation fails, the decoder returns
-/// [`VctrlError::CorruptedData`](crate::VctrlError::CorruptedData) or a more
+/// [`VctrlError::CorruptedData`] or a more
 /// specific variant depending on the context.
 ///
 /// # Examples
@@ -144,19 +144,19 @@ use crate::types::tree::Tree;
 /// assert_eq!(blob.data(), b"data");
 /// ```
 pub trait Decoder {
-    /// Decodes a byte slice into a [`Blob`](crate::Blob).
+    /// Decodes a byte slice into a [`Blob`].
     ///
     /// # Purpose
     ///
     /// Reconstructs a [`Blob`] from its serialized form. The implementation
     /// should extract the raw byte content and wrap it in a new
-    /// [`Blob`](crate::Blob) using [`Blob::new`](crate::Blob::new). No
+    /// [`Blob`] using [`Blob::new`]. No
     /// additional validation is required because a [`Blob`] accepts any
     /// byte sequence.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::CorruptedData`](crate::VctrlError::CorruptedData)
+    /// Returns [`VctrlError::CorruptedData`]
     /// if the byte slice does not represent a valid blob according to the
     /// wire format.
     ///
@@ -191,13 +191,13 @@ pub trait Decoder {
     /// ```
     fn decode_blob(&self, data: &[u8]) -> Result<Blob, VctrlError>;
 
-    /// Decodes a byte slice into a [`Tree`](crate::Tree).
+    /// Decodes a byte slice into a [`Tree`].
     ///
     /// # Purpose
     ///
     /// Reconstructs a [`Tree`] from its serialized representation. The
     /// implementation must parse entries, validate their names and order,
-    /// and call [`Tree::new`](crate::Tree::new) with the resulting vector.
+    /// and call [`Tree::new`] with the resulting vector.
     ///
     /// # Why validation is critical
     ///
@@ -208,7 +208,7 @@ pub trait Decoder {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::CorruptedData`](crate::VctrlError::CorruptedData)
+    /// Returns [`VctrlError::CorruptedData`]
     /// if the byte slice contains malformed entries or violates tree
     /// invariants.
     ///
@@ -229,20 +229,20 @@ pub trait Decoder {
     /// ```
     fn decode_tree(&self, data: &[u8]) -> Result<Tree, VctrlError>;
 
-    /// Decodes a byte slice into a [`Commit`](crate::Commit).
+    /// Decodes a byte slice into a [`Commit`].
     ///
     /// # Purpose
     ///
     /// Reconstructs a [`Commit`] from its serialized form. The implementation
     /// must extract the root tree hash, parent hashes, author and committer
     /// information, message, and optional metadata, then construct a
-    /// [`Commit`](crate::Commit) using either
-    /// [`Commit::new`](crate::Commit::new) or
-    /// [`Commit::with_meta`](crate::Commit::with_meta).
+    /// [`Commit`] using either
+    /// [`Commit::new`] or
+    /// [`Commit::with_meta`].
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::CorruptedData`](crate::VctrlError::CorruptedData)
+    /// Returns [`VctrlError::CorruptedData`]
     /// if any field is malformed or fails validation.
     ///
     /// # Examples
@@ -262,19 +262,19 @@ pub trait Decoder {
     /// ```
     fn decode_commit(&self, data: &[u8]) -> Result<Commit, VctrlError>;
 
-    /// Decodes a byte slice into a [`Tag`](crate::Tag).
+    /// Decodes a byte slice into a [`Tag`].
     ///
     /// # Purpose
     ///
     /// Reconstructs a [`Tag`] from its serialized representation. The
     /// implementation must extract the tag name, target hash, optional tagger
     /// information, message, and metadata, then construct a
-    /// [`Tag`](crate::Tag) using either [`Tag::new`](crate::Tag::new) or
-    /// [`Tag::with_meta`](crate::Tag::with_meta).
+    /// [`Tag`] using either [`Tag::new`] or
+    /// [`Tag::with_meta`].
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::CorruptedData`](crate::VctrlError::CorruptedData)
+    /// Returns [`VctrlError::CorruptedData`]
     /// if the name is invalid or the target hash length is incorrect.
     ///
     /// # Examples
