@@ -4,10 +4,10 @@
 //!
 //! This module defines the [`ObjectStore`] trait, which represents the
 //! persistence layer for raw, serialized version control objects. An object
-//! store is a key-value database where the key is a [`Hash`] (the content
+//! store is a key-value database where the key is a `Hash` (the content
 //! address) and the value is the raw byte representation of a
-//! [`Blob`](crate::Blob), [`Tree`](crate::Tree), [`Commit`](crate::Commit),
-//! or [`Tag`](crate::Tag).
+//! [`Blob`], [`Tree`], [`Commit`],
+//! or [`Tag`].
 //!
 //! # Design Rationale
 //!
@@ -34,7 +34,7 @@
 //!
 //! # How It Works Internally
 //!
-//! An implementation stores byte vectors under [`Hash`] keys. When
+//! An implementation stores byte vectors under `Hash` keys. When
 //! [`ObjectStore::put`] is called, the implementation should copy or move
 //! the provided `data` into its internal storage. When
 //! [`ObjectStore::get`] is called, the implementation looks up the hash and
@@ -99,13 +99,13 @@ use std::io::Read;
 ///
 /// An `ObjectStore` is responsible for storing and retrieving raw,
 /// serialized version control objects (blobs, trees, commits, tags) using
-/// their [`Hash`] as the primary key. This trait is the low-level
+/// their `Hash` as the primary key. This trait is the low-level
 /// persistence contract that all storage backends must implement.
 ///
 /// # Design Rationale
 ///
-/// - **`&Hash` lookups**: The trait uses borrowed [`Hash`] references for
-///   lookups rather than owned values. A [`Hash`] is 64 bytes; borrowing
+/// - **`&Hash` lookups**: The trait uses borrowed `Hash` references for
+///   lookups rather than owned values. A `Hash` is 64 bytes; borrowing
 ///   avoids unnecessary stack copies and permits the store to implement
 ///   efficient in-place key comparisons.
 /// - **`&[u8]` for `put`**: The `put` method accepts a byte slice instead of
