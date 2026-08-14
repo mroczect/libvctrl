@@ -5,7 +5,7 @@
 //! # Purpose
 //!
 //! This module contains the canonical definitions of all persistent objects:
-//! [`Blob`], [`Commit`], [`CommitMeta`], [`Hash`], [`Tag`], [`Tree`],
+//! [`Blob`], [`Commit`], [`CommitMeta`], `Hash`, [`Tag`], [`Tree`],
 //! [`TreeEntry`], and [`UserID`]. Each type is defined in its own submodule
 //! and re-exported here for direct access. These types form the immutable
 //! core of the content-addressable object model used throughout
@@ -31,9 +31,9 @@
 //!   optionally to parent commits via parent hashes. It records who authored
 //!   and committed the change, along with a message and metadata.
 //! - A [`Tree`] contains a sorted list of [`TreeEntry`] items. Each entry
-//!   associates a name with a [`Hash`] and an [`EntryKind`](crate::EntryKind)
+//!   associates a name with a `Hash` and an [`EntryKind`]
 //!   that indicates whether the entry points to a blob or another tree.
-//! - A [`Blob`] represents raw file content and is referred to by a [`Hash`]
+//! - A [`Blob`] represents raw file content and is referred to by a `Hash`
 //!   stored in a tree entry. Blobs are the leaves of the object graph.
 //! - A [`Tag`] provides a human-readable name (e.g., a release version) for
 //!   a commit, tree, or blob, often with an optional tagger and message.
@@ -41,7 +41,7 @@
 //!   in commits and tags to record authorship.
 //! - [`CommitMeta`] holds optional timestamp, timezone offset, and encoding
 //!   information shared by commits and tags.
-//! - [`Hash`] is the content address that identifies every object. It is a
+//! - `Hash` is the content address that identifies every object. It is a
 //!   64-byte cryptographic digest.
 //!
 //! # Design Rationale
@@ -62,7 +62,7 @@
 //!
 //! The module is intentionally free of logic beyond type definitions and
 //! accessors. Behaviour such as serialization, hashing, and storage is
-//! defined in the [`traits`](crate::traits) module. This separation keeps
+//! defined in the [`traits`] module. This separation keeps
 //! the data model pure and easy to reason about.
 //!
 //! # Examples
@@ -86,7 +86,7 @@ pub mod blob;
 /// # Purpose
 ///
 /// A [`Blob`] stores arbitrary byte content exactly as provided. It is the
-/// simplest object in the system and is content-addressable via its [`Hash`].
+/// simplest object in the system and is content-addressable via its `Hash`.
 /// Blobs represent file contents in a version control tree.
 ///
 /// # Design Rationale
@@ -170,7 +170,7 @@ pub mod hash;
 ///
 /// # Purpose
 ///
-/// [`Hash`] is a fixed-size cryptographic digest (64 bytes) that identifies
+/// `Hash` is a fixed-size cryptographic digest (64 bytes) that identifies
 /// objects. It is used throughout the system for deduplication and integrity
 /// verification.
 ///
@@ -200,7 +200,7 @@ pub mod tag;
 ///
 /// # Purpose
 ///
-/// A [`Tag`] associates a human-readable name with a specific [`Hash`] and
+/// A [`Tag`] associates a human-readable name with a specific `Hash` and
 /// optional metadata (tagger, message, timestamp). Tags are typically used
 /// to mark releases or significant points in history.
 ///
@@ -233,7 +233,7 @@ pub mod tree;
 /// # Purpose
 ///
 /// A [`Tree`] contains a sorted list of [`TreeEntry`] items, each linking a
-/// name, an [`EntryKind`](crate::EntryKind), and a [`Hash`]. Trees reference
+/// name, an [`EntryKind`], and a `Hash`. Trees reference
 /// both blobs (files) and other trees (subdirectories), forming the
 /// hierarchical structure of a repository.
 ///
