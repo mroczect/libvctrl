@@ -2,11 +2,11 @@
 //!
 //! # Purpose
 //!
-//! This module defines the [`Signer`] trait, which abstracts the process of
+//! This module defines the `Signer` trait, which abstracts the process of
 //! producing cryptographic signatures over arbitrary byte slices. In a
 //! version control system, signatures are typically used to attest to the
-//! authenticity and integrity of [`Commit`] and
-//! [`Tag`] objects, allowing users to verify that an object was
+//! authenticity and integrity of `Commit` and
+//! `Tag` objects, allowing users to verify that an object was
 //! indeed created by the claimed author.
 //!
 //! # Design Rationale
@@ -30,7 +30,7 @@
 //!
 //! # Why `&mut self`?
 //!
-//! The [`Signer::sign`] method takes `&mut self` rather than `&self`. This
+//! The `Signer::sign` method takes `&mut self` rather than `&self`. This
 //! design choice reflects the fact that signing often involves mutable
 //! internal state:
 //!
@@ -51,10 +51,10 @@
 //! - Hardware module unavailability.
 //! - Algorithm-specific constraints (e.g., message too long for RSA).
 //!
-//! The trait therefore returns [`Result<Vec<u8>, VctrlError>`], allowing
+//! The trait therefore returns `Result<Vec<u8>, VctrlError>`, allowing
 //! implementations to report failures through the crate's unified error type.
 //! The most common error variant is
-//! [`VctrlError::Other`], which can carry a
+//! `VctrlError::Other`, which can carry a
 //! descriptive message.
 //!
 //! # Internal Mechanism
@@ -96,8 +96,8 @@ use crate::errors::VctrlError;
 /// # Purpose
 ///
 /// A `Signer` produces a cryptographic signature over a byte slice, typically
-/// to attest to the authenticity of a [`Commit`] or
-/// [`Tag`]. The trait is intentionally minimal: it only specifies
+/// to attest to the authenticity of a `Commit` or
+/// `Tag`. The trait is intentionally minimal: it only specifies
 /// the signing operation itself, leaving algorithm selection and key
 /// management to the implementation.
 ///
@@ -115,15 +115,15 @@ use crate::errors::VctrlError;
 /// The input is a plain byte slice rather than a generic type to keep the
 /// trait simple and avoid imposing serialization requirements on the data
 /// being signed. Callers are responsible for converting their objects to
-/// bytes (e.g., using an [`Encoder`]) before calling
-/// [`sign`](Signer::sign).
+/// bytes (e.g., using an `Encoder`) before calling
+/// `sign`.
 ///
 /// # Why `Result<Vec<u8>>`?
 ///
 /// Signing is fallible because the private key may be missing, the hardware
 /// module may be unavailable, or the algorithm may reject the input length.
 /// The return type captures both success (as a byte vector) and failure (as
-/// a [`VctrlError`]).
+/// a `VctrlError`).
 ///
 /// # How It Works Internally
 ///
@@ -158,16 +158,16 @@ pub trait Signer {
     ///
     /// # Purpose
     ///
-    /// This method is the core contract of the [`Signer`] trait. It takes an
+    /// This method is the core contract of the `Signer` trait. It takes an
     /// arbitrary byte slice and produces a cryptographic signature that can
     /// later be verified using a corresponding
-    /// [`Verifier`] implementation.
+    /// `Verifier` implementation.
     ///
     /// # Arguments
     ///
     /// * `data` - The raw bytes to sign. Typically this is the serialized
-    ///   representation of a [`Commit`] or
-    ///   [`Tag`], but any byte slice is accepted.
+    ///   representation of a `Commit` or
+    ///   `Tag`, but any byte slice is accepted.
     ///
     /// # Returns
     ///
@@ -177,7 +177,7 @@ pub trait Signer {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::Other`] if the signing process fails, for
+    /// Returns `VctrlError::Other` if the signing process fails, for
     /// example because the private key is missing, the hardware module is
     /// unavailable, or the algorithm rejects the input length. The error
     /// message should provide additional context.
