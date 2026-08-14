@@ -5,8 +5,8 @@
 //! # Purpose
 //!
 //! This module contains the canonical definitions of all persistent objects:
-//! [`Blob`], [`Commit`], [`CommitMeta`], `Hash`, [`Tag`], [`Tree`],
-//! [`TreeEntry`], and [`UserID`]. Each type is defined in its own submodule
+//! `Blob`, `Commit`, `CommitMeta`, `Hash`, `Tag`, `Tree`,
+//! `TreeEntry`, and `UserID`. Each type is defined in its own submodule
 //! and re-exported here for direct access. These types form the immutable
 //! core of the content-addressable object model used throughout
 //! `libvctrl_handler`.
@@ -27,19 +27,19 @@
 //!
 //! # How the Types Relate
 //!
-//! - A [`Commit`] points to a [`Tree`] via its root tree hash, and
+//! - A `Commit` points to a `Tree` via its root tree hash, and
 //!   optionally to parent commits via parent hashes. It records who authored
 //!   and committed the change, along with a message and metadata.
-//! - A [`Tree`] contains a sorted list of [`TreeEntry`] items. Each entry
-//!   associates a name with a `Hash` and an [`EntryKind`]
+//! - A `Tree` contains a sorted list of `TreeEntry` items. Each entry
+//!   associates a name with a `Hash` and an `EntryKind`
 //!   that indicates whether the entry points to a blob or another tree.
-//! - A [`Blob`] represents raw file content and is referred to by a `Hash`
+//! - A `Blob` represents raw file content and is referred to by a `Hash`
 //!   stored in a tree entry. Blobs are the leaves of the object graph.
-//! - A [`Tag`] provides a human-readable name (e.g., a release version) for
+//! - A `Tag` provides a human-readable name (e.g., a release version) for
 //!   a commit, tree, or blob, often with an optional tagger and message.
-//! - [`UserID`] captures the identity of an actor (name + email) and is used
+//! - `UserID` captures the identity of an actor (name + email) and is used
 //!   in commits and tags to record authorship.
-//! - [`CommitMeta`] holds optional timestamp, timezone offset, and encoding
+//! - `CommitMeta` holds optional timestamp, timezone offset, and encoding
 //!   information shared by commits and tags.
 //! - `Hash` is the content address that identifies every object. It is a
 //!   64-byte cryptographic digest.
@@ -62,7 +62,7 @@
 //!
 //! The module is intentionally free of logic beyond type definitions and
 //! accessors. Behaviour such as serialization, hashing, and storage is
-//! defined in the [`traits`] module. This separation keeps
+//! defined in the `traits` module. This separation keeps
 //! the data model pure and easy to reason about.
 //!
 //! # Examples
@@ -78,14 +78,13 @@
 //! assert_eq!(blob.size(), 14);
 //! assert_eq!(hash.as_bytes().len(), 64);
 //! ```
-
 pub mod blob;
 
 /// Binary Large Object.
 ///
 /// # Purpose
 ///
-/// A [`Blob`] stores arbitrary byte content exactly as provided. It is the
+/// A `Blob` stores arbitrary byte content exactly as provided. It is the
 /// simplest object in the system and is content-addressable via its `Hash`.
 /// Blobs represent file contents in a version control tree.
 ///
@@ -114,18 +113,18 @@ pub mod commit;
 ///
 /// # Purpose
 ///
-/// [`Commit`] records a snapshot of the repository state. It carries a
+/// `Commit` records a snapshot of the repository state. It carries a
 /// pointer to the root tree, references to parent commits, author/committer
 /// information, a message, and optional metadata.
 ///
-/// [`CommitMeta`] is a separate struct that holds timestamp, timezone
+/// `CommitMeta` is a separate struct that holds timestamp, timezone
 /// offset, and encoding information, allowing the commit to be constructed
 /// with or without explicit metadata.
 ///
 /// # Design Rationale
 ///
 /// - The commit is immutable after construction, preserving its hash.
-/// - The separation of [`Commit`] and [`CommitMeta`] keeps the main struct
+/// - The separation of `Commit` and `CommitMeta` keeps the main struct
 ///   uncluttered and allows default values when metadata is absent.
 /// - The commit message and other fields are private with accessor methods
 ///   to enforce invariants.
@@ -177,7 +176,7 @@ pub mod hash;
 /// # Design Rationale
 ///
 /// - The hash is stored as a byte array of length
-///   [`HASH_LENGTH`](crate::constants::HASH_LENGTH), ensuring stack
+///   `HASH_LENGTH`, ensuring stack
 ///   allocation and cheap copies.
 /// - The type implements `Copy`, `Eq`, `Ord`, and `Hash`, making it suitable
 ///   as a key in maps and sets.
@@ -200,7 +199,7 @@ pub mod tag;
 ///
 /// # Purpose
 ///
-/// A [`Tag`] associates a human-readable name with a specific `Hash` and
+/// A `Tag` associates a human-readable name with a specific `Hash` and
 /// optional metadata (tagger, message, timestamp). Tags are typically used
 /// to mark releases or significant points in history.
 ///
@@ -210,7 +209,7 @@ pub mod tag;
 ///   non-emptiness.
 /// - The optional tagger and message support both lightweight and annotated
 ///   tags.
-/// - Reuses [`CommitMeta`] for timestamp and encoding information, avoiding
+/// - Reuses `CommitMeta` for timestamp and encoding information, avoiding
 ///   duplication.
 ///
 /// # Examples
@@ -232,8 +231,8 @@ pub mod tree;
 ///
 /// # Purpose
 ///
-/// A [`Tree`] contains a sorted list of [`TreeEntry`] items, each linking a
-/// name, an [`EntryKind`], and a `Hash`. Trees reference
+/// A `Tree` contains a sorted list of `TreeEntry` items, each linking a
+/// name, an `EntryKind`, and a `Hash`. Trees reference
 /// both blobs (files) and other trees (subdirectories), forming the
 /// hierarchical structure of a repository.
 ///
@@ -262,7 +261,7 @@ pub mod user_id;
 ///
 /// # Purpose
 ///
-/// [`UserID`] is used to record who authored or committed a change. It
+/// `UserID` is used to record who authored or committed a change. It
 /// enforces non-empty name and valid email format at construction.
 ///
 /// # Design Rationale
