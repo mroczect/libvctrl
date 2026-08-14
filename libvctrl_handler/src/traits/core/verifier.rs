@@ -45,9 +45,9 @@
 //! cryptographic check. The exact steps depend on the algorithm, but the
 //! trait ensures a uniform interface.
 //!
-//! # Relationship to [`Signer`](crate::Signer)
+//! # Relationship to [`Signer`]
 //!
-//! A [`Signer`](crate::Signer) produces signatures, and a [`Verifier`]
+//! A [`Signer`] produces signatures, and a [`Verifier`]
 //! checks them. They are designed as separate traits to reflect real-world
 //! security practices where signing and verification use different keys and
 //! often different software components.
@@ -80,7 +80,7 @@ use crate::errors::VctrlError;
 ///
 /// A `Verifier` checks whether a given byte slice and signature pair are
 /// valid according to a specific cryptographic key or verification context.
-/// It is the counterpart to [`Signer`](crate::Signer), which produces
+/// It is the counterpart to [`Signer`], which produces
 /// signatures. Verification is used to confirm that data has not been
 /// altered and was indeed signed by the claimed entity.
 ///
@@ -151,7 +151,7 @@ pub trait Verifier {
     /// * `data` - The raw bytes that were signed. This is typically the
     ///   serialized representation of a version control object.
     /// * `signature` - The signature bytes to verify, in the format produced
-    ///   by the corresponding [`Signer`](crate::Signer).
+    ///   by the corresponding [`Signer`].
     ///
     /// # Returns
     ///
