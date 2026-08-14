@@ -301,6 +301,7 @@ pub use errors::VctrlError;
 /// assert_eq!(hash.as_bytes().len(), 64);
 /// ```
 pub use traits::core::{
+    blame::{Blame, BlameEntry},
     config::ConfigStore,
     decoder::Decoder,
     diff::{Change, TreeDiffer},
@@ -310,7 +311,7 @@ pub use traits::core::{
     object_store::ObjectStore,
     pack::{PackReader, PackWriter},
     ref_store::RefStore,
-    reflog::{ReflogEntry, ReflogStore},
+    reflog::ReflogStore,
     remote::Remote,
     revwalk::RevWalk,
     signer::Signer,
@@ -332,4 +333,7 @@ pub use traits::core::{
 /// let blob = Blob::new(vec![1, 2, 3]);
 /// assert_eq!(blob.size(), 3);
 /// ```
-pub use types::{Blob, Commit, CommitMeta, Hash, Tag, Tree, TreeEntry, UserID};
+pub use types::{
+    Blob, ChangeKind, Commit, CommitMeta, Conflict, FileDelta, Hash, MergeResult, ReflogEntry, Tag,
+    Tree, TreeDelta, TreeEntry, UserID,
+};

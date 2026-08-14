@@ -42,8 +42,8 @@
 //!             .entry(reference.clone())
 //!             .or_default()
 //!             .push(ReflogEntry {
-//!                 old_hash,
-//!                 new_hash,
+//!                 old_id: old_hash,
+//!                 new_id: new_hash,
 //!                 reason: reason.to_string(),
 //!                 timestamp,
 //!             });
@@ -68,28 +68,10 @@
 //!
 //! let entries = reflog.entries(&"refs/heads/main".to_string()).unwrap();
 //! assert_eq!(entries.len(), 1);
-//! assert_eq!(entries[0].old_hash, Some(old));
+//! assert_eq!(entries[0].old_id, Some(old));
 //! ```
 
-use crate::{Hash, VctrlError};
-
-/// A single entry in a reference log.
-///
-/// Each entry records the previous hash, the new hash, a human-readable
-/// reason for the change, and a timestamp. The hash fields are optional
-/// because a reference may be created from nothing (`old_hash` is `None`)
-/// or deleted (`new_hash` is `None`).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReflogEntry {
-    /// The hash before the change, or `None` if the reference was created.
-    pub old_hash: Option<Hash>,
-    /// The hash after the change, or `None` if the reference was deleted.
-    pub new_hash: Option<Hash>,
-    /// A human-readable reason for the change (e.g., "commit").
-    pub reason: String,
-    /// The timestamp of the change (e.g., Unix epoch seconds).
-    pub timestamp: u64,
-}
+use crate::{Hash, ReflogEntry, VctrlError};
 
 /// Trait for recording changes to references.
 ///
