@@ -20,6 +20,7 @@
 //!   and tags.
 //! - `RevWalk` – traverses the commit graph by retrieving parent commits.
 //! - `Index` – represents a staging area for index operations.
+//! - `ReflogStore` – records changes to references for historical safety.
 //! - `Signer` – produces cryptographic signatures over data.
 //! - `Transport` – abstracts remote object synchronization.
 //! - `Verifier` – verifies cryptographic signatures.
@@ -352,3 +353,4 @@ pub mod config;
 pub mod diff;
 pub mod index;
 pub mod pack;
+pub mod reflog;
