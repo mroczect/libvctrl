@@ -2,12 +2,14 @@ use libvctrl_handler::{Hash, ObjectStore, VctrlError};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
+/// An in-memory implementation of `ObjectStore`.
 #[derive(Debug, Default)]
 pub struct MemoryStore {
     objects: HashMap<Hash, Vec<u8>>,
 }
 
 impl MemoryStore {
+    /// Creates a new `MemoryStore`.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -22,7 +24,6 @@ impl ObjectStore for MemoryStore {
         Ok(())
     }
 
-    // Fix: Zero-clone read. We borrow the slice directly instead of cloning the Vec.
     fn get(&self, hash: &Hash) -> Result<Box<dyn Read + Send + '_>, VctrlError> {
         let data = self
             .objects
