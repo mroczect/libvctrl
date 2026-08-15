@@ -2,6 +2,10 @@ use libvctrl_handler::{MAX_NAME_LENGTH, VctrlError};
 use std::path::Path;
 
 /// Validates a generic name.
+///
+/// # Errors
+///
+/// Returns [`VctrlError::InvalidName`] if the name is empty, too long, or contains control characters.
 pub fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
         return Err(VctrlError::InvalidName("name is empty".into()));
@@ -12,7 +16,6 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
             "name exceeds maximum length {MAX_NAME_LENGTH}: '{name}'"
         )));
     }
-    // Fix: Check for control characters
     if name.chars().any(char::is_control) {
         return Err(VctrlError::InvalidName(format!(
             "name contains control characters: '{name}'"
@@ -22,6 +25,10 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
 }
 
 /// Validates a reference name (e.g., branch or tag) strictly according to Git rules.
+///
+/// # Errors
+///
+/// Returns [`VctrlError::InvalidName`] if the name contains forbidden characters or patterns.
 pub fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
     if name.contains("..")
@@ -49,9 +56,12 @@ pub fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
 }
 
 /// Validates a tree entry name strictly.
+///
+/// # Errors
+///
+/// Returns [`VctrlError::InvalidName`] if the name contains forbidden path characters or names.
 pub fn validate_tree_entry_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
-    // Fix: Check for backslash to prevent Windows path traversal
     if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
         return Err(VctrlError::InvalidName(format!(
             "tree entry name contains forbidden path characters or names: '{name}'"
