@@ -2,6 +2,9 @@
 
 use crate::errors::VctrlError;
 
+/// An iterator over commit history.
+pub type RevWalkIterator<'a, T> = Box<dyn Iterator<Item = Result<T, VctrlError>> + Send + 'a>;
+
 /// Trait for walking commit history.
 pub trait RevWalk: Send + Sync {
     /// The commit identifier type.
@@ -15,5 +18,5 @@ pub trait RevWalk: Send + Sync {
     fn walk(
         &self,
         start: &Self::CommitId,
-    ) -> Result<Box<dyn Iterator<Item = Result<Self::CommitId, VctrlError>> + Send + '_>, VctrlError>;
+    ) -> Result<RevWalkIterator<'_, Self::CommitId>, VctrlError>;
 }
