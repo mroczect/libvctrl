@@ -15,9 +15,10 @@ fn build_database() -> Result<(MemoryStore, MemoryRefStore), VctrlError> {
     let alice = UserID::new("Alice".into(), "alice@example.com".into())?;
     let bob = UserID::new("Bob".into(), "bob@example.com".into())?;
 
-    let readme_blob = libvctrl::Blob::new(b"# My Project\n\nHello, world!".to_vec());
-    let readme_enc = encoder.encode_blob(&readme_blob)?;
-    let readme_hash = hasher.hash(&readme_enc)?;
+    let readme_blob = libvctrl::Blob::new(b"# My Project\n\nHello, world!".to_vec())?;
+    let mut readme_enc = Vec::new();
+    encoder.encode_blob(&readme_blob, &mut readme_enc)?;
+    let readme_hash = hasher.hash(&readme_enc[..])?;
     obj_store.put(&readme_hash, &readme_enc)?;
 
     let root1 = Tree::new(vec![TreeEntry::new(
@@ -25,8 +26,9 @@ fn build_database() -> Result<(MemoryStore, MemoryRefStore), VctrlError> {
         EntryKind::Blob,
         readme_hash,
     )?])?;
-    let root1_enc = encoder.encode_tree(&root1)?;
-    let root1_hash = hasher.hash(&root1_enc)?;
+    let mut root1_enc = Vec::new();
+    encoder.encode_tree(&root1, &mut root1_enc)?;
+    let root1_hash = hasher.hash(&root1_enc[..])?;
     obj_store.put(&root1_hash, &root1_enc)?;
 
     let c1 = {
@@ -36,31 +38,35 @@ fn build_database() -> Result<(MemoryStore, MemoryRefStore), VctrlError> {
             alice.clone(),
             alice,
             "Initial commit".into(),
-        );
-        let enc = encoder.encode_commit(&commit)?;
-        let h = hasher.hash(&enc)?;
+        )?;
+        let mut enc = Vec::new();
+        encoder.encode_commit(&commit, &mut enc)?;
+        let h = hasher.hash(&enc[..])?;
         obj_store.put(&h, &enc)?;
         h
     };
 
     let main_blob =
-        libvctrl::Blob::new(b"fn main() { println!(\"Hello from libvctrl!\"); }".to_vec());
-    let main_enc = encoder.encode_blob(&main_blob)?;
-    let main_hash = hasher.hash(&main_enc)?;
+        libvctrl::Blob::new(b"fn main() { println!(\"Hello from libvctrl!\"); }".to_vec())?;
+    let mut main_enc = Vec::new();
+    encoder.encode_blob(&main_blob, &mut main_enc)?;
+    let main_hash = hasher.hash(&main_enc[..])?;
     obj_store.put(&main_hash, &main_enc)?;
 
     let root2 = Tree::new(vec![
         TreeEntry::new("README.md".into(), EntryKind::Blob, readme_hash)?,
         TreeEntry::new("main.rs".into(), EntryKind::Blob, main_hash)?,
     ])?;
-    let root2_enc = encoder.encode_tree(&root2)?;
-    let root2_hash = hasher.hash(&root2_enc)?;
+    let mut root2_enc = Vec::new();
+    encoder.encode_tree(&root2, &mut root2_enc)?;
+    let root2_hash = hasher.hash(&root2_enc[..])?;
     obj_store.put(&root2_hash, &root2_enc)?;
 
     let c2 = {
-        let commit = Commit::new(root2_hash, vec![c1], bob.clone(), bob, "Add main.rs".into());
-        let enc = encoder.encode_commit(&commit)?;
-        let h = hasher.hash(&enc)?;
+        let commit = Commit::new(root2_hash, vec![c1], bob.clone(), bob, "Add main.rs".into())?;
+        let mut enc = Vec::new();
+        encoder.encode_commit(&commit, &mut enc)?;
+        let h = hasher.hash(&enc[..])?;
         obj_store.put(&h, &enc)?;
         h
     };
@@ -80,8 +86,8 @@ fn print_commit_log(obj_store: &MemoryStore, ref_store: &MemoryRefStore) -> Resu
         obj_store
             .get(&current_hash)?
             .read_to_end(&mut encoded)
-            .map_err(VctrlError::IoError)?;
-        let commit = decoder.decode_commit(&encoded)?;
+            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+        let commit = decoder.decode_commit(&encoded[..])?;
         println!("commit {current_hash}");
         println!("  Author:  {}", commit.author().name());
         println!("  Message: {}\n", commit.message());
@@ -101,14 +107,14 @@ fn print_tree(obj_store: &MemoryStore, ref_store: &MemoryRefStore) -> Result<(),
     obj_store
         .get(&ref_store.get_ref("HEAD")?)?
         .read_to_end(&mut encoded_commit)
-        .map_err(VctrlError::IoError)?;
-    let head_commit = decoder.decode_commit(&encoded_commit)?;
+        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+    let head_commit = decoder.decode_commit(&encoded_commit[..])?;
     let mut encoded_tree = vec![];
     obj_store
         .get(head_commit.tree())?
         .read_to_end(&mut encoded_tree)
-        .map_err(VctrlError::IoError)?;
-    let tree = decoder.decode_tree(&encoded_tree)?;
+        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+    let tree = decoder.decode_tree(&encoded_tree[..])?;
 
     for entry in tree.entries() {
         print!("  {:?} {}", entry.kind(), entry.name());
@@ -117,8 +123,8 @@ fn print_tree(obj_store: &MemoryStore, ref_store: &MemoryRefStore) -> Result<(),
             obj_store
                 .get(entry.hash())?
                 .read_to_end(&mut encoded_blob)
-                .map_err(VctrlError::IoError)?;
-            let blob = decoder.decode_blob(&encoded_blob)?;
+                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+            let blob = decoder.decode_blob(&encoded_blob[..])?;
             let preview = String::from_utf8_lossy(&blob.data()[..blob.data().len().min(40)]);
             println!(" → {}", preview.lines().next().unwrap_or(""));
         } else {
