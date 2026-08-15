@@ -1,136 +1,12 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #![allow(clippy::inline_always)]
 use crate::utils::{load_be, store_be, verify};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct W([u64; 16]);
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Copy, Clone)]
 pub(crate) struct State(pub(crate) [u64; 8]);
 
 impl W {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn new(input: &[u8]) -> Self {
         let mut words = [0u64; 16];
         for (i, e) in words.iter_mut().enumerate() {
@@ -139,86 +15,36 @@ impl W {
         Self(words)
     }
 
-    
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     const fn ch(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (!x & z)
     }
 
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     const fn maj(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (x & z) ^ (y & z)
     }
 
-    
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     const fn big_sigma0(x: u64) -> u64 {
         x.rotate_right(28) ^ x.rotate_right(34) ^ x.rotate_right(39)
     }
 
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     const fn big_sigma1(x: u64) -> u64 {
         x.rotate_right(14) ^ x.rotate_right(18) ^ x.rotate_right(41)
     }
 
-    
-    
-    
-    
-    
     #[inline(always)]
     const fn small_sigma0(x: u64) -> u64 {
         x.rotate_right(1) ^ x.rotate_right(8) ^ (x >> 7)
     }
 
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     const fn small_sigma1(x: u64) -> u64 {
         x.rotate_right(19) ^ x.rotate_right(61) ^ (x >> 6)
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     #[allow(clippy::many_single_char_names, clippy::missing_const_for_fn)]
@@ -230,21 +56,6 @@ impl W {
             .wrapping_add(Self::small_sigma0(words[src_d]));
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[inline]
     fn expand(&mut self) {
         self.m(0, 14, 9, 1);
@@ -265,21 +76,6 @@ impl W {
         self.m(15, 13, 8, 0);
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     #[allow(clippy::missing_const_for_fn)]
@@ -304,21 +100,6 @@ impl W {
             ));
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[allow(clippy::unreadable_literal)]
     fn g(&self, state: &mut State, s: usize) {
         const ROUND_CONSTANTS: [u64; 80] = [
@@ -424,10 +205,6 @@ impl W {
 }
 
 impl State {
-    
-    
-    
-    
     pub(crate) fn new() -> Self {
         const IV: [u8; 64] = [
             0x6a, 0x09, 0xe6, 0x67, 0xf3, 0xbc, 0xc9, 0x08, 0xbb, 0x67, 0xae, 0x85, 0x84, 0xca,
@@ -443,12 +220,8 @@ impl State {
         Self(t)
     }
 
-    
-    
-    
-    
     #[inline(always)]
-    #[allow(clippy::missing_const_for_fn)] 
+    #[allow(clippy::missing_const_for_fn)]
     pub(crate) fn add(&mut self, x: &Self) {
         let sx = &mut self.0;
         let ex = &x.0;
@@ -462,22 +235,12 @@ impl State {
         sx[7] = sx[7].wrapping_add(ex[7]);
     }
 
-    
-    
-    
     pub(crate) fn store(&self, out: &mut [u8]) {
         for (i, &e) in self.0.iter().enumerate() {
             store_be(out, i * 8, e);
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn blocks(&mut self, mut input: &[u8]) -> usize {
         let mut t = *self;
         let mut inlen = input.len();
@@ -501,44 +264,6 @@ impl State {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[derive(Clone)]
 pub struct Hash {
     pub(crate) state: State,
@@ -548,18 +273,6 @@ pub struct Hash {
 }
 
 impl Hash {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -570,10 +283,6 @@ impl Hash {
         }
     }
 
-    
-    
-    
-    
     pub(crate) fn update_inner<T: AsRef<[u8]>>(&mut self, input: T) {
         let input = input.as_ref();
         let mut n = input.len();
@@ -597,40 +306,10 @@ impl Hash {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T) {
         self.update_inner(input);
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn finalize(mut self) -> [u8; 64] {
         let mut padded = [0u8; 256];
@@ -650,63 +329,18 @@ impl Hash {
         out
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 64] {
         let mut h = Self::new();
         h.update(input);
         h.finalize()
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn verify(self, expected: &[u8; 64]) -> bool {
         let out = self.finalize();
         verify(&out, expected)
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn zeroize(&mut self) {
         self.state.0.fill(0);
         self.w.fill(0);
@@ -717,7 +351,6 @@ impl Hash {
 }
 
 impl Default for Hash {
-    
     fn default() -> Self {
         Self::new()
     }

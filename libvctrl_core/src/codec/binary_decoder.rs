@@ -6,7 +6,6 @@ use std::str;
 
 const EXPECTED_VERSION: u8 = 2;
 
-
 pub struct BinaryDecoder;
 
 impl BinaryDecoder {

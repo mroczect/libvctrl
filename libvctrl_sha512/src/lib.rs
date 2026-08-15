@@ -1,85 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #![deny(
     clippy::all,
     clippy::pedantic,
@@ -90,39 +8,7 @@
     unreachable_pub,
     unused_qualifications
 )]
-
 #![allow(unused_crate_dependencies)]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[macro_export]
 macro_rules! impl_hmac {
@@ -223,38 +109,6 @@ macro_rules! impl_hmac {
     };
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[macro_export]
 macro_rules! impl_hkdf {
     ($hash_struct:ty, $output_size:expr, $block_size:expr) => {
@@ -302,78 +156,22 @@ macro_rules! impl_hkdf {
     };
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub mod hmac;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub mod hkdf;
 
-
-
-
-
-
-
-
-
-
-
-
 pub mod sha512;
 
-
-
-
-
 pub mod utils;
-
-
-
 
 #[cfg(feature = "sha384")]
 pub mod sha384;
 
-
 pub use sha512::Hash;
-
 
 pub use hmac::HMAC;
 
-
 pub use hkdf::HKDF;
-
 
 pub use utils::{BLOCKBYTES, BYTES};
 

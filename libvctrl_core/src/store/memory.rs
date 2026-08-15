@@ -2,14 +2,12 @@ use libvctrl_handler::{Hash, ObjectStore, VctrlError};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
-
 #[derive(Debug, Default)]
 pub struct MemoryStore {
     objects: HashMap<Hash, Vec<u8>>,
 }
 
 impl MemoryStore {
-    
     #[must_use]
     pub fn new() -> Self {
         Self {

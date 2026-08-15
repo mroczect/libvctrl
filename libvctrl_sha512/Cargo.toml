@@ -2,18 +2,22 @@
 name = "libvctrl_sha512"
 version = "2.0.1"
 edition = "2024"
+rust-version = "1.96"            
 description = "Zero-dependency SHA512, HMAC-SHA512, HKDF-SHA512, and optional SHA384"
 license = "ISC"
-authors = ["mroczect"]
+authors = ["mroczect <mroczect@proton.me"]
 repository = "https://github.com/mroczect/libvctrl"
+homepage = "https://github.com/mroczect/libvctrl"
+documentation = "https://docs.rs/libvctrl_sha512"
 readme = "README.md"
 keywords = ["cryptography", "sha512", "hmac", "hkdf", "no-std"]
 categories = ["cryptography", "algorithms", "no-std"]
+include = ["src/**/*", "Cargo.toml", "README.md", "LICENSE"]
 
 [features]
 default = ["sha384"]
-sha384 = []    
-opt_size = []  
+sha384 = []
+opt_size = []
 
 [dependencies]
 
@@ -31,15 +35,21 @@ harness = false
 path = "benches/sha384_bench.rs"
 required-features = ["sha384"]
 
+[lints.rust]
+missing_docs = "allow"               
+unsafe_code = "warn"
+unused_qualifications = "warn"
+
 [lints.clippy]
-all = "deny"
-pedantic = "deny"
-nursery = "deny"
-cargo = "deny"
+all = "warn"                         
+pedantic = "warn"                    
+nursery = "warn"
+cargo = "warn"
+
 missing_docs_in_private_items = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 missing_safety_doc = "allow"
 
-[lints.rust]
-missing_docs = "allow"
+must_use_candidate = "warn"
+missing_const_for_fn = "warn"

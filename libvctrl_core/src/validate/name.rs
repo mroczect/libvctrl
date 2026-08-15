@@ -1,12 +1,6 @@
 use libvctrl_handler::{MAX_NAME_LENGTH, VctrlError};
 use std::path::Path;
 
-
-
-
-
-
-
 pub fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
         return Err(VctrlError::InvalidName("name is empty".into()));
@@ -24,12 +18,6 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
     }
     Ok(())
 }
-
-
-
-
-
-
 
 pub fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
@@ -62,12 +50,6 @@ pub fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
     }
     Ok(())
 }
-
-
-
-
-
-
 
 pub fn validate_tree_entry_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;

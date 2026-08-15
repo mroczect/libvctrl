@@ -3,9 +3,7 @@ use libvctrl_handler::{
 };
 use std::io::Write;
 
-
 pub const VERSION: u8 = 2;
-
 
 pub struct BinaryEncoder;
 
