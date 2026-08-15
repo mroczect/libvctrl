@@ -4,6 +4,7 @@ pub mod core;
 
 use crate::constants::MAX_NAME_LENGTH;
 use crate::errors::VctrlError;
+use std::path::Path;
 
 pub use core::*;
 
@@ -44,7 +45,9 @@ pub(crate) fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
         || name.contains('\\')
         || name.contains(' ')
         || name.contains("@{")
-        || name.ends_with(".lock")
+        || Path::new(name)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("lock"))
         || name.starts_with('.')
         || name.starts_with('/')
         || name.ends_with('/')
