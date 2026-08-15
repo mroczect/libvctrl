@@ -73,17 +73,11 @@ impl CommitBuilder {
             .message
             .ok_or_else(|| VctrlError::Other("message is required".into()))?;
 
+        // Fix: Remove redundant Ok(...?) wrapping
         if let Some(meta) = self.meta {
-            Ok(Commit::with_meta(
-                tree,
-                self.parents,
-                author,
-                committer,
-                message,
-                meta,
-            ))
+            Commit::with_meta(tree, self.parents, author, committer, message, meta)
         } else {
-            Ok(Commit::new(tree, self.parents, author, committer, message))
+            Commit::new(tree, self.parents, author, committer, message)
         }
     }
 }
