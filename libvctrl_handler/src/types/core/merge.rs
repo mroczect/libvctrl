@@ -1,6 +1,6 @@
 //! Merge-related types.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::Hash;
 
@@ -27,7 +27,7 @@ impl Conflict {
 
     /// Returns the path with a conflict.
     #[must_use]
-    pub const fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &Path {
         &self.path
     }
 
