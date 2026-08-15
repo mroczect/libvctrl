@@ -34,6 +34,6 @@ fn tag_rejects_empty_name() {
 
 #[test]
 fn blob_accepts_empty_data() {
-    let blob = Blob::new(vec![]);
+    let blob = Blob::new(vec![]).unwrap();
     assert!(blob.data().is_empty());
 }
