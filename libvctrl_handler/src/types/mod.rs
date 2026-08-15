@@ -32,7 +32,7 @@ pub(crate) fn validate_name(name: &str) -> Result<(), VctrlError> {
     Ok(())
 }
 
-/// Validates a reference name (e.g., branch or tag).
+/// Validates a reference name (e.g., branch or tag) strictly according to Git rules.
 pub(crate) fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
     if name.contains("..")
@@ -45,12 +45,12 @@ pub(crate) fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
         || name.contains('\\')
         || name.contains(' ')
         || name.contains("@{")
-        || Path::new(name)
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("lock"))
         || name.starts_with('.')
         || name.starts_with('/')
         || name.ends_with('/')
+        || Path::new(name)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("lock"))
     {
         return Err(VctrlError::InvalidName(format!(
             "invalid ref name: '{name}'"
@@ -59,7 +59,7 @@ pub(crate) fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
     Ok(())
 }
 
-/// Validates a tree entry name.
+/// Validates a tree entry name strictly.
 pub(crate) fn validate_tree_entry_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
     if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
