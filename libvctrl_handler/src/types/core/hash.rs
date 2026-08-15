@@ -78,7 +78,7 @@ impl fmt::Debug for Hash {
         for &byte in self.0.iter().take(16) {
             write!(f, "{byte:02x}")?;
         }
-        write!(f, "...)")
+        write!(f, "…)") // <-- Changed from "..." to "…"
     }
 }
 
