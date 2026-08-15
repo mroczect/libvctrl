@@ -235,8 +235,17 @@ fmt-check-pkg:
 clippy-pkg:
 	$(CARGO) clippy -p $(PKG) --all-targets --all-features -- -D warnings
 
+.PHONY: clippy-pkg-unwarn
+clippy-pkg-unwarn:
+	$(CARGO) clippy -p $(PKG) --all-targets --all-features
+
+	
 .PHONY: ci-pkg
 ci-pkg: fmt-check-pkg clippy-pkg test-verbose-pkg
+
+.PHONY: ci-pkg-unwarn
+ci-pkg-unwarn: fmt-check-pkg clippy-pkg test-verbose-pkg
+
 
 .PHONY: doc-pkg
 doc-pkg:
@@ -276,3 +285,6 @@ root-pkg: ci-pkg
 .PHONY: sha512
 sha512: PKG=libvctrl_sha512
 sha512: ci-pkg
+
+clippy-pedantic-nursery:
+	cargo clippy --all-targets --all-features -- -W clippy::all -W clippy::pedantic -W clippy::nursery -W clippy::cargo
