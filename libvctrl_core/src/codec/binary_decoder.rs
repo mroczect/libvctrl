@@ -22,14 +22,35 @@ impl BinaryDecoder {
         }
         Ok(&data[1..])
     }
+
+    fn read_bounded<R: std::io::Read>(
+        reader: &mut R,
+        max_size: usize,
+    ) -> Result<Vec<u8>, VctrlError> {
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            let n = reader
+                .read(&mut chunk)
+                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+            if n == 0 {
+                break;
+            }
+            if buf.len() + n > max_size {
+                return Err(VctrlError::CorruptedData(
+                    "stream exceeds maximum allowed size".into(),
+                ));
+            }
+            buf.extend_from_slice(&chunk[..n]);
+        }
+        Ok(buf)
+    }
 }
 
 impl Decoder for BinaryDecoder {
     fn decode_blob<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Blob, VctrlError> {
-        let mut data = Vec::new();
-        reader
-            .read_to_end(&mut data)
-            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+        let max_size = usize::try_from(MAX_BLOB_SIZE).unwrap_or(usize::MAX) + 16;
+        let data = Self::read_bounded(&mut reader, max_size)?;
 
         let data = Self::check_version(&data)?;
         if data.len() < 8 {
@@ -50,10 +71,8 @@ impl Decoder for BinaryDecoder {
     }
 
     fn decode_tree<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Tree, VctrlError> {
-        let mut data = Vec::new();
-        reader
-            .read_to_end(&mut data)
-            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+        let max_size = usize::try_from(MAX_TREE_ENTRIES).unwrap_or(usize::MAX) * 321 + 5;
+        let data = Self::read_bounded(&mut reader, max_size)?;
 
         let data = Self::check_version(&data)?;
         if data.len() < 4 {
@@ -67,7 +86,7 @@ impl Decoder for BinaryDecoder {
             ));
         }
         let mut pos = 4;
-        let mut entries = Vec::new();
+        let mut entries = Vec::with_capacity(count);
         for _ in 0..count {
             if pos >= data.len() {
                 return Err(VctrlError::CorruptedData("unexpected end of tree".into()));
@@ -108,10 +127,8 @@ impl Decoder for BinaryDecoder {
 
     #[allow(clippy::too_many_lines)]
     fn decode_commit<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Commit, VctrlError> {
-        let mut data = Vec::new();
-        reader
-            .read_to_end(&mut data)
-            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+        let max_size = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) + 1024;
+        let data = Self::read_bounded(&mut reader, max_size)?;
 
         let data = Self::check_version(&data)?;
         if data.len() < HASH_LENGTH + 1 {
@@ -120,7 +137,7 @@ impl Decoder for BinaryDecoder {
         let tree = Hash::from_bytes(&data[..HASH_LENGTH])?;
         let parent_count = data[HASH_LENGTH] as usize;
         let mut pos = HASH_LENGTH + 1;
-        let mut parents = Vec::new();
+        let mut parents = Vec::with_capacity(parent_count);
         for _ in 0..parent_count {
             if pos + HASH_LENGTH > data.len() {
                 return Err(VctrlError::CorruptedData("parent hash truncated".into()));
@@ -221,7 +238,7 @@ impl Decoder for BinaryDecoder {
             let enc = str::from_utf8(&data[pos..pos + encoding_len])
                 .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in encoding".into()))?
                 .to_string();
-            pos += encoding_len; // <-- FIX: advance pos after reading encoding
+            pos += encoding_len;
             Some(enc)
         } else {
             None
@@ -236,10 +253,8 @@ impl Decoder for BinaryDecoder {
 
     #[allow(clippy::too_many_lines)]
     fn decode_tag<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Tag, VctrlError> {
-        let mut data = Vec::new();
-        reader
-            .read_to_end(&mut data)
-            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+        let max_size = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) + 1024;
+        let data = Self::read_bounded(&mut reader, max_size)?;
 
         let data = Self::check_version(&data)?;
         if data.is_empty() {
@@ -344,7 +359,7 @@ impl Decoder for BinaryDecoder {
             let enc = str::from_utf8(&data[pos..pos + encoding_len])
                 .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in encoding".into()))?
                 .to_string();
-            pos += encoding_len; // <-- FIX: advance pos after reading encoding
+            pos += encoding_len;
             Some(enc)
         } else {
             None
