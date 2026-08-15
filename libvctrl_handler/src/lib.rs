@@ -13,20 +13,36 @@
     unused_qualifications
 )]
 
+/// Constants related to Git object formats.
 pub mod constants;
+
+/// Enums for Git object types.
 pub mod enums;
+
+/// Error types used throughout the crate.
 pub mod errors;
+
+/// Helper macros for the crate.
 pub mod macros;
+
+/// Traits defining repository operations.
 pub mod traits;
+
+/// Core data types for Git objects.
 pub mod types;
 
+/// Re-export of common constants.
 pub use constants::{
     HASH_LENGTH, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, MAX_TREE_ENTRIES,
 };
 
+/// Re-export of the entry kind enum.
 pub use enums::EntryKind;
+
+/// Re-export of the error type.
 pub use errors::VctrlError;
 
+/// Re-export of core traits.
 pub use traits::core::{
     blame::{Blame, BlameEntry},
     config::ConfigStore,
@@ -46,6 +62,7 @@ pub use traits::core::{
     verifier::Verifier,
 };
 
+/// Re-export of core data types.
 pub use types::{
     Blob, ChangeKind, Commit, CommitMeta, Conflict, FileDelta, Hash, MergeResult, ReflogEntry, Tag,
     Tree, TreeDelta, TreeEntry, UserID,
