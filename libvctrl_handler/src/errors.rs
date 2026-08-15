@@ -76,8 +76,17 @@ impl PartialEq for VctrlError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::InvalidHashLength(a), Self::InvalidHashLength(b)) => a == b,
+
+            // Gabungkan semua varian dengan payload String
             (
-                Self::InvalidName(a),
+                Self::InvalidName(a)
+                | Self::InvalidEmail(a)
+                | Self::RefNotFound(a)
+                | Self::CorruptedData(a)
+                | Self::SerializationError(a)
+                | Self::Other(a)
+                | Self::InvalidTreeStructure(a)
+                | Self::ExceededMaxSize(a),
                 Self::InvalidName(b)
                 | Self::InvalidEmail(b)
                 | Self::RefNotFound(b)
@@ -87,14 +96,18 @@ impl PartialEq for VctrlError {
                 | Self::InvalidTreeStructure(b)
                 | Self::ExceededMaxSize(b),
             ) => a == b,
+
             (Self::ObjectNotFound(a), Self::ObjectNotFound(b)) => a == b,
             (Self::IoError(a), Self::IoError(b)) => {
                 a.as_ref().kind() == b.as_ref().kind()
                     && a.as_ref().to_string() == b.as_ref().to_string()
             }
             (Self::InvalidTimezoneOffset(a), Self::InvalidTimezoneOffset(b)) => a == b,
+
+            // Gabungkan varian unit
             (Self::DuplicateParent, Self::DuplicateParent)
             | (Self::InvalidBlameRange, Self::InvalidBlameRange) => true,
+
             _ => false,
         }
     }
