@@ -5,7 +5,8 @@ use std::path::Path;
 ///
 /// # Errors
 ///
-/// Returns [`VctrlError::InvalidName`] if the name is empty, too long, or contains control characters.
+/// Returns [`VctrlError::InvalidName`] if the name is empty, exceeds the maximum
+/// allowed length, or contains control characters.
 pub fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
         return Err(VctrlError::InvalidName("name is empty".into()));
@@ -28,7 +29,8 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
 ///
 /// # Errors
 ///
-/// Returns [`VctrlError::InvalidName`] if the name contains forbidden characters or patterns.
+/// Returns [`VctrlError::InvalidName`] if the name fails basic name validation
+/// or contains forbidden characters or patterns.
 pub fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
     if name.contains("..")
@@ -41,9 +43,15 @@ pub fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
         || name.contains('\\')
         || name.contains(' ')
         || name.contains("@{")
+        || name.contains("//")
         || name.starts_with('.')
         || name.starts_with('/')
         || name.ends_with('/')
+        || name.ends_with('.')
+        || name.contains('<')
+        || name.contains('>')
+        || name.contains('|')
+        || name.contains('"')
         || Path::new(name)
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("lock"))
@@ -59,7 +67,8 @@ pub fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
 ///
 /// # Errors
 ///
-/// Returns [`VctrlError::InvalidName`] if the name contains forbidden path characters or names.
+/// Returns [`VctrlError::InvalidName`] if the name fails basic name validation
+/// or contains forbidden path characters or names.
 pub fn validate_tree_entry_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
     if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
