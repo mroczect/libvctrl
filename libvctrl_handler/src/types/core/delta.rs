@@ -34,7 +34,7 @@ pub struct FileDelta {
 impl FileDelta {
     /// Creates a new `FileDelta` representing an addition.
     #[must_use]
-    pub fn added(path: PathBuf, new_hash: Hash) -> Self {
+    pub const fn added(path: PathBuf, new_hash: Hash) -> Self {
         Self {
             path,
             old_path: None,
@@ -46,7 +46,7 @@ impl FileDelta {
 
     /// Creates a new `FileDelta` representing a deletion.
     #[must_use]
-    pub fn deleted(path: PathBuf, old_hash: Hash) -> Self {
+    pub const fn deleted(path: PathBuf, old_hash: Hash) -> Self {
         Self {
             path,
             old_path: None,
@@ -58,7 +58,7 @@ impl FileDelta {
 
     /// Creates a new `FileDelta` representing a modification.
     #[must_use]
-    pub fn modified(path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+    pub const fn modified(path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
         Self {
             path,
             old_path: None,
@@ -70,7 +70,7 @@ impl FileDelta {
 
     /// Creates a new `FileDelta` representing a type change.
     #[must_use]
-    pub fn type_change(path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+    pub const fn type_change(path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
         Self {
             path,
             old_path: None,
@@ -82,7 +82,12 @@ impl FileDelta {
 
     /// Creates a new `FileDelta` representing a rename.
     #[must_use]
-    pub fn renamed(old_path: PathBuf, new_path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+    pub const fn renamed(
+        old_path: PathBuf,
+        new_path: PathBuf,
+        old_hash: Hash,
+        new_hash: Hash,
+    ) -> Self {
         Self {
             path: new_path,
             old_path: Some(old_path),
@@ -94,7 +99,12 @@ impl FileDelta {
 
     /// Creates a new `FileDelta` representing a copy.
     #[must_use]
-    pub fn copied(old_path: PathBuf, new_path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+    pub const fn copied(
+        old_path: PathBuf,
+        new_path: PathBuf,
+        old_hash: Hash,
+        new_hash: Hash,
+    ) -> Self {
         Self {
             path: new_path,
             old_path: Some(old_path),
@@ -106,13 +116,13 @@ impl FileDelta {
 
     /// Returns the path of the changed file.
     #[must_use]
-    pub fn path(&self) -> &PathBuf {
+    pub const fn path(&self) -> &PathBuf {
         &self.path
     }
 
     /// Returns the old path if the file was renamed or copied.
     #[must_use]
-    pub fn old_path(&self) -> Option<&PathBuf> {
+    pub const fn old_path(&self) -> Option<&PathBuf> {
         self.old_path.as_ref()
     }
 
@@ -188,7 +198,7 @@ impl TreeDelta {
 
     /// Creates a `TreeDelta` from a vector of `FileDelta`.
     #[must_use]
-    pub fn from_changes(changes: Vec<FileDelta>) -> Self {
+    pub const fn from_changes(changes: Vec<FileDelta>) -> Self {
         Self { changes }
     }
 
