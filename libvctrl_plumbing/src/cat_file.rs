@@ -39,9 +39,9 @@ pub enum ObjectType {
     Tag,
 }
 
-pub fn cat_file(
+pub fn cat_file<D: Decoder>(
     store: &dyn ObjectStore,
-    decoder: &dyn Decoder,
+    decoder: &D,
     object_name: &str,
     mode: CatFileMode,
     writer: &mut impl IoWrite,
@@ -52,26 +52,27 @@ pub fn cat_file(
     store
         .get(&hash)?
         .read_to_end(&mut encoded)
-        .map_err(VctrlError::IoError)?;
+        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
 
     match mode {
         CatFileMode::Exists => Ok(()),
         CatFileMode::ObjectType => {
             let obj_type = decode_type(decoder, &encoded)?;
-            writeln!(writer, "{}", obj_type_to_str(obj_type)).map_err(VctrlError::IoError)?;
+            writeln!(writer, "{}", obj_type_to_str(obj_type))
+                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
             Ok(())
         }
         CatFileMode::ObjectSize => {
             let _obj_type = decode_type(decoder, &encoded)?;
             let size = encoded.len();
-            writeln!(writer, "{size}").map_err(VctrlError::IoError)?;
+            writeln!(writer, "{size}").map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
             Ok(())
         }
         CatFileMode::PrettyPrint => {
             let content = pretty_print(decoder, &encoded)?;
             writer
                 .write_all(content.as_bytes())
-                .map_err(VctrlError::IoError)?;
+                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
             Ok(())
         }
         CatFileMode::Raw(expected_type) => {
@@ -84,7 +85,9 @@ pub fn cat_file(
                     obj_type_to_str(expected_type)
                 )));
             }
-            writer.write_all(&encoded).map_err(VctrlError::IoError)?;
+            writer
+                .write_all(&encoded)
+                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
             Ok(())
         }
     }
@@ -99,9 +102,9 @@ pub struct BatchOptions {
     pub print_contents: bool,
 }
 
-pub fn cat_file_batch(
+pub fn cat_file_batch<D: Decoder>(
     store: &dyn ObjectStore,
-    decoder: &dyn Decoder,
+    decoder: &D,
     input: &mut impl BufRead,
     output: &mut impl IoWrite,
     options: &BatchOptions,
@@ -113,7 +116,11 @@ pub fn cat_file_batch(
 
     loop {
         line.clear();
-        if input.read_line(&mut line).map_err(VctrlError::IoError)? == 0 {
+        if input
+            .read_line(&mut line)
+            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?
+            == 0
+        {
             break;
         }
         let trimmed = if options.nul_terminated {
@@ -137,7 +144,9 @@ pub fn cat_file_batch(
                     }
                 }
                 if !options.buffer {
-                    output.write_all(&out_buf).map_err(VctrlError::IoError)?;
+                    output
+                        .write_all(&out_buf)
+                        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
                     out_buf.clear();
                 }
             }
@@ -146,7 +155,9 @@ pub fn cat_file_batch(
                 out_buf.extend_from_slice(error_line.as_bytes());
                 out_buf.push(delimiter);
                 if !options.buffer {
-                    output.write_all(&out_buf).map_err(VctrlError::IoError)?;
+                    output
+                        .write_all(&out_buf)
+                        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
                     out_buf.clear();
                 }
             }
@@ -154,14 +165,16 @@ pub fn cat_file_batch(
     }
 
     if !out_buf.is_empty() {
-        output.write_all(&out_buf).map_err(VctrlError::IoError)?;
+        output
+            .write_all(&out_buf)
+            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
     }
     Ok(())
 }
 
-fn handle_one_object(
+fn handle_one_object<D: Decoder>(
     store: &dyn ObjectStore,
-    decoder: &dyn Decoder,
+    decoder: &D,
     object_name: &str,
     options: &BatchOptions,
 ) -> Result<(String, Option<Vec<u8>>), VctrlError> {
@@ -171,7 +184,7 @@ fn handle_one_object(
     store
         .get(&hash)?
         .read_to_end(&mut encoded)
-        .map_err(VctrlError::IoError)?;
+        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
 
     let obj_type = decode_type(decoder, &encoded)?;
     let obj_size = encoded.len() as u64;
@@ -207,7 +220,7 @@ fn parse_hash(s: &str) -> Result<Hash, VctrlError> {
     Hash::from_bytes(&bytes)
 }
 
-fn decode_type(decoder: &dyn Decoder, encoded: &[u8]) -> Result<ObjectType, VctrlError> {
+fn decode_type<D: Decoder>(decoder: &D, encoded: &[u8]) -> Result<ObjectType, VctrlError> {
     if decoder.decode_blob(encoded).is_ok() {
         return Ok(ObjectType::Blob);
     }
@@ -223,7 +236,7 @@ fn decode_type(decoder: &dyn Decoder, encoded: &[u8]) -> Result<ObjectType, Vctr
     Err(VctrlError::CorruptedData("unknown object type".into()))
 }
 
-fn pretty_print(decoder: &dyn Decoder, encoded: &[u8]) -> Result<String, VctrlError> {
+fn pretty_print<D: Decoder>(decoder: &D, encoded: &[u8]) -> Result<String, VctrlError> {
     if let Ok(blob) = decoder.decode_blob(encoded) {
         return Ok(String::from_utf8_lossy(blob.data()).to_string());
     }

@@ -1,133 +1,194 @@
-//! Delta types for representing differences between trees.
-//!
-//! # Purpose
-//!
-//! This module defines data structures that describe what changed between
-//! two tree objects. These types are used by the `TreeDiffer` trait and
-//! by plumbing diff commands such as `diff-tree`, `diff-index`, and
-//! `merge-trees`.
-//!
-//! The module contains:
-//!
-//! - [`ChangeKind`] – an enum classifying the type of change.
-//! - [`FileDelta`] – a single file-level change.
-//! - [`TreeDelta`] – a collection of file-level changes representing the
-//!   difference between two trees.
-//!
-//! # Examples
-//!
-//! Constructing a simple delta between two file versions:
-//!
-//! ```
-//! use std::path::PathBuf;
-//! use libvctrl_handler::{ChangeKind, FileDelta, Hash, TreeDelta};
-//!
-//! let old = Hash::from_bytes(&[0u8; 64]).unwrap();
-//! let new = Hash::from_bytes(&[1u8; 64]).unwrap();
-//!
-//! let file_delta = FileDelta {
-//!     path: PathBuf::from("src/main.rs"),
-//!     old_hash: Some(old),
-//!     new_hash: Some(new),
-//!     kind: ChangeKind::Modified,
-//! };
-//!
-//! let tree_delta = TreeDelta {
-//!     changes: vec![file_delta],
-//! };
-//!
-//! assert_eq!(tree_delta.changes.len(), 1);
-//! assert!(tree_delta.iter().all(|d| d.path.as_os_str() == "src/main.rs"));
-//! ```
+//! Delta and change types.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::Hash;
 
-/// The kind of change detected between two versions of a file.
-///
-/// This enum mirrors the essential change categories used by diff
-/// algorithms.
+/// The kind of change between two objects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChangeKind {
-    /// The file was added in the new tree.
+    /// The object was added.
     Added,
-    /// The file was deleted from the old tree.
+    /// The object was deleted.
     Deleted,
-    /// The file content or mode was modified.
+    /// The object was modified.
     Modified,
-    /// The file changed type (e.g., blob to tree, or symlink to blob).
+    /// The object type changed (e.g., blob to tree).
     TypeChange,
+    /// The object was renamed.
+    Renamed,
+    /// The object was copied.
+    Copied,
 }
 
-/// Represents a single file-level change between two trees.
-///
-/// The `old_hash` and `new_hash` fields are optional because a file may be
-/// added (`old_hash` is `None`) or deleted (`new_hash` is `None`).
+/// A single file delta between two trees.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FileDelta {
-    /// The path of the changed file.
-    pub path: PathBuf,
-    /// The blob hash in the old tree, if the file existed there.
-    pub old_hash: Option<Hash>,
-    /// The blob hash in the new tree, if the file exists there.
-    pub new_hash: Option<Hash>,
-    /// The kind of change.
-    pub kind: ChangeKind,
+    path: PathBuf,
+    old_path: Option<PathBuf>,
+    old_hash: Option<Hash>,
+    new_hash: Option<Hash>,
+    kind: ChangeKind,
 }
 
 impl FileDelta {
-    /// Creates a new `FileDelta` with the given path and change kind.
-    ///
-    /// The hash fields are initialized to `None`.
+    /// Creates a new `FileDelta` representing an addition.
     #[must_use]
-    pub const fn new(path: PathBuf, kind: ChangeKind) -> Self {
+    pub const fn added(path: PathBuf, new_hash: Hash) -> Self {
         Self {
             path,
+            old_path: None,
             old_hash: None,
-            new_hash: None,
-            kind,
+            new_hash: Some(new_hash),
+            kind: ChangeKind::Added,
         }
     }
 
-    /// Returns `true` if this delta represents an addition.
+    /// Creates a new `FileDelta` representing a deletion.
+    #[must_use]
+    pub const fn deleted(path: PathBuf, old_hash: Hash) -> Self {
+        Self {
+            path,
+            old_path: None,
+            old_hash: Some(old_hash),
+            new_hash: None,
+            kind: ChangeKind::Deleted,
+        }
+    }
+
+    /// Creates a new `FileDelta` representing a modification.
+    #[must_use]
+    pub const fn modified(path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+        Self {
+            path,
+            old_path: None,
+            old_hash: Some(old_hash),
+            new_hash: Some(new_hash),
+            kind: ChangeKind::Modified,
+        }
+    }
+
+    /// Creates a new `FileDelta` representing a type change.
+    #[must_use]
+    pub const fn type_change(path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+        Self {
+            path,
+            old_path: None,
+            old_hash: Some(old_hash),
+            new_hash: Some(new_hash),
+            kind: ChangeKind::TypeChange,
+        }
+    }
+
+    /// Creates a new `FileDelta` representing a rename.
+    #[must_use]
+    pub const fn renamed(
+        old_path: PathBuf,
+        new_path: PathBuf,
+        old_hash: Hash,
+        new_hash: Hash,
+    ) -> Self {
+        Self {
+            path: new_path,
+            old_path: Some(old_path),
+            old_hash: Some(old_hash),
+            new_hash: Some(new_hash),
+            kind: ChangeKind::Renamed,
+        }
+    }
+
+    /// Creates a new `FileDelta` representing a copy.
+    #[must_use]
+    pub const fn copied(
+        old_path: PathBuf,
+        new_path: PathBuf,
+        old_hash: Hash,
+        new_hash: Hash,
+    ) -> Self {
+        Self {
+            path: new_path,
+            old_path: Some(old_path),
+            old_hash: Some(old_hash),
+            new_hash: Some(new_hash),
+            kind: ChangeKind::Copied,
+        }
+    }
+
+    /// Returns the path of the changed file.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Returns the old path if the file was renamed or copied.
+    #[must_use]
+    pub fn old_path(&self) -> Option<&Path> {
+        self.old_path.as_deref()
+    }
+
+    /// Returns the old hash, if the file previously existed.
+    #[must_use]
+    pub const fn old_hash(&self) -> Option<Hash> {
+        self.old_hash
+    }
+
+    /// Returns the new hash, if the file exists now.
+    #[must_use]
+    pub const fn new_hash(&self) -> Option<Hash> {
+        self.new_hash
+    }
+
+    /// Returns the kind of change.
+    #[must_use]
+    pub const fn kind(&self) -> ChangeKind {
+        self.kind
+    }
+
+    /// Returns `true` if this is an addition.
     #[must_use]
     pub fn is_added(&self) -> bool {
         self.kind == ChangeKind::Added
     }
 
-    /// Returns `true` if this delta represents a deletion.
+    /// Returns `true` if this is a deletion.
     #[must_use]
     pub fn is_deleted(&self) -> bool {
         self.kind == ChangeKind::Deleted
     }
 
-    /// Returns `true` if this delta represents a modification.
+    /// Returns `true` if this is a modification.
     #[must_use]
     pub fn is_modified(&self) -> bool {
         self.kind == ChangeKind::Modified
     }
 
-    /// Returns `true` if this delta represents a type change.
+    /// Returns `true` if this is a type change.
     #[must_use]
     pub fn is_type_change(&self) -> bool {
         self.kind == ChangeKind::TypeChange
     }
+
+    /// Returns `true` if this is a rename.
+    #[must_use]
+    pub fn is_renamed(&self) -> bool {
+        self.kind == ChangeKind::Renamed
+    }
+
+    /// Returns `true` if this is a copy.
+    #[must_use]
+    pub fn is_copied(&self) -> bool {
+        self.kind == ChangeKind::Copied
+    }
 }
 
-/// Represents the complete difference between two trees.
-///
-/// A `TreeDelta` is simply a collection of [`FileDelta`] entries. It is
-/// intentionally lightweight and can be constructed manually or returned
-/// from a `TreeDiffer` implementation.
+/// A collection of file deltas between two trees.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TreeDelta {
-    /// The list of file-level changes.
-    pub changes: Vec<FileDelta>,
+    changes: Vec<FileDelta>,
 }
 
 impl TreeDelta {
-    /// Creates a new empty `TreeDelta`.
+    /// Creates an empty `TreeDelta`.
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -135,7 +196,13 @@ impl TreeDelta {
         }
     }
 
-    /// Returns the number of file changes in this delta.
+    /// Creates a `TreeDelta` from a vector of `FileDelta`.
+    #[must_use]
+    pub const fn from_changes(changes: Vec<FileDelta>) -> Self {
+        Self { changes }
+    }
+
+    /// Returns the number of changes.
     #[must_use]
     pub const fn len(&self) -> usize {
         self.changes.len()
@@ -147,9 +214,15 @@ impl TreeDelta {
         self.changes.is_empty()
     }
 
-    /// Returns an iterator over the file changes.
+    /// Iterates over the changes.
     pub fn iter(&self) -> std::slice::Iter<'_, FileDelta> {
         self.changes.iter()
+    }
+
+    /// Returns the changes.
+    #[must_use]
+    pub fn changes(&self) -> &[FileDelta] {
+        &self.changes
     }
 }
 

@@ -1,487 +1,199 @@
-//! Binary serialization format encoder for `libvctrl_core`.
-//!
-//! # Purpose
-//!
-//! This module provides the [`BinaryEncoder`], a concrete implementation of the
-//! [`Encoder`](libvctrl_handler::Encoder) trait. It serializes version control
-//! objects ([`Blob`](libvctrl_handler::Blob), [`Tree`](libvctrl_handler::Tree),
-//! [`Commit`](libvctrl_handler::Commit), [`Tag`](libvctrl_handler::Tag)) into a
-//! compact, little-endian binary format suitable for storage or network
-//! transmission.
-//!
-//! # Design Rationale
-//!
-//! - **Little-endian integers**: All integer fields (lengths, timestamps,
-//!   timezone offsets) are encoded in little-endian byte order. This matches
-//!   the native byte order of most modern CPU architectures (x86, x86_64,
-//!   ARM little-endian), minimizing byte-swapping overhead during encoding
-//!   and decoding.
-//! - **Length-prefixed strings**: Variable-length data (names, email
-//!   addresses, messages, blob data) are prefixed by their length. This
-//!   allows the corresponding
-//!   [`BinaryDecoder`](crate::codec::BinaryDecoder) to pre-allocate buffers
-//!   efficiently and to avoid reading until EOF. Length prefixes also
-//!   provide structural validation points.
-//! - **Versioning**: Every serialized payload begins with a version byte
-//!   ([`VERSION`]). This ensures forward and backward compatibility; if the
-//!   format changes, the version can be bumped, and decoders can reject
-//!   unsupported versions cleanly.
-//! - **Zero-copy where possible**: The encoder uses `extend_from_slice` to
-//!   copy data directly into the output `Vec<u8>`, leveraging LLVM's
-//!   `memcpy` intrinsics for fast bulk copies. It also pre-allocates the
-//!   output buffer based on the estimated object size to minimize heap
-//!   reallocations.
-//!
-//! # Binary Format Overview
-//!
-//! The exact layout for each object type is documented on the corresponding
-//! `encode_*` method. In general:
-//!
-//! 1. The first byte is always the version number.
-//! 2. Fixed-width integer fields follow in little-endian order.
-//! 3. Variable-length fields are prefixed with a length indicator (u8 or
-//!    u32 depending on the maximum possible size).
-//!
-//! # Determinism
-//!
-//! The encoder is fully deterministic. Encoding the same object always
-//! produces the same byte sequence. This is critical for content addressing,
-//! where identical objects must yield identical hashes.
-//!
-//! # Error Handling
-//!
-//! All `encode_*` methods return
-//! [`Result<Vec<u8>, VctrlError>`](libvctrl_handler::VctrlError). Encoding
-//! may fail if a field length exceeds the width of its length prefix (e.g.,
-//! a name longer than 255 bytes cannot be represented by a single-byte
-//! length). In such cases, the encoder returns
-//! [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError).
-//!
-//! # Examples
-//!
-//! Encoding a simple `Blob`:
-//!
-//! ```
-//! use libvctrl_handler::{Blob, Encoder};
-//! use libvctrl_core::codec::BinaryEncoder;
-//!
-//! let encoder = BinaryEncoder;
-//! let blob = Blob::new(b"hello".to_vec());
-//! let bytes = encoder.encode_blob(&blob).unwrap();
-//!
-//! // The first byte is the version
-//! assert_eq!(bytes[0], 2);
-//! ```
-
 use libvctrl_handler::{
     Blob, Commit, Encoder, EntryKind, MAX_MESSAGE_LENGTH, Tag, Tree, VctrlError,
 };
+use std::io::Write;
 
-/// The binary format version number.
-///
-/// # Purpose
-///
-/// This constant is prepended to every serialized object. It allows the
-/// [`BinaryDecoder`](crate::codec::BinaryDecoder) to verify that the data was
-/// produced by a compatible encoder.
-///
-/// # Design Rationale
-///
-/// Bumping this version allows breaking changes to the wire format in the
-/// future. A decoder reading an unexpected version can fail gracefully
-/// instead of attempting to parse incompatible data. The current version is
-/// 2, indicating the second revision of the binary format.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_core::codec::binary_encoder::VERSION;
-/// assert_eq!(VERSION, 2);
-/// ```
+/// The current version of the binary encoding format.
 pub const VERSION: u8 = 2;
 
-/// A binary encoder that serializes version control objects into a compact
-/// byte format.
-///
-/// # Purpose
-///
-/// Implements the [`Encoder`](libvctrl_handler::Encoder) trait to convert
-/// in-memory objects into a deterministic binary representation suitable for
-/// storage or network transmission. This is the inverse operation of
-/// [`BinaryDecoder`](crate::codec::BinaryDecoder).
-///
-/// # Design Rationale
-///
-/// This encoder is stateless (a unit struct) because encoding does not
-/// require external configuration or state. It can be instantiated cheaply
-/// anywhere and reused without side effects. The type is a zero-sized type
-/// (ZST), which means it occupies no memory and can be passed by value with
-/// no runtime cost.
-///
-/// # Internal Mechanism
-///
-/// The encoder pre-allocates a `Vec<u8>` based on the estimated size of the
-/// object to minimize reallocations. It then pushes the version byte,
-/// followed by length-prefixed fields, using `extend_from_slice` for fast
-/// memory copies. The output is always deterministic.
-///
-/// # Examples
-///
-/// Encoding a simple `Blob`:
-///
-/// ```
-/// use libvctrl_handler::{Blob, Encoder};
-/// use libvctrl_core::codec::BinaryEncoder;
-///
-/// let encoder = BinaryEncoder;
-/// let blob = Blob::new(b"hello".to_vec());
-/// let bytes = encoder.encode_blob(&blob).unwrap();
-///
-/// // The first byte is the version
-/// assert_eq!(bytes[0], 2);
-/// ```
+/// An encoder for the binary format of Git objects.
 pub struct BinaryEncoder;
 
 impl Encoder for BinaryEncoder {
-    /// Encodes a [`Blob`](libvctrl_handler::Blob) into a byte vector.
-    ///
-    /// # Purpose
-    ///
-    /// Converts a [`Blob`](libvctrl_handler::Blob) into its binary
-    /// representation. The resulting byte vector contains the version byte,
-    /// a length prefix, and the raw blob data.
-    ///
-    /// # Format
-    ///
-    /// 1. `VERSION` (1 byte, u8)
-    /// 2. `data_len` (8 bytes, u64 LE)
-    /// 3. `data` (`data_len` bytes)
-    ///
-    /// # Design Rationale
-    ///
-    /// The blob data is copied as-is without any transformation. This
-    /// preserves the exact byte content and ensures a round-trip with
-    /// [`BinaryDecoder::decode_blob`](crate::codec::BinaryDecoder::decode_blob).
-    ///
-    /// # Errors
-    ///
-    /// This method is currently infallible for valid
-    /// [`Blob`](libvctrl_handler::Blob) values because blob data length is
-    /// constrained by the type system (it is a `Vec<u8>` and its length fits
-    /// in `u64`). The `Result` return type is required by the
-    /// [`Encoder`](libvctrl_handler::Encoder) trait.
-    ///
-    /// # Performance
-    ///
-    /// The output buffer is pre-allocated with the exact required capacity
-    /// (`1 + 8 + data.len()`), so no reallocations occur during encoding.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_handler::{Blob, Encoder};
-    /// use libvctrl_core::codec::BinaryEncoder;
-    ///
-    /// let encoder = BinaryEncoder;
-    /// let blob = Blob::new(vec![1, 2, 3]);
-    /// let encoded = encoder.encode_blob(&blob).unwrap();
-    ///
-    /// assert_eq!(encoded.len(), 1 + 8 + 3);
-    /// assert_eq!(encoded[0], 2);
-    /// ```
-    fn encode_blob(&self, blob: &Blob) -> Result<Vec<u8>, VctrlError> {
+    fn encode_blob<W: Write + Send>(&self, blob: &Blob, writer: &mut W) -> Result<(), VctrlError> {
         let data = blob.data();
-        let mut out = Vec::with_capacity(1 + 8 + data.len());
-        out.push(VERSION);
-        out.extend_from_slice(&(data.len() as u64).to_le_bytes());
-        out.extend_from_slice(data);
-        Ok(out)
+        writer.write_all(&[VERSION]).map_err(io_err)?;
+        writer
+            .write_all(&(data.len() as u64).to_le_bytes())
+            .map_err(io_err)?;
+        writer.write_all(data).map_err(io_err)?;
+        Ok(())
     }
 
-    /// Encodes a [`Tree`](libvctrl_handler::Tree) into a byte vector.
-    ///
-    /// # Purpose
-    ///
-    /// Converts a [`Tree`](libvctrl_handler::Tree) into its binary
-    /// representation. The tree entries are serialized in the order they are
-    /// stored (which is guaranteed to be sorted by name by the tree
-    /// constructor).
-    ///
-    /// # Format
-    ///
-    /// 1. `VERSION` (1 byte, u8)
-    /// 2. `entry_count` (4 bytes, u32 LE)
-    /// 3. For each entry:
-    ///    a. `name_len` (1 byte, u8)
-    ///    b. `name` (`name_len` bytes, UTF-8)
-    ///    c. `kind` (1 byte, u8: 0 = Blob, 1 = Executable, 2 = Symlink, 3 = Tree, 4 = Submodule)
-    ///    d. `hash` (64 bytes)
-    ///
-    /// # Design Rationale
-    ///
-    /// The entry kind is encoded as a single byte discriminant to keep the
-    /// format compact. The mapping between [`EntryKind`](libvctrl_handler::EntryKind)
-    /// and the byte value is explicit and stable. Tree entries are validated
-    /// by [`Tree::new`](libvctrl_handler::Tree::new), so this encoder assumes
-    /// the input tree is valid.
-    ///
-    /// # Errors
-    ///
-    /// Returns
-    /// [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError)
-    /// if:
-    ///
-    /// - The number of entries exceeds `u32::MAX`.
-    /// - A name length exceeds `u8::MAX` (255 bytes).
-    /// - An [`EntryKind`](libvctrl_handler::EntryKind) variant is unknown
-    ///   (this cannot happen for well-formed trees because the enum is
-    ///   `#[non_exhaustive]` but all known variants are mapped).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_handler::{Encoder, EntryKind, Hash, Tree, TreeEntry};
-    /// use libvctrl_core::codec::BinaryEncoder;
-    ///
-    /// let encoder = BinaryEncoder;
-    /// let hash = Hash::from_bytes(&[0; 64]).unwrap();
-    /// let entry = TreeEntry::new("file.txt".to_string(), EntryKind::Blob, hash).unwrap();
-    /// let tree = Tree::new(vec![entry]).unwrap();
-    ///
-    /// let encoded = encoder.encode_tree(&tree).unwrap();
-    /// assert!(!encoded.is_empty());
-    /// ```
-    fn encode_tree(&self, tree: &Tree) -> Result<Vec<u8>, VctrlError> {
+    fn encode_tree<W: Write + Send>(&self, tree: &Tree, writer: &mut W) -> Result<(), VctrlError> {
         let entries = tree.entries();
-        let mut out = vec![VERSION];
+        writer.write_all(&[VERSION]).map_err(io_err)?;
         let entry_count = u32::try_from(entries.len())
             .map_err(|_| VctrlError::SerializationError("too many entries".into()))?;
-        out.extend_from_slice(&entry_count.to_le_bytes());
+        writer
+            .write_all(&entry_count.to_le_bytes())
+            .map_err(io_err)?;
+
         for entry in entries {
             let name = entry.name();
             let name_len = u8::try_from(name.len())
                 .map_err(|_| VctrlError::SerializationError("name too long".into()))?;
-            out.push(name_len);
-            out.extend_from_slice(name.as_bytes());
-            out.push(match entry.kind() {
+            writer.write_all(&[name_len]).map_err(io_err)?;
+            writer.write_all(name.as_bytes()).map_err(io_err)?;
+
+            let kind_byte = match entry.kind() {
                 EntryKind::Blob => 0,
                 EntryKind::Executable => 1,
                 EntryKind::Symlink => 2,
                 EntryKind::Tree => 3,
                 EntryKind::Submodule => 4,
                 _ => return Err(VctrlError::SerializationError("unknown entry kind".into())),
-            });
-            out.extend_from_slice(entry.hash().as_bytes());
+            };
+            writer.write_all(&[kind_byte]).map_err(io_err)?;
+            writer.write_all(entry.hash().as_bytes()).map_err(io_err)?;
         }
-        Ok(out)
+        Ok(())
     }
 
-    /// Encodes a [`Commit`](libvctrl_handler::Commit) into a byte vector.
-    ///
-    /// # Purpose
-    ///
-    /// Converts a [`Commit`](libvctrl_handler::Commit) into its binary
-    /// representation, including tree hash, parent hashes, author and
-    /// committer identities, message, and metadata.
-    ///
-    /// # Format
-    ///
-    /// 1. `VERSION` (1 byte, u8)
-    /// 2. `tree_hash` (64 bytes)
-    /// 3. `parent_count` (1 byte, u8)
-    /// 4. `parent_hashes` (64 bytes * `parent_count`)
-    /// 5. `author_name_len` (1 byte, u8) + `author_name`
-    /// 6. `author_email_len` (1 byte, u8) + `author_email`
-    /// 7. `committer_name_len` (1 byte, u8) + `committer_name`
-    /// 8. `committer_email_len` (1 byte, u8) + `committer_email`
-    /// 9. `msg_len` (4 bytes, u32 LE) + `msg`
-    /// 10. `timestamp` (8 bytes, i64 LE)
-    /// 11. `timezone_offset` (2 bytes, i16 LE)
-    /// 12. `encoding_len` (1 byte, u8) + `encoding`
-    ///
-    /// # Design Rationale
-    ///
-    /// The parent count and all string lengths use `u8` prefixes because
-    /// these fields are expected to be small. The message length uses a
-    /// `u32` prefix to allow larger messages up to the system limit
-    /// [`MAX_MESSAGE_LENGTH`](libvctrl_handler::MAX_MESSAGE_LENGTH).
-    ///
-    /// # Errors
-    ///
-    /// Returns
-    /// [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError)
-    /// if:
-    ///
-    /// - The number of parents exceeds 255.
-    /// - Any string length exceeds the capacity of its length prefix
-    ///   (u8 or u32).
-    /// - The commit message exceeds
-    ///   [`MAX_MESSAGE_LENGTH`](libvctrl_handler::MAX_MESSAGE_LENGTH).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_handler::{Commit, Encoder, Hash, UserID};
-    /// use libvctrl_core::codec::BinaryEncoder;
-    ///
-    /// let encoder = BinaryEncoder;
-    /// let tree = Hash::from_bytes(&[0; 64]).unwrap();
-    /// let user = UserID::new("Alice".to_string(), "alice@example.com".to_string()).unwrap();
-    /// let commit = Commit::new(tree, Vec::new(), user.clone(), user, "Initial".to_string());
-    ///
-    /// let encoded = encoder.encode_commit(&commit).unwrap();
-    /// assert!(!encoded.is_empty());
-    /// ```
-    fn encode_commit(&self, commit: &Commit) -> Result<Vec<u8>, VctrlError> {
-        let mut out = vec![VERSION];
-        out.extend_from_slice(commit.tree().as_bytes());
+    fn encode_commit<W: Write + Send>(
+        &self,
+        commit: &Commit,
+        writer: &mut W,
+    ) -> Result<(), VctrlError> {
+        writer.write_all(&[VERSION]).map_err(io_err)?;
+        writer.write_all(commit.tree().as_bytes()).map_err(io_err)?;
+
         let parents = commit.parents();
         let parent_count = u8::try_from(parents.len())
             .map_err(|_| VctrlError::SerializationError("too many parents".into()))?;
-        out.push(parent_count);
+        writer.write_all(&[parent_count]).map_err(io_err)?;
+
         for p in parents {
-            out.extend_from_slice(p.as_bytes());
+            writer.write_all(p.as_bytes()).map_err(io_err)?;
         }
-        let author_name_len = u8::try_from(commit.author().name().len())
-            .map_err(|_| VctrlError::SerializationError("author name too long".into()))?;
-        out.push(author_name_len);
-        out.extend_from_slice(commit.author().name().as_bytes());
-        let author_email_len = u8::try_from(commit.author().email().len())
-            .map_err(|_| VctrlError::SerializationError("author email too long".into()))?;
-        out.push(author_email_len);
-        out.extend_from_slice(commit.author().email().as_bytes());
-        let committer_name_len = u8::try_from(commit.committer().name().len())
-            .map_err(|_| VctrlError::SerializationError("committer name too long".into()))?;
-        out.push(committer_name_len);
-        out.extend_from_slice(commit.committer().name().as_bytes());
-        let committer_email_len = u8::try_from(commit.committer().email().len())
-            .map_err(|_| VctrlError::SerializationError("committer email too long".into()))?;
-        out.push(committer_email_len);
-        out.extend_from_slice(commit.committer().email().as_bytes());
+
+        let author_name = commit.author().name();
+        writer
+            .write_all(&[u8::try_from(author_name.len())
+                .map_err(|_| VctrlError::SerializationError("author name too long".into()))?])
+            .map_err(io_err)?;
+        writer.write_all(author_name.as_bytes()).map_err(io_err)?;
+
+        let author_email = commit.author().email();
+        writer
+            .write_all(&[u8::try_from(author_email.len())
+                .map_err(|_| VctrlError::SerializationError("author email too long".into()))?])
+            .map_err(io_err)?;
+        writer.write_all(author_email.as_bytes()).map_err(io_err)?;
+
+        let committer_name = commit.committer().name();
+        writer
+            .write_all(&[u8::try_from(committer_name.len())
+                .map_err(|_| VctrlError::SerializationError("committer name too long".into()))?])
+            .map_err(io_err)?;
+        writer
+            .write_all(committer_name.as_bytes())
+            .map_err(io_err)?;
+
+        let committer_email = commit.committer().email();
+        writer
+            .write_all(&[u8::try_from(committer_email.len())
+                .map_err(|_| VctrlError::SerializationError("committer email too long".into()))?])
+            .map_err(io_err)?;
+        writer
+            .write_all(committer_email.as_bytes())
+            .map_err(io_err)?;
+
         let msg = commit.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
-        if msg_len as usize
-            > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large")
-        {
+        if msg_len as usize > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::SerializationError(
                 "commit message exceeds size limit".into(),
             ));
         }
-        out.extend_from_slice(&msg_len.to_le_bytes());
-        out.extend_from_slice(msg.as_bytes());
-        out.extend_from_slice(&commit.timestamp().to_le_bytes());
-        out.extend_from_slice(&commit.timezone_offset().to_le_bytes());
-        match commit.encoding() {
+        writer.write_all(&msg_len.to_le_bytes()).map_err(io_err)?;
+        writer.write_all(msg.as_bytes()).map_err(io_err)?;
+
+        writer
+            .write_all(&commit.meta().timestamp().to_le_bytes())
+            .map_err(io_err)?;
+        writer
+            .write_all(&commit.meta().timezone_offset().to_le_bytes())
+            .map_err(io_err)?;
+
+        match commit.meta().encoding() {
             Some(enc) => {
                 let len = u8::try_from(enc.len())
                     .map_err(|_| VctrlError::SerializationError("encoding too long".into()))?;
-                out.push(len);
-                out.extend_from_slice(enc.as_bytes());
+                writer.write_all(&[len]).map_err(io_err)?;
+                writer.write_all(enc.as_bytes()).map_err(io_err)?;
             }
-            None => out.push(0u8),
+            None => writer.write_all(&[0u8]).map_err(io_err)?,
         }
-        Ok(out)
+        Ok(())
     }
 
-    /// Encodes a [`Tag`](libvctrl_handler::Tag) into a byte vector.
-    ///
-    /// # Purpose
-    ///
-    /// Converts a [`Tag`](libvctrl_handler::Tag) into its binary
-    /// representation, including name, target hash, optional tagger identity,
-    /// message, and metadata.
-    ///
-    /// # Format
-    ///
-    /// 1. `VERSION` (1 byte, u8)
-    /// 2. `name_len` (1 byte, u8) + `name`
-    /// 3. `target_hash` (64 bytes)
-    /// 4. `has_tagger` (1 byte, u8: 0 = false, 1 = true)
-    /// 5. If `has_tagger` is 1:
-    ///    a. `tagger_name_len` (1 byte, u8) + `tagger_name`
-    ///    b. `tagger_email_len` (1 byte, u8) + `tagger_email`
-    /// 6. `msg_len` (4 bytes, u32 LE) + `msg`
-    /// 7. `timestamp` (8 bytes, i64 LE)
-    /// 8. `timezone_offset` (2 bytes, i16 LE)
-    /// 9. `encoding_len` (1 byte, u8) + `encoding`
-    ///
-    /// # Design Rationale
-    ///
-    /// The `has_tagger` byte acts as a boolean flag. When `0`, the tagger
-    /// fields are omitted entirely; when `1`, the tagger name and email are
-    /// included. This keeps lightweight tags compact while still supporting
-    /// annotated tags.
-    ///
-    /// # Errors
-    ///
-    /// Returns
-    /// [`VctrlError::SerializationError`](libvctrl_handler::VctrlError::SerializationError)
-    /// if:
-    ///
-    /// - Any string length exceeds the capacity of its length prefix
-    ///   (u8 or u32).
-    /// - The tag message exceeds
-    ///   [`MAX_MESSAGE_LENGTH`](libvctrl_handler::MAX_MESSAGE_LENGTH).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_handler::{Encoder, Hash, Tag, UserID};
-    /// use libvctrl_core::codec::BinaryEncoder;
-    ///
-    /// let encoder = BinaryEncoder;
-    /// let target = Hash::from_bytes(&[0; 64]).unwrap();
-    /// let tagger = UserID::new("Bob".to_string(), "bob@example.com".to_string()).unwrap();
-    /// let tag = Tag::new("v1.0".to_string(), target, Some(tagger), "Release".to_string()).unwrap();
-    ///
-    /// let encoded = encoder.encode_tag(&tag).unwrap();
-    /// assert!(!encoded.is_empty());
-    /// ```
-    fn encode_tag(&self, tag: &Tag) -> Result<Vec<u8>, VctrlError> {
-        let mut out = vec![VERSION];
-        let name_len = u8::try_from(tag.name().len())
+    fn encode_tag<W: Write + Send>(&self, tag: &Tag, writer: &mut W) -> Result<(), VctrlError> {
+        writer.write_all(&[VERSION]).map_err(io_err)?;
+
+        let name = tag.name();
+        let name_len = u8::try_from(name.len())
             .map_err(|_| VctrlError::SerializationError("tag name too long".into()))?;
-        out.push(name_len);
-        out.extend_from_slice(tag.name().as_bytes());
-        out.extend_from_slice(tag.target().as_bytes());
+        writer.write_all(&[name_len]).map_err(io_err)?;
+        writer.write_all(name.as_bytes()).map_err(io_err)?;
+
+        writer.write_all(tag.target().as_bytes()).map_err(io_err)?;
+
         match tag.tagger() {
             Some(tagger) => {
-                out.push(1u8);
-                let tagger_name_len = u8::try_from(tagger.name().len())
-                    .map_err(|_| VctrlError::SerializationError("tagger name too long".into()))?;
-                out.push(tagger_name_len);
-                out.extend_from_slice(tagger.name().as_bytes());
-                let tagger_email_len = u8::try_from(tagger.email().len())
-                    .map_err(|_| VctrlError::SerializationError("tagger email too long".into()))?;
-                out.push(tagger_email_len);
-                out.extend_from_slice(tagger.email().as_bytes());
+                writer.write_all(&[1u8]).map_err(io_err)?;
+
+                let tagger_name = tagger.name();
+                writer
+                    .write_all(&[u8::try_from(tagger_name.len()).map_err(|_| {
+                        VctrlError::SerializationError("tagger name too long".into())
+                    })?])
+                    .map_err(io_err)?;
+                writer.write_all(tagger_name.as_bytes()).map_err(io_err)?;
+
+                let tagger_email = tagger.email();
+                writer
+                    .write_all(&[u8::try_from(tagger_email.len()).map_err(|_| {
+                        VctrlError::SerializationError("tagger email too long".into())
+                    })?])
+                    .map_err(io_err)?;
+                writer.write_all(tagger_email.as_bytes()).map_err(io_err)?;
             }
-            None => out.push(0u8),
+            None => writer.write_all(&[0u8]).map_err(io_err)?,
         }
+
         let msg = tag.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
-        if msg_len as usize
-            > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large")
-        {
+        if msg_len as usize > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::SerializationError(
                 "tag message exceeds size limit".into(),
             ));
         }
-        out.extend_from_slice(&msg_len.to_le_bytes());
-        out.extend_from_slice(msg.as_bytes());
-        out.extend_from_slice(&tag.timestamp().to_le_bytes());
-        out.extend_from_slice(&tag.timezone_offset().to_le_bytes());
-        match tag.encoding() {
+        writer.write_all(&msg_len.to_le_bytes()).map_err(io_err)?;
+        writer.write_all(msg.as_bytes()).map_err(io_err)?;
+
+        writer
+            .write_all(&tag.meta().timestamp().to_le_bytes())
+            .map_err(io_err)?;
+        writer
+            .write_all(&tag.meta().timezone_offset().to_le_bytes())
+            .map_err(io_err)?;
+
+        match tag.meta().encoding() {
             Some(enc) => {
                 let len = u8::try_from(enc.len())
                     .map_err(|_| VctrlError::SerializationError("encoding too long".into()))?;
-                out.push(len);
-                out.extend_from_slice(enc.as_bytes());
+                writer.write_all(&[len]).map_err(io_err)?;
+                writer.write_all(enc.as_bytes()).map_err(io_err)?;
             }
-            None => out.push(0u8),
+            None => writer.write_all(&[0u8]).map_err(io_err)?,
         }
-        Ok(out)
+        Ok(())
     }
+}
+
+fn io_err(e: std::io::Error) -> VctrlError {
+    VctrlError::IoError(std::sync::Arc::new(e))
 }

@@ -29,11 +29,16 @@ struct ClientTransport<'a> {
 }
 
 impl Transport for ClientTransport<'_> {
-    fn fetch_object(&self, hash: &libvctrl::Hash) -> Result<Vec<u8>, VctrlError> {
+    fn fetch_object(
+        &self,
+        hash: &libvctrl::Hash,
+    ) -> Result<Box<dyn std::io::Read + Send + '_>, VctrlError> {
         self.server
             .objects
             .get(hash)
-            .cloned()
+            .map(|v| {
+                Box::new(std::io::Cursor::new(v.clone())) as Box<dyn std::io::Read + Send + '_>
+            })
             .ok_or(VctrlError::ObjectNotFound(*hash))
     }
 
@@ -49,15 +54,17 @@ fn main() -> Result<(), VctrlError> {
     let hasher = Sha512Hasher;
     let alice = UserID::new("Alice".into(), "alice@example.com".into())?;
 
-    let blob = libvctrl::Blob::new(b"Hello, Server!".to_vec());
-    let encoded_blob = encoder.encode_blob(&blob)?;
-    let blob_hash = hasher.hash(&encoded_blob)?;
+    let blob = libvctrl::Blob::new(b"Hello, Server!".to_vec())?;
+    let mut encoded_blob = Vec::new();
+    encoder.encode_blob(&blob, &mut encoded_blob)?;
+    let blob_hash = hasher.hash(&encoded_blob[..])?;
     server.store(&blob_hash, &encoded_blob);
 
     let entry = TreeEntry::new("hello.txt".into(), EntryKind::Blob, blob_hash)?;
     let tree = Tree::new(vec![entry])?;
-    let encoded_tree = encoder.encode_tree(&tree)?;
-    let tree_hash = hasher.hash(&encoded_tree)?;
+    let mut encoded_tree = Vec::new();
+    encoder.encode_tree(&tree, &mut encoded_tree)?;
+    let tree_hash = hasher.hash(&encoded_tree[..])?;
     server.store(&tree_hash, &encoded_tree);
 
     let commit = Commit::new(
@@ -66,9 +73,10 @@ fn main() -> Result<(), VctrlError> {
         alice.clone(),
         alice,
         "Server commit".into(),
-    );
-    let encoded_commit = encoder.encode_commit(&commit)?;
-    let commit_hash = hasher.hash(&encoded_commit)?;
+    )?;
+    let mut encoded_commit = Vec::new();
+    encoder.encode_commit(&commit, &mut encoded_commit)?;
+    let commit_hash = hasher.hash(&encoded_commit[..])?;
     server.store(&commit_hash, &encoded_commit);
 
     // Client connects to server
@@ -76,18 +84,30 @@ fn main() -> Result<(), VctrlError> {
     let decoder = BinaryDecoder;
 
     println!("=== Fetching commit from server ===");
-    let encoded_commit = transport.fetch_object(&commit_hash)?;
-    let commit = decoder.decode_commit(&encoded_commit)?;
+    let mut encoded_commit = Vec::new();
+    transport
+        .fetch_object(&commit_hash)?
+        .read_to_end(&mut encoded_commit)
+        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+    let commit = decoder.decode_commit(&encoded_commit[..])?;
     println!("Commit message: {}", commit.message());
 
     println!("\n=== Fetching tree from server ===");
-    let encoded_tree = transport.fetch_object(commit.tree())?;
-    let tree = decoder.decode_tree(&encoded_tree)?;
+    let mut encoded_tree = Vec::new();
+    transport
+        .fetch_object(commit.tree())?
+        .read_to_end(&mut encoded_tree)
+        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+    let tree = decoder.decode_tree(&encoded_tree[..])?;
     for entry in tree.entries() {
         println!("  {:?} {}", entry.kind(), entry.name());
         if entry.kind() == EntryKind::Blob {
-            let encoded_blob = transport.fetch_object(entry.hash())?;
-            let blob = decoder.decode_blob(&encoded_blob)?;
+            let mut encoded_blob = Vec::new();
+            transport
+                .fetch_object(entry.hash())?
+                .read_to_end(&mut encoded_blob)
+                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+            let blob = decoder.decode_blob(&encoded_blob[..])?;
             let content = String::from_utf8_lossy(blob.data());
             println!("    Content: {content}");
         }

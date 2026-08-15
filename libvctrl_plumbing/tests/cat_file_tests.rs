@@ -35,16 +35,18 @@ impl TestRepo {
         let user = UserID::new("Alice".into(), "alice@example.com".into()).unwrap();
 
         // Blob
-        let blob = Blob::new(b"hello, world\n".to_vec());
-        let enc_blob = encoder.encode_blob(&blob).unwrap();
-        let blob_hash = hasher.hash(&enc_blob).unwrap();
+        let blob = Blob::new(b"hello, world\n".to_vec()).unwrap();
+        let mut enc_blob = Vec::new();
+        encoder.encode_blob(&blob, &mut enc_blob).unwrap();
+        let blob_hash = hasher.hash(enc_blob.as_slice()).unwrap();
         store.put(&blob_hash, &enc_blob).unwrap();
 
         // Tree with one entry pointing to the blob
         let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash).unwrap();
         let tree = Tree::new(vec![entry]).unwrap();
-        let enc_tree = encoder.encode_tree(&tree).unwrap();
-        let tree_hash = hasher.hash(&enc_tree).unwrap();
+        let mut enc_tree = Vec::new();
+        encoder.encode_tree(&tree, &mut enc_tree).unwrap();
+        let tree_hash = hasher.hash(enc_tree.as_slice()).unwrap();
         store.put(&tree_hash, &enc_tree).unwrap();
 
         // Commit
@@ -54,15 +56,18 @@ impl TestRepo {
             user.clone(),
             user.clone(),
             "Initial commit\n".into(),
-        );
-        let enc_commit = encoder.encode_commit(&commit).unwrap();
-        let commit_hash = hasher.hash(&enc_commit).unwrap();
+        )
+        .unwrap();
+        let mut enc_commit = Vec::new();
+        encoder.encode_commit(&commit, &mut enc_commit).unwrap();
+        let commit_hash = hasher.hash(enc_commit.as_slice()).unwrap();
         store.put(&commit_hash, &enc_commit).unwrap();
 
         // Tag pointing to the commit
         let tag = Tag::new("v1.0".into(), commit_hash, Some(user), "Release\n".into()).unwrap();
-        let enc_tag = encoder.encode_tag(&tag).unwrap();
-        let tag_hash = hasher.hash(&enc_tag).unwrap();
+        let mut enc_tag = Vec::new();
+        encoder.encode_tag(&tag, &mut enc_tag).unwrap();
+        let tag_hash = hasher.hash(enc_tag.as_slice()).unwrap();
         store.put(&tag_hash, &enc_tag).unwrap();
 
         Self {
@@ -267,8 +272,9 @@ fn raw_with_correct_type() {
     )
     .unwrap();
     let encoder = BinaryEncoder;
-    let blob = Blob::new(b"hello, world\n".to_vec());
-    let expected = encoder.encode_blob(&blob).unwrap();
+    let blob = Blob::new(b"hello, world\n".to_vec()).unwrap();
+    let mut expected = Vec::new();
+    encoder.encode_blob(&blob, &mut expected).unwrap();
     assert_eq!(out, expected);
 }
 

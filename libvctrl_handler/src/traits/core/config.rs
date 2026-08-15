@@ -1,89 +1,52 @@
-//! Defines the `ConfigStore` trait for accessing configuration values.
-//!
-//! # Purpose
-//!
-//! The `ConfigStore` trait abstracts access to configuration variables,
-//! such as user name, email, and diff settings. This allows different
-//! backends (in-memory, file-based, gitconfig) to provide configuration
-//! data without coupling the caller to a specific storage mechanism.
-//!
-//! # Why a separate module
-//!
-//! Configuration is a cross-cutting concern that must be swappable.
-//! Keeping the trait in its own file follows the same pattern as other
-//! core traits (`ObjectStore`, `RefStore`, etc.), enabling independent
-//! implementations.
-//!
-//! # Examples
-//!
-//! A simple in-memory implementation:
-//!
-//! ```
-//! use std::collections::HashMap;
-//! use libvctrl_handler::{ConfigStore, VctrlError};
-//!
-//! struct MemoryConfig {
-//!     values: HashMap<String, String>,
-//! }
-//!
-//! impl ConfigStore for MemoryConfig {
-//!     fn get_string(&self, section: &str, key: &str) -> Result<Option<String>, VctrlError> {
-//!         let full_key = format!("{}.{}", section, key);
-//!         Ok(self.values.get(&full_key).cloned())
-//!     }
-//! }
-//!
-//! let mut map = HashMap::new();
-//! map.insert("user.name".to_string(), "Alice".to_string());
-//! let config = MemoryConfig { values: map };
-//!
-//! assert_eq!(
-//!     config.get_string("user", "name").unwrap(),
-//!     Some("Alice".to_string())
-//! );
-//! assert_eq!(config.get_string("user", "email").unwrap(), None);
-//! ```
+//! Configuration store trait.
 
-use crate::VctrlError;
+use crate::errors::VctrlError;
 
-/// Trait for accessing configuration variables.
-///
-/// # Purpose
-///
-/// `ConfigStore` abstracts read access to configuration values, allowing
-/// implementations to source data from memory, files, or system gitconfig.
-/// It is primarily used to retrieve settings such as user identity and
-/// diff preferences during porcelain command execution.
-///
-/// # Examples
-///
-/// A trivial implementation that returns `None` for every key:
-///
-/// ```
-/// use libvctrl_handler::{ConfigStore, VctrlError};
-///
-/// struct EmptyConfig;
-///
-/// impl ConfigStore for EmptyConfig {
-///     fn get_string(&self, _section: &str, _key: &str) -> Result<Option<String>, VctrlError> {
-///         Ok(None)
-///     }
-/// }
-///
-/// let config = EmptyConfig;
-/// assert_eq!(config.get_string("user", "name").unwrap(), None);
-/// ```
-///
-/// # Errors
-///
-/// - [`VctrlError::Other`] if the underlying configuration backend fails.
-pub trait ConfigStore {
-    /// Returns the configuration value for the given section and key.
+/// A trait for reading and writing configuration values.
+pub trait ConfigStore: Send + Sync {
+    /// Returns the string value for the given section and key.
     ///
-    /// Returns `Ok(None)` if the key does not exist.
+    /// Returns `Ok(None)` if the key is not found.
     ///
     /// # Errors
     ///
-    /// Returns an error if the configuration backend cannot be accessed.
+    /// Returns [`VctrlError`] if the configuration cannot be read.
     fn get_string(&self, section: &str, key: &str) -> Result<Option<String>, VctrlError>;
+
+    /// Sets the string value for the given section and key.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if the configuration cannot be written.
+    fn set_string(&mut self, section: &str, key: &str, value: &str) -> Result<(), VctrlError>;
+
+    /// Returns the boolean value for the given section and key.
+    ///
+    /// Returns `Ok(None)` if the key is not found.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if the configuration cannot be read or is not a boolean.
+    fn get_bool(&self, section: &str, key: &str) -> Result<Option<bool>, VctrlError>;
+
+    /// Sets the boolean value for the given section and key.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if the configuration cannot be written.
+    fn set_bool(&mut self, section: &str, key: &str, value: bool) -> Result<(), VctrlError>;
+
+    /// Removes a key from the configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if the configuration cannot be modified.
+    fn remove(&mut self, section: &str, key: &str) -> Result<(), VctrlError>;
+
+    /// Checks if a key exists in the configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if the configuration cannot be read.
+    fn exists(&self, section: &str, key: &str) -> Result<bool, VctrlError>;
 }

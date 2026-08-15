@@ -22,31 +22,35 @@ fn main() -> Result<(), VctrlError> {
 
     // --- Blob: README.md ---
     let readme_content = b"# My Project\n\nHello, world!";
-    let readme_blob = libvctrl::Blob::new(readme_content.to_vec());
-    let encoded_readme = encoder.encode_blob(&readme_blob)?;
-    let readme_hash = hasher.hash(&encoded_readme)?; // FIXED: handle Result
+    let readme_blob = libvctrl::Blob::new(readme_content.to_vec())?;
+    let mut encoded_readme = Vec::new();
+    encoder.encode_blob(&readme_blob, &mut encoded_readme)?;
+    let readme_hash = hasher.hash(&encoded_readme[..])?;
     obj_store.put(&readme_hash, &encoded_readme)?;
 
     // --- Blob: src/main.rs ---
     let main_rs_content = b"fn main() { println!(\"Hello from libvctrl!\"); }";
-    let main_blob = libvctrl::Blob::new(main_rs_content.to_vec());
-    let encoded_main = encoder.encode_blob(&main_blob)?;
-    let main_hash = hasher.hash(&encoded_main)?; // FIXED: handle Result
+    let main_blob = libvctrl::Blob::new(main_rs_content.to_vec())?;
+    let mut encoded_main = Vec::new();
+    encoder.encode_blob(&main_blob, &mut encoded_main)?;
+    let main_hash = hasher.hash(&encoded_main[..])?;
     obj_store.put(&main_hash, &encoded_main)?;
 
     // --- Tree: src/ (subdirectory) ---
     let src_entry = TreeEntry::new("main.rs".into(), EntryKind::Blob, main_hash)?;
     let src_tree = Tree::new(vec![src_entry])?;
-    let encoded_src_tree = encoder.encode_tree(&src_tree)?;
-    let src_tree_hash = hasher.hash(&encoded_src_tree)?; // FIXED: handle Result
+    let mut encoded_src_tree = Vec::new();
+    encoder.encode_tree(&src_tree, &mut encoded_src_tree)?;
+    let src_tree_hash = hasher.hash(&encoded_src_tree[..])?;
     obj_store.put(&src_tree_hash, &encoded_src_tree)?;
 
     // --- Root tree: README.md + src/ ---
     let readme_entry = TreeEntry::new("README.md".into(), EntryKind::Blob, readme_hash)?;
     let src_dir_entry = TreeEntry::new("src".into(), EntryKind::Tree, src_tree_hash)?;
     let root_tree = Tree::new(vec![readme_entry, src_dir_entry])?;
-    let encoded_root_tree = encoder.encode_tree(&root_tree)?;
-    let root_tree_hash = hasher.hash(&encoded_root_tree)?; // FIXED: handle Result
+    let mut encoded_root_tree = Vec::new();
+    encoder.encode_tree(&root_tree, &mut encoded_root_tree)?;
+    let root_tree_hash = hasher.hash(&encoded_root_tree[..])?;
     obj_store.put(&root_tree_hash, &encoded_root_tree)?;
 
     // --- Commit ---
@@ -56,9 +60,10 @@ fn main() -> Result<(), VctrlError> {
         user.clone(),
         user,
         "Initial commit".into(),
-    );
-    let encoded_commit = encoder.encode_commit(&commit)?;
-    let commit_hash = hasher.hash(&encoded_commit)?; // FIXED: handle Result
+    )?;
+    let mut encoded_commit = Vec::new();
+    encoder.encode_commit(&commit, &mut encoded_commit)?;
+    let commit_hash = hasher.hash(&encoded_commit[..])?;
     obj_store.put(&commit_hash, &encoded_commit)?;
 
     // Set HEAD
@@ -76,8 +81,8 @@ fn main() -> Result<(), VctrlError> {
     obj_store
         .get(&head_hash)?
         .read_to_end(&mut encoded_commit)
-        .map_err(VctrlError::IoError)?;
-    let commit = decoder.decode_commit(&encoded_commit)?;
+        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+    let commit = decoder.decode_commit(&encoded_commit[..])?;
     println!("Commit message: {}", commit.message());
 
     // Load and decode the root tree
@@ -85,8 +90,8 @@ fn main() -> Result<(), VctrlError> {
     obj_store
         .get(commit.tree())?
         .read_to_end(&mut encoded_tree)
-        .map_err(VctrlError::IoError)?;
-    let tree = decoder.decode_tree(&encoded_tree)?;
+        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+    let tree = decoder.decode_tree(&encoded_tree[..])?;
     println!("Root tree contains {} entries:", tree.entries().len());
 
     for entry in tree.entries() {
@@ -96,8 +101,8 @@ fn main() -> Result<(), VctrlError> {
             obj_store
                 .get(entry.hash())?
                 .read_to_end(&mut encoded_blob)
-                .map_err(VctrlError::IoError)?;
-            let blob = decoder.decode_blob(&encoded_blob)?;
+                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+            let blob = decoder.decode_blob(&encoded_blob[..])?;
             let preview = String::from_utf8_lossy(&blob.data()[..blob.data().len().min(60)]);
             println!(" → {}", preview.lines().next().unwrap_or(""));
         } else {
