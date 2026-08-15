@@ -68,7 +68,8 @@ impl Tree {
     /// Returns [`VctrlError::InvalidTreeStructure`] if entries are not sorted or contain duplicates.
     /// Returns [`VctrlError::ExceededMaxSize`] if the number of entries exceeds `MAX_TREE_ENTRIES`.
     pub fn new(entries: Vec<TreeEntry>) -> Result<Self, VctrlError> {
-        if entries.len() > MAX_TREE_ENTRIES as usize {
+        let max_entries = usize::try_from(MAX_TREE_ENTRIES).unwrap_or(usize::MAX);
+        if entries.len() > max_entries {
             return Err(VctrlError::ExceededMaxSize(format!(
                 "tree entries count {} exceeds maximum allowed count {MAX_TREE_ENTRIES}",
                 entries.len()
