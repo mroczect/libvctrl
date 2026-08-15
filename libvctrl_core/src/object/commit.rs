@@ -1,5 +1,6 @@
 use libvctrl_handler::{Commit, CommitMeta, Hash, UserID, VctrlError};
 
+/// A builder for creating `Commit` objects.
 #[derive(Debug, Default)]
 pub struct CommitBuilder {
     tree: Option<Hash>,
@@ -11,6 +12,7 @@ pub struct CommitBuilder {
 }
 
 impl CommitBuilder {
+    /// Creates a new `CommitBuilder`.
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -23,42 +25,53 @@ impl CommitBuilder {
         }
     }
 
+    /// Sets the tree hash.
     #[must_use]
     pub const fn tree(mut self, tree: Hash) -> Self {
         self.tree = Some(tree);
         self
     }
 
+    /// Adds a parent commit hash.
     #[must_use]
     pub fn parent(mut self, parent: Hash) -> Self {
         self.parents.push(parent);
         self
     }
 
+    /// Sets the author.
     #[must_use]
     pub fn author(mut self, author: UserID) -> Self {
         self.author = Some(author);
         self
     }
 
+    /// Sets the committer.
     #[must_use]
     pub fn committer(mut self, committer: UserID) -> Self {
         self.committer = Some(committer);
         self
     }
 
+    /// Sets the commit message.
     #[must_use]
     pub fn message(mut self, msg: impl Into<String>) -> Self {
         self.message = Some(msg.into());
         self
     }
 
+    /// Sets the commit metadata.
     #[must_use]
     pub fn meta(mut self, meta: CommitMeta) -> Self {
         self.meta = Some(meta);
         self
     }
 
+    /// Builds the `Commit`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if validation fails.
     pub fn build(self) -> Result<Commit, VctrlError> {
         let tree = self
             .tree
@@ -73,7 +86,6 @@ impl CommitBuilder {
             .message
             .ok_or_else(|| VctrlError::Other("message is required".into()))?;
 
-        // Fix: Remove redundant Ok(...?) wrapping
         if let Some(meta) = self.meta {
             Commit::with_meta(tree, self.parents, author, committer, message, meta)
         } else {
