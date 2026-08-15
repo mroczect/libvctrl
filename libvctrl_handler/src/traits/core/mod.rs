@@ -1,5 +1,3 @@
-//! Core traits for repository operations.
-
 pub mod blame;
 pub mod config;
 pub mod decoder;

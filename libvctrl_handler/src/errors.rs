@@ -1,40 +1,36 @@
-//! Error types for the crate.
-
 use crate::types::Hash;
 use std::fmt;
 use std::sync::Arc;
 
-/// The main error type for all operations in this crate.
 #[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum VctrlError {
-    /// The length of a hash did not match the expected length.
     InvalidHashLength(usize),
-    /// A name was invalid (empty, too long, or contained control characters).
+
     InvalidName(String),
-    /// An email address was invalid.
+
     InvalidEmail(String),
-    /// An object with the given hash was not found.
+
     ObjectNotFound(Hash),
-    /// A reference with the given name was not found.
+
     RefNotFound(String),
-    /// Data was corrupted or malformed.
+
     CorruptedData(String),
-    /// An I/O error occurred.
+
     IoError(Arc<std::io::Error>),
-    /// A serialization/deserialization error occurred.
+
     SerializationError(String),
-    /// Any other error not covered by the above variants.
+
     Other(String),
-    /// The tree structure is invalid (e.g., unsorted entries, duplicates).
+
     InvalidTreeStructure(String),
-    /// The timezone offset is out of the valid range (-1440 to 1440).
+
     InvalidTimezoneOffset(i16),
-    /// A commit contains duplicate parent hashes.
+
     DuplicateParent,
-    /// A size or count limit was exceeded.
+
     ExceededMaxSize(String),
-    /// An invalid blame range was specified (e.g., zero line count).
+
     InvalidBlameRange,
 }
 

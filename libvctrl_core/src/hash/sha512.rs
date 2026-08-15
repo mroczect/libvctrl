@@ -1,7 +1,7 @@
 use libvctrl_handler::{Hash, Hasher, VctrlError};
 use libvctrl_sha512::Hash as Sha512Hash;
 
-/// A hasher that uses the SHA-512 algorithm.
+
 #[derive(Debug, Default, Clone)]
 pub struct Sha512Hasher;
 

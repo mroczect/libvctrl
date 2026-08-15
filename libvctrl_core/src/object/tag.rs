@@ -1,6 +1,6 @@
 use libvctrl_handler::{CommitMeta, Hash, Tag, UserID, VctrlError};
 
-/// A builder for creating `Tag` objects.
+
 #[derive(Debug, Default)]
 pub struct TagBuilder {
     name: Option<String>,
@@ -11,7 +11,7 @@ pub struct TagBuilder {
 }
 
 impl TagBuilder {
-    /// Creates a new `TagBuilder`.
+    
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -23,46 +23,46 @@ impl TagBuilder {
         }
     }
 
-    /// Sets the tag name.
+    
     #[must_use]
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Sets the target hash.
+    
     #[must_use]
     pub const fn target(mut self, target: Hash) -> Self {
         self.target = Some(target);
         self
     }
 
-    /// Sets the tagger.
+    
     #[must_use]
     pub fn tagger(mut self, tagger: UserID) -> Self {
         self.tagger = Some(tagger);
         self
     }
 
-    /// Sets the tag message.
+    
     #[must_use]
     pub fn message(mut self, msg: impl Into<String>) -> Self {
         self.message = Some(msg.into());
         self
     }
 
-    /// Sets the tag metadata.
+    
     #[must_use]
     pub fn meta(mut self, meta: CommitMeta) -> Self {
         self.meta = Some(meta);
         self
     }
 
-    /// Builds the `Tag`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`VctrlError`] if validation fails.
+    
+    
+    
+    
+    
     pub fn build(self) -> Result<Tag, VctrlError> {
         let name = self
             .name

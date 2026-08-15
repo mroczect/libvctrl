@@ -1,3 +1,3 @@
 [workspace]
 resolver = "2"
-members = ["libvctrl","libvctrl_core", "libvctrl_docs","libvctrl_handler", "libvctrl_plumbing", "libvctrl_porcelain", "libvctrl_sha512"]
+members = ["libvctrl","libvctrl_core","libvctrl_handler", "libvctrl_plumbing", "libvctrl_porcelain", "libvctrl_sha512"]

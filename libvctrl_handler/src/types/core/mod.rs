@@ -1,5 +1,3 @@
-//! Core data types.
-
 pub mod blob;
 pub use blob::Blob;
 

@@ -6,7 +6,7 @@ use std::str;
 
 const EXPECTED_VERSION: u8 = 2;
 
-/// A decoder for the binary format of Git objects.
+
 pub struct BinaryDecoder;
 
 impl BinaryDecoder {

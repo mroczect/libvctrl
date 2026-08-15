@@ -17,20 +17,15 @@ libvctrl = { path = "../libvctrl", version = "2.1.2" }
 
 [dev-dependencies]
 
-# [lints.clippy]
-# all = "deny"
-# pedantic = "deny"
-# nursery = "deny"
-# cargo = "deny"
-# missing_const_for_fn = "deny"
-# redundant_clone = "deny"
-# unwrap_used = "deny"
-# expect_used = "deny"
-# panic = "deny"
+[lints.clippy]
+all = "deny"
+pedantic = "deny"
+nursery = "deny"
+cargo = "deny"
+missing_docs_in_private_items = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+missing_safety_doc = "allow"
 
-# [lints.rust]
-# unsafe_code = "forbid"
-# missing_docs = "deny"
-# rust_2018_idioms = "deny"
-# unreachable_pub = "deny"
-# unused_qualifications = "deny"
+[lints.rust]
+missing_docs = "allow"

@@ -1,14 +1,14 @@
 use libvctrl_handler::{Hash, RefStore, VctrlError};
 use std::collections::HashMap;
 
-/// An in-memory implementation of `RefStore`.
+
 #[derive(Debug, Default)]
 pub struct MemoryRefStore {
     refs: HashMap<String, Hash>,
 }
 
 impl MemoryRefStore {
-    /// Creates a new `MemoryRefStore`.
+    
     #[must_use]
     pub fn new() -> Self {
         Self {

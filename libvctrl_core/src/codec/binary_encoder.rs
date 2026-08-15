@@ -3,10 +3,10 @@ use libvctrl_handler::{
 };
 use std::io::Write;
 
-/// The current version of the binary encoding format.
+
 pub const VERSION: u8 = 2;
 
-/// An encoder for the binary format of Git objects.
+
 pub struct BinaryEncoder;
 
 impl Encoder for BinaryEncoder {

@@ -1,25 +1,20 @@
-//! Entry kind enum and mode conversion.
-
 use crate::constants::entry_mode;
 
-/// The kind of an entry in a Git tree.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EntryKind {
-    /// A regular file.
     Blob,
-    /// An executable file.
+
     Executable,
-    /// A symbolic link.
+
     Symlink,
-    /// A directory (tree).
+
     Tree,
-    /// A submodule commit.
+
     Submodule,
 }
 
 impl EntryKind {
-    /// Returns the Git mode bits for this entry kind.
     #[must_use]
     pub const fn mode(self) -> u32 {
         match self {
@@ -31,7 +26,6 @@ impl EntryKind {
         }
     }
 
-    /// Converts raw Git mode bits into an [`EntryKind`].
     #[must_use]
     pub const fn from_mode(mode: u32) -> Option<Self> {
         match mode {

@@ -1,5 +1,3 @@
-//! Core data types and validation helpers.
-
 pub mod core;
 
 use crate::constants::MAX_NAME_LENGTH;
@@ -8,12 +6,10 @@ use std::path::Path;
 
 pub use core::*;
 
-/// Returns `true` if the string contains any Unicode control character.
 fn contains_control_character(s: &str) -> bool {
     s.chars().any(char::is_control)
 }
 
-/// Validates a generic name.
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
@@ -32,7 +28,6 @@ pub(crate) fn validate_name(name: &str) -> Result<(), VctrlError> {
     Ok(())
 }
 
-/// Validates a reference name (e.g., branch or tag) strictly according to Git rules.
 pub(crate) fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
     if name.contains("..")
@@ -59,7 +54,6 @@ pub(crate) fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
     Ok(())
 }
 
-/// Validates a tree entry name strictly.
 pub(crate) fn validate_tree_entry_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
     if name.contains('/') || name.contains('\\') || name == "." || name == ".." {

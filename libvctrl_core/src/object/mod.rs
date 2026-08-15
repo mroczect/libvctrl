@@ -1,15 +1,15 @@
-//! Object builders module.
 
-/// Blob builder.
+
+
 pub mod blob;
 
-/// Commit builder.
+
 pub mod commit;
 
-/// Tag builder.
+
 pub mod tag;
 
-/// Tree builder.
+
 pub mod tree;
 
 pub use blob::BlobBuilder;
