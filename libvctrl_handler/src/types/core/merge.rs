@@ -27,7 +27,7 @@ impl Conflict {
 
     /// Returns the path with a conflict.
     #[must_use]
-    pub fn path(&self) -> &PathBuf {
+    pub const fn path(&self) -> &PathBuf {
         &self.path
     }
 
