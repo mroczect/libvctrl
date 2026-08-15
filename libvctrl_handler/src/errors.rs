@@ -26,6 +26,16 @@ pub enum VctrlError {
     SerializationError(String),
     /// Any other error not covered by the above variants.
     Other(String),
+    /// The tree structure is invalid (e.g., unsorted entries, duplicates).
+    InvalidTreeStructure(String),
+    /// The timezone offset is out of the valid range (-1440 to 1440).
+    InvalidTimezoneOffset(i16),
+    /// A commit contains duplicate parent hashes.
+    DuplicateParent,
+    /// A size or count limit was exceeded.
+    ExceededMaxSize(String),
+    /// An invalid blame range was specified (e.g., zero line count).
+    InvalidBlameRange,
 }
 
 impl fmt::Display for VctrlError {
@@ -44,6 +54,11 @@ impl fmt::Display for VctrlError {
             Self::IoError(err) => write!(f, "I/O error: {}", err.as_ref()),
             Self::SerializationError(msg) => write!(f, "Serialization error: {msg}"),
             Self::Other(msg) => write!(f, "{msg}"),
+            Self::InvalidTreeStructure(msg) => write!(f, "Invalid tree structure: {msg}"),
+            Self::InvalidTimezoneOffset(offset) => write!(f, "Invalid timezone offset: {offset}"),
+            Self::DuplicateParent => write!(f, "Duplicate parent in commit"),
+            Self::ExceededMaxSize(msg) => write!(f, "Exceeded max size: {msg}"),
+            Self::InvalidBlameRange => write!(f, "Invalid blame range"),
         }
     }
 }
@@ -61,17 +76,25 @@ impl PartialEq for VctrlError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::InvalidHashLength(a), Self::InvalidHashLength(b)) => a == b,
-            (Self::InvalidName(a), Self::InvalidName(b)) => a == b,
-            (Self::InvalidEmail(a), Self::InvalidEmail(b)) => a == b,
+            (
+                Self::InvalidName(a),
+                Self::InvalidName(b)
+                | Self::InvalidEmail(b)
+                | Self::RefNotFound(b)
+                | Self::CorruptedData(b)
+                | Self::SerializationError(b)
+                | Self::Other(b)
+                | Self::InvalidTreeStructure(b)
+                | Self::ExceededMaxSize(b),
+            ) => a == b,
             (Self::ObjectNotFound(a), Self::ObjectNotFound(b)) => a == b,
-            (Self::RefNotFound(a), Self::RefNotFound(b)) => a == b,
-            (Self::CorruptedData(a), Self::CorruptedData(b)) => a == b,
             (Self::IoError(a), Self::IoError(b)) => {
                 a.as_ref().kind() == b.as_ref().kind()
                     && a.as_ref().to_string() == b.as_ref().to_string()
             }
-            (Self::SerializationError(a), Self::SerializationError(b)) => a == b,
-            (Self::Other(a), Self::Other(b)) => a == b,
+            (Self::InvalidTimezoneOffset(a), Self::InvalidTimezoneOffset(b)) => a == b,
+            (Self::DuplicateParent, Self::DuplicateParent) => true,
+            (Self::InvalidBlameRange, Self::InvalidBlameRange) => true,
             _ => false,
         }
     }

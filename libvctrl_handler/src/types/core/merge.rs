@@ -7,14 +7,10 @@ use crate::Hash;
 /// A conflict that occurred during a merge.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Conflict {
-    /// The path with a conflict.
-    pub path: PathBuf,
-    /// The ancestor blob hash.
-    pub ancestor_blob: Hash,
-    /// The blob from the current branch.
-    pub our_blob: Hash,
-    /// The blob from the merging branch.
-    pub their_blob: Hash,
+    path: PathBuf,
+    ancestor_blob: Hash,
+    our_blob: Hash,
+    their_blob: Hash,
 }
 
 impl Conflict {
@@ -27,6 +23,30 @@ impl Conflict {
             our_blob,
             their_blob,
         }
+    }
+
+    /// Returns the path with a conflict.
+    #[must_use]
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    /// Returns the ancestor blob hash.
+    #[must_use]
+    pub const fn ancestor_blob(&self) -> Hash {
+        self.ancestor_blob
+    }
+
+    /// Returns the blob from the current branch.
+    #[must_use]
+    pub const fn our_blob(&self) -> Hash {
+        self.our_blob
+    }
+
+    /// Returns the blob from the merging branch.
+    #[must_use]
+    pub const fn their_blob(&self) -> Hash {
+        self.their_blob
     }
 }
 

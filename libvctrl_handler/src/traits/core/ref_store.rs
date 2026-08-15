@@ -1,12 +1,12 @@
 //! Reference store trait.
 
 use crate::errors::VctrlError;
-use crate::types::hash::Hash;
+use crate::types::Hash;
 
 /// A trait for managing Git references (branches, tags, etc.).
-pub trait RefStore {
+pub trait RefStore: Send + Sync {
     /// An iterator over reference names.
-    type RefsIterator: Iterator<Item = Result<String, VctrlError>>;
+    type RefsIterator: Iterator<Item = Result<String, VctrlError>> + Send;
 
     /// Sets a reference to the given hash.
     ///

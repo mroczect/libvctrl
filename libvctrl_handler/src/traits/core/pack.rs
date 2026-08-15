@@ -1,11 +1,12 @@
 //! Pack file reader/writer traits.
 
-use crate::VctrlError;
+use crate::errors::VctrlError;
+use std::io::Read;
 
 /// Trait for writing Git pack files.
-pub trait PackWriter {
+pub trait PackWriter: Send + Sync {
     /// The object identifier type.
-    type ObjectId;
+    type ObjectId: Send + Sync;
 
     /// Writes an object to the pack.
     ///
@@ -23,14 +24,14 @@ pub trait PackWriter {
 }
 
 /// Trait for reading Git pack files.
-pub trait PackReader {
+pub trait PackReader: Send + Sync {
     /// The object identifier type.
-    type ObjectId;
+    type ObjectId: Send + Sync;
 
-    /// Reads an object from the pack.
+    /// Reads an object from the pack, returning a reader.
     ///
     /// # Errors
     ///
     /// Returns [`VctrlError`] if the object cannot be read.
-    fn read_object(&self, id: &Self::ObjectId) -> Result<Vec<u8>, VctrlError>;
+    fn read_object(&self, id: &Self::ObjectId) -> Result<Box<dyn Read + Send + '_>, VctrlError>;
 }

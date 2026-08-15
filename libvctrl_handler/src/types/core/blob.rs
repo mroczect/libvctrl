@@ -1,5 +1,8 @@
 //! Blob object representation.
 
+use crate::constants::MAX_BLOB_SIZE;
+use crate::errors::VctrlError;
+
 /// A Git blob object (file content).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Blob {
@@ -8,14 +11,22 @@ pub struct Blob {
 
 impl Blob {
     /// Creates a new blob from raw bytes.
-    #[allow(clippy::missing_const_for_fn)]
-    #[must_use]
-    pub fn new(data: Vec<u8>) -> Self {
-        Self { data }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError::ExceededMaxSize`] if the data exceeds `MAX_BLOB_SIZE`.
+    pub fn new(data: Vec<u8>) -> Result<Self, VctrlError> {
+        if data.len() > MAX_BLOB_SIZE as usize {
+            return Err(VctrlError::ExceededMaxSize(format!(
+                "blob size {} exceeds maximum allowed size {}",
+                data.len(),
+                MAX_BLOB_SIZE
+            )));
+        }
+        Ok(Self { data })
     }
 
     /// Returns the raw bytes of the blob.
-    #[allow(clippy::missing_const_for_fn)]
     #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data

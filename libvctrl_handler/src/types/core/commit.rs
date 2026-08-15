@@ -2,16 +2,56 @@
 
 use super::hash::Hash;
 use super::user_id::UserID;
+use crate::constants::MAX_MESSAGE_LENGTH;
+use crate::errors::VctrlError;
+use std::collections::HashSet;
 
 /// Metadata associated with a commit or tag.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct CommitMeta {
-    /// Unix timestamp.
-    pub timestamp: i64,
-    /// Timezone offset in minutes.
-    pub timezone_offset: i16,
-    /// Optional character encoding.
-    pub encoding: Option<String>,
+    timestamp: i64,
+    timezone_offset: i16,
+    encoding: Option<String>,
+}
+
+impl CommitMeta {
+    /// Creates new commit metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError::InvalidTimezoneOffset`] if the offset is out of range.
+    pub fn new(
+        timestamp: i64,
+        timezone_offset: i16,
+        encoding: Option<String>,
+    ) -> Result<Self, VctrlError> {
+        if !(-1440..=1440).contains(&timezone_offset) {
+            return Err(VctrlError::InvalidTimezoneOffset(timezone_offset));
+        }
+        Ok(Self {
+            timestamp,
+            timezone_offset,
+            encoding,
+        })
+    }
+
+    /// Returns the timestamp.
+    #[must_use]
+    pub const fn timestamp(&self) -> i64 {
+        self.timestamp
+    }
+
+    /// Returns the timezone offset.
+    #[must_use]
+    pub const fn timezone_offset(&self) -> i16 {
+        self.timezone_offset
+    }
+
+    /// Returns the encoding, if any.
+    #[must_use]
+    pub fn encoding(&self) -> Option<&str> {
+        self.encoding.as_deref()
+    }
 }
 
 /// A Git commit object.
@@ -22,36 +62,38 @@ pub struct Commit {
     author: UserID,
     committer: UserID,
     message: String,
-    timestamp: i64,
-    timezone_offset: i16,
-    encoding: Option<String>,
+    meta: CommitMeta,
 }
 
 impl Commit {
     /// Creates a new commit without timestamp metadata.
-    #[allow(clippy::missing_const_for_fn)]
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError::DuplicateParent`] if parents contain duplicates.
+    /// Returns [`VctrlError::ExceededMaxSize`] if the message is too long.
     pub fn new(
         tree: Hash,
         parents: Vec<Hash>,
         author: UserID,
         committer: UserID,
         message: String,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, VctrlError> {
+        Self::with_meta(
             tree,
             parents,
             author,
             committer,
             message,
-            timestamp: 0,
-            timezone_offset: 0,
-            encoding: None,
-        }
+            CommitMeta::default(),
+        )
     }
 
     /// Creates a new commit with timestamp metadata.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if validation fails.
     pub fn with_meta(
         tree: Hash,
         parents: Vec<Hash>,
@@ -59,17 +101,28 @@ impl Commit {
         committer: UserID,
         message: String,
         meta: CommitMeta,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, VctrlError> {
+        if message.len() > MAX_MESSAGE_LENGTH as usize {
+            return Err(VctrlError::ExceededMaxSize(format!(
+                "message length exceeds maximum allowed length {MAX_MESSAGE_LENGTH}"
+            )));
+        }
+
+        let mut seen = HashSet::new();
+        for p in &parents {
+            if !seen.insert(*p) {
+                return Err(VctrlError::DuplicateParent);
+            }
+        }
+
+        Ok(Self {
             tree,
             parents,
             author,
             committer,
             message,
-            timestamp: meta.timestamp,
-            timezone_offset: meta.timezone_offset,
-            encoding: meta.encoding,
-        }
+            meta,
+        })
     }
 
     /// Returns the tree hash of this commit.
@@ -102,21 +155,9 @@ impl Commit {
         &self.message
     }
 
-    /// Returns the commit timestamp.
+    /// Returns the commit metadata.
     #[must_use]
-    pub const fn timestamp(&self) -> i64 {
-        self.timestamp
-    }
-
-    /// Returns the timezone offset.
-    #[must_use]
-    pub const fn timezone_offset(&self) -> i16 {
-        self.timezone_offset
-    }
-
-    /// Returns the encoding, if any.
-    #[must_use]
-    pub fn encoding(&self) -> Option<&str> {
-        self.encoding.as_deref()
+    pub const fn meta(&self) -> &CommitMeta {
+        &self.meta
     }
 }

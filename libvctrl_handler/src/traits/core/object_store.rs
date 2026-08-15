@@ -1,11 +1,11 @@
 //! Object store trait.
 
 use crate::errors::VctrlError;
-use crate::types::hash::Hash;
+use crate::types::Hash;
 use std::io::Read;
 
 /// A trait for storing and retrieving Git objects.
-pub trait ObjectStore {
+pub trait ObjectStore: Send + Sync {
     /// Stores an object under the given hash.
     ///
     /// # Errors
@@ -18,7 +18,7 @@ pub trait ObjectStore {
     /// # Errors
     ///
     /// Returns [`VctrlError`] if the object cannot be found or read.
-    fn get(&self, hash: &Hash) -> Result<Box<dyn Read + '_>, VctrlError>;
+    fn get(&self, hash: &Hash) -> Result<Box<dyn Read + Send + '_>, VctrlError>;
 
     /// Deletes an object by hash.
     ///

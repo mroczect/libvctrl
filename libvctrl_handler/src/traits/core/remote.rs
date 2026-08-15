@@ -1,14 +1,14 @@
 //! Remote repository trait.
 
-use crate::VctrlError;
+use crate::errors::VctrlError;
 
 /// Trait for interacting with remote repositories.
-pub trait Remote {
+pub trait Remote: Send + Sync {
     /// The refspec type.
-    type RefSpec;
+    type RefSpec: Send + Sync;
 
     /// The remote reference type.
-    type RemoteRef;
+    type RemoteRef: Send + Sync;
 
     /// Lists references available on the remote.
     ///

@@ -32,8 +32,6 @@ impl EntryKind {
     }
 
     /// Converts raw Git mode bits into an [`EntryKind`].
-    ///
-    /// Returns `None` if the mode does not correspond to a known entry kind.
     #[must_use]
     pub const fn from_mode(mode: u32) -> Option<Self> {
         match mode {

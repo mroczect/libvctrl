@@ -3,8 +3,9 @@
 use super::commit::CommitMeta;
 use super::hash::Hash;
 use super::user_id::UserID;
+use crate::constants::MAX_MESSAGE_LENGTH;
 use crate::errors::VctrlError;
-use crate::types::validate_name;
+use crate::types::validate_ref_name;
 
 /// A Git tag object.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -13,9 +14,7 @@ pub struct Tag {
     target: Hash,
     tagger: Option<UserID>,
     message: String,
-    timestamp: i64,
-    timezone_offset: i16,
-    encoding: Option<String>,
+    meta: CommitMeta,
 }
 
 impl Tag {
@@ -23,30 +22,21 @@ impl Tag {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::InvalidName`] if the tag name is invalid.
+    /// Returns [`VctrlError`] if validation fails.
     pub fn new(
         name: String,
         target: Hash,
         tagger: Option<UserID>,
         message: String,
     ) -> Result<Self, VctrlError> {
-        validate_name(&name)?;
-        Ok(Self {
-            name,
-            target,
-            tagger,
-            message,
-            timestamp: 0,
-            timezone_offset: 0,
-            encoding: None,
-        })
+        Self::with_meta(name, target, tagger, message, CommitMeta::default())
     }
 
     /// Creates a new tag with timestamp metadata.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::InvalidName`] if the tag name is invalid.
+    /// Returns [`VctrlError`] if validation fails.
     pub fn with_meta(
         name: String,
         target: Hash,
@@ -54,15 +44,18 @@ impl Tag {
         message: String,
         meta: CommitMeta,
     ) -> Result<Self, VctrlError> {
-        validate_name(&name)?;
+        validate_ref_name(&name)?;
+        if message.len() > MAX_MESSAGE_LENGTH as usize {
+            return Err(VctrlError::ExceededMaxSize(format!(
+                "message length exceeds maximum allowed length {MAX_MESSAGE_LENGTH}"
+            )));
+        }
         Ok(Self {
             name,
             target,
             tagger,
             message,
-            timestamp: meta.timestamp,
-            timezone_offset: meta.timezone_offset,
-            encoding: meta.encoding,
+            meta,
         })
     }
 
@@ -90,21 +83,9 @@ impl Tag {
         &self.message
     }
 
-    /// Returns the tag timestamp.
+    /// Returns the tag metadata.
     #[must_use]
-    pub const fn timestamp(&self) -> i64 {
-        self.timestamp
-    }
-
-    /// Returns the timezone offset.
-    #[must_use]
-    pub const fn timezone_offset(&self) -> i16 {
-        self.timezone_offset
-    }
-
-    /// Returns the encoding, if any.
-    #[must_use]
-    pub fn encoding(&self) -> Option<&str> {
-        self.encoding.as_deref()
+    pub const fn meta(&self) -> &CommitMeta {
+        &self.meta
     }
 }

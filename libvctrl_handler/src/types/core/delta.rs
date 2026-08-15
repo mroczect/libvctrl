@@ -15,31 +15,123 @@ pub enum ChangeKind {
     Modified,
     /// The object type changed (e.g., blob to tree).
     TypeChange,
+    /// The object was renamed.
+    Renamed,
+    /// The object was copied.
+    Copied,
 }
 
 /// A single file delta between two trees.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FileDelta {
-    /// The path of the changed file.
-    pub path: PathBuf,
-    /// The old hash, if the file previously existed.
-    pub old_hash: Option<Hash>,
-    /// The new hash, if the file exists now.
-    pub new_hash: Option<Hash>,
-    /// The kind of change.
-    pub kind: ChangeKind,
+    path: PathBuf,
+    old_path: Option<PathBuf>,
+    old_hash: Option<Hash>,
+    new_hash: Option<Hash>,
+    kind: ChangeKind,
 }
 
 impl FileDelta {
-    /// Creates a new `FileDelta` with no hash information.
+    /// Creates a new `FileDelta` representing an addition.
     #[must_use]
-    pub const fn new(path: PathBuf, kind: ChangeKind) -> Self {
+    pub fn added(path: PathBuf, new_hash: Hash) -> Self {
         Self {
             path,
+            old_path: None,
             old_hash: None,
-            new_hash: None,
-            kind,
+            new_hash: Some(new_hash),
+            kind: ChangeKind::Added,
         }
+    }
+
+    /// Creates a new `FileDelta` representing a deletion.
+    #[must_use]
+    pub fn deleted(path: PathBuf, old_hash: Hash) -> Self {
+        Self {
+            path,
+            old_path: None,
+            old_hash: Some(old_hash),
+            new_hash: None,
+            kind: ChangeKind::Deleted,
+        }
+    }
+
+    /// Creates a new `FileDelta` representing a modification.
+    #[must_use]
+    pub fn modified(path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+        Self {
+            path,
+            old_path: None,
+            old_hash: Some(old_hash),
+            new_hash: Some(new_hash),
+            kind: ChangeKind::Modified,
+        }
+    }
+
+    /// Creates a new `FileDelta` representing a type change.
+    #[must_use]
+    pub fn type_change(path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+        Self {
+            path,
+            old_path: None,
+            old_hash: Some(old_hash),
+            new_hash: Some(new_hash),
+            kind: ChangeKind::TypeChange,
+        }
+    }
+
+    /// Creates a new `FileDelta` representing a rename.
+    #[must_use]
+    pub fn renamed(old_path: PathBuf, new_path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+        Self {
+            path: new_path,
+            old_path: Some(old_path),
+            old_hash: Some(old_hash),
+            new_hash: Some(new_hash),
+            kind: ChangeKind::Renamed,
+        }
+    }
+
+    /// Creates a new `FileDelta` representing a copy.
+    #[must_use]
+    pub fn copied(old_path: PathBuf, new_path: PathBuf, old_hash: Hash, new_hash: Hash) -> Self {
+        Self {
+            path: new_path,
+            old_path: Some(old_path),
+            old_hash: Some(old_hash),
+            new_hash: Some(new_hash),
+            kind: ChangeKind::Copied,
+        }
+    }
+
+    /// Returns the path of the changed file.
+    #[must_use]
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    /// Returns the old path if the file was renamed or copied.
+    #[must_use]
+    pub fn old_path(&self) -> Option<&PathBuf> {
+        self.old_path.as_ref()
+    }
+
+    /// Returns the old hash, if the file previously existed.
+    #[must_use]
+    pub const fn old_hash(&self) -> Option<Hash> {
+        self.old_hash
+    }
+
+    /// Returns the new hash, if the file exists now.
+    #[must_use]
+    pub const fn new_hash(&self) -> Option<Hash> {
+        self.new_hash
+    }
+
+    /// Returns the kind of change.
+    #[must_use]
+    pub const fn kind(&self) -> ChangeKind {
+        self.kind
     }
 
     /// Returns `true` if this is an addition.
@@ -65,13 +157,24 @@ impl FileDelta {
     pub fn is_type_change(&self) -> bool {
         self.kind == ChangeKind::TypeChange
     }
+
+    /// Returns `true` if this is a rename.
+    #[must_use]
+    pub fn is_renamed(&self) -> bool {
+        self.kind == ChangeKind::Renamed
+    }
+
+    /// Returns `true` if this is a copy.
+    #[must_use]
+    pub fn is_copied(&self) -> bool {
+        self.kind == ChangeKind::Copied
+    }
 }
 
 /// A collection of file deltas between two trees.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TreeDelta {
-    /// The list of changes.
-    pub changes: Vec<FileDelta>,
+    changes: Vec<FileDelta>,
 }
 
 impl TreeDelta {
@@ -81,6 +184,12 @@ impl TreeDelta {
         Self {
             changes: Vec::new(),
         }
+    }
+
+    /// Creates a `TreeDelta` from a vector of `FileDelta`.
+    #[must_use]
+    pub fn from_changes(changes: Vec<FileDelta>) -> Self {
+        Self { changes }
     }
 
     /// Returns the number of changes.
@@ -98,6 +207,12 @@ impl TreeDelta {
     /// Iterates over the changes.
     pub fn iter(&self) -> std::slice::Iter<'_, FileDelta> {
         self.changes.iter()
+    }
+
+    /// Returns the changes.
+    #[must_use]
+    pub fn changes(&self) -> &[FileDelta] {
+        &self.changes
     }
 }
 

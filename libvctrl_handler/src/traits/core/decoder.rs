@@ -2,34 +2,35 @@
 
 use crate::errors::VctrlError;
 use crate::types::{Blob, Commit, Tag, Tree};
+use std::io::Read;
 
 /// Trait for decoding raw Git object bytes into structured types.
-pub trait Decoder {
-    /// Decodes a blob object from raw bytes.
+pub trait Decoder: Send + Sync {
+    /// Decodes a blob object from a reader.
     ///
     /// # Errors
     ///
     /// Returns [`VctrlError`] if decoding fails.
-    fn decode_blob(&self, data: &[u8]) -> Result<Blob, VctrlError>;
+    fn decode_blob<R: Read + Send>(&self, reader: R) -> Result<Blob, VctrlError>;
 
-    /// Decodes a tree object from raw bytes.
+    /// Decodes a tree object from a reader.
     ///
     /// # Errors
     ///
     /// Returns [`VctrlError`] if decoding fails.
-    fn decode_tree(&self, data: &[u8]) -> Result<Tree, VctrlError>;
+    fn decode_tree<R: Read + Send>(&self, reader: R) -> Result<Tree, VctrlError>;
 
-    /// Decodes a commit object from raw bytes.
+    /// Decodes a commit object from a reader.
     ///
     /// # Errors
     ///
     /// Returns [`VctrlError`] if decoding fails.
-    fn decode_commit(&self, data: &[u8]) -> Result<Commit, VctrlError>;
+    fn decode_commit<R: Read + Send>(&self, reader: R) -> Result<Commit, VctrlError>;
 
-    /// Decodes a tag object from raw bytes.
+    /// Decodes a tag object from a reader.
     ///
     /// # Errors
     ///
     /// Returns [`VctrlError`] if decoding fails.
-    fn decode_tag(&self, data: &[u8]) -> Result<Tag, VctrlError>;
+    fn decode_tag<R: Read + Send>(&self, reader: R) -> Result<Tag, VctrlError>;
 }

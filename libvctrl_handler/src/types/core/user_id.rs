@@ -16,11 +16,18 @@ impl UserID {
     /// # Errors
     ///
     /// Returns [`VctrlError::InvalidName`] if the name is invalid,
-    /// or [`VctrlError::InvalidEmail`] if the email is empty.
+    /// or [`VctrlError::InvalidEmail`] if the email is empty or malformed.
     pub fn new(name: String, email: String) -> Result<Self, VctrlError> {
         validate_name(&name)?;
-        if email.is_empty() {
-            return Err(VctrlError::InvalidEmail("email is empty".into()));
+        if email.is_empty()
+            || !email.contains('@')
+            || email.starts_with('@')
+            || email.ends_with('@')
+            || email.contains(' ')
+        {
+            return Err(VctrlError::InvalidEmail(format!(
+                "invalid email: '{email}'"
+            )));
         }
         Ok(Self { name, email })
     }

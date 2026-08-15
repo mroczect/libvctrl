@@ -1,16 +1,19 @@
 //! Revision walking trait.
 
-use crate::VctrlError;
+use crate::errors::VctrlError;
 
 /// Trait for walking commit history.
-pub trait RevWalk {
+pub trait RevWalk: Send + Sync {
     /// The commit identifier type.
-    type CommitId;
+    type CommitId: Send + Sync;
 
-    /// Returns the parent commit IDs of the given commit.
+    /// Returns an iterator over commit history starting from the given commit.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError`] if the commit cannot be read.
-    fn parents(&self, id: &Self::CommitId) -> Result<Vec<Self::CommitId>, VctrlError>;
+    /// Returns [`VctrlError`] if the walk cannot be initialized.
+    fn walk(
+        &self,
+        start: &Self::CommitId,
+    ) -> Result<Box<dyn Iterator<Item = Result<Self::CommitId, VctrlError>> + Send + '_>, VctrlError>;
 }
