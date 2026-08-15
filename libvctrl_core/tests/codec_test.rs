@@ -216,9 +216,7 @@ fn test_commit_roundtrip_and_limits() {
     // Message too long
     let msg_len = usize::try_from(MAX_MESSAGE_LENGTH).unwrap() + 1;
     let msg = "A".repeat(msg_len);
-    let c = Commit::new(dummy_hash(), vec![], user.clone(), user, msg).unwrap();
-    let mut enc = Vec::new();
-    assert!(BinaryEncoder.encode_commit(&c, &mut enc).is_err());
+    assert!(Commit::new(dummy_hash(), vec![], user.clone(), user, msg).is_err());
 }
 
 #[test]
@@ -269,7 +267,5 @@ fn test_tag_roundtrip_and_limits() {
     // Message too long
     let msg_len = usize::try_from(MAX_MESSAGE_LENGTH).unwrap() + 1;
     let msg = "A".repeat(msg_len);
-    let t = Tag::new("v".into(), dummy_hash(), None, msg).unwrap();
-    let mut enc = Vec::new();
-    assert!(BinaryEncoder.encode_tag(&t, &mut enc).is_err());
+    assert!(Tag::new("v".into(), dummy_hash(), None, msg).is_err());
 }
