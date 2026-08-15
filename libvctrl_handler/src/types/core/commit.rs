@@ -102,7 +102,8 @@ impl Commit {
         message: String,
         meta: CommitMeta,
     ) -> Result<Self, VctrlError> {
-        if message.len() > MAX_MESSAGE_LENGTH as usize {
+        let max_len = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX);
+        if message.len() > max_len {
             return Err(VctrlError::ExceededMaxSize(format!(
                 "message length exceeds maximum allowed length {MAX_MESSAGE_LENGTH}"
             )));
