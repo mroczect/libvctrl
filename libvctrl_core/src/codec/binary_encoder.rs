@@ -1,34 +1,40 @@
 use libvctrl_handler::{
     Blob, Commit, Encoder, EntryKind, MAX_MESSAGE_LENGTH, Tag, Tree, VctrlError,
 };
+use std::io::Write;
 
 pub const VERSION: u8 = 2;
 
 pub struct BinaryEncoder;
 
 impl Encoder for BinaryEncoder {
-    fn encode_blob(&self, blob: &Blob) -> Result<Vec<u8>, VctrlError> {
+    fn encode_blob<W: Write + Send>(&self, blob: &Blob, writer: &mut W) -> Result<(), VctrlError> {
         let data = blob.data();
-        let mut out = Vec::with_capacity(1 + 8 + data.len());
-        out.push(VERSION);
-        out.extend_from_slice(&(data.len() as u64).to_le_bytes());
-        out.extend_from_slice(data);
-        Ok(out)
+        writer.write_all(&[VERSION]).map_err(io_err)?;
+        writer
+            .write_all(&(data.len() as u64).to_le_bytes())
+            .map_err(io_err)?;
+        writer.write_all(data).map_err(io_err)?;
+        Ok(())
     }
 
-    fn encode_tree(&self, tree: &Tree) -> Result<Vec<u8>, VctrlError> {
+    fn encode_tree<W: Write + Send>(&self, tree: &Tree, writer: &mut W) -> Result<(), VctrlError> {
         let entries = tree.entries();
-        let mut out = vec![VERSION];
+        writer.write_all(&[VERSION]).map_err(io_err)?;
         let entry_count = u32::try_from(entries.len())
             .map_err(|_| VctrlError::SerializationError("too many entries".into()))?;
-        out.extend_from_slice(&entry_count.to_le_bytes());
+        writer
+            .write_all(&entry_count.to_le_bytes())
+            .map_err(io_err)?;
+
+        let mut buf = Vec::new();
         for entry in entries {
             let name = entry.name();
             let name_len = u8::try_from(name.len())
                 .map_err(|_| VctrlError::SerializationError("name too long".into()))?;
-            out.push(name_len);
-            out.extend_from_slice(name.as_bytes());
-            out.push(match entry.kind() {
+            buf.push(name_len);
+            buf.extend_from_slice(name.as_bytes());
+            buf.push(match entry.kind() {
                 EntryKind::Blob => 0,
                 EntryKind::Executable => 1,
                 EntryKind::Symlink => 2,
@@ -36,107 +42,157 @@ impl Encoder for BinaryEncoder {
                 EntryKind::Submodule => 4,
                 _ => return Err(VctrlError::SerializationError("unknown entry kind".into())),
             });
-            out.extend_from_slice(entry.hash().as_bytes());
+            buf.extend_from_slice(entry.hash().as_bytes());
         }
-        Ok(out)
+        writer.write_all(&buf).map_err(io_err)?;
+        Ok(())
     }
 
-    fn encode_commit(&self, commit: &Commit) -> Result<Vec<u8>, VctrlError> {
-        let mut out = vec![VERSION];
-        out.extend_from_slice(commit.tree().as_bytes());
+    fn encode_commit<W: Write + Send>(
+        &self,
+        commit: &Commit,
+        writer: &mut W,
+    ) -> Result<(), VctrlError> {
+        writer.write_all(&[VERSION]).map_err(io_err)?;
+        writer.write_all(commit.tree().as_bytes()).map_err(io_err)?;
+
         let parents = commit.parents();
         let parent_count = u8::try_from(parents.len())
             .map_err(|_| VctrlError::SerializationError("too many parents".into()))?;
-        out.push(parent_count);
+        writer.write_all(&[parent_count]).map_err(io_err)?;
+
+        let mut buf = Vec::new();
         for p in parents {
-            out.extend_from_slice(p.as_bytes());
+            buf.extend_from_slice(p.as_bytes());
         }
-        let author_name_len = u8::try_from(commit.author().name().len())
-            .map_err(|_| VctrlError::SerializationError("author name too long".into()))?;
-        out.push(author_name_len);
-        out.extend_from_slice(commit.author().name().as_bytes());
-        let author_email_len = u8::try_from(commit.author().email().len())
-            .map_err(|_| VctrlError::SerializationError("author email too long".into()))?;
-        out.push(author_email_len);
-        out.extend_from_slice(commit.author().email().as_bytes());
-        let committer_name_len = u8::try_from(commit.committer().name().len())
-            .map_err(|_| VctrlError::SerializationError("committer name too long".into()))?;
-        out.push(committer_name_len);
-        out.extend_from_slice(commit.committer().name().as_bytes());
-        let committer_email_len = u8::try_from(commit.committer().email().len())
-            .map_err(|_| VctrlError::SerializationError("committer email too long".into()))?;
-        out.push(committer_email_len);
-        out.extend_from_slice(commit.committer().email().as_bytes());
+
+        let author_name = commit.author().name();
+        buf.push(
+            u8::try_from(author_name.len())
+                .map_err(|_| VctrlError::SerializationError("author name too long".into()))?,
+        );
+        buf.extend_from_slice(author_name.as_bytes());
+
+        let author_email = commit.author().email();
+        buf.push(
+            u8::try_from(author_email.len())
+                .map_err(|_| VctrlError::SerializationError("author email too long".into()))?,
+        );
+        buf.extend_from_slice(author_email.as_bytes());
+
+        let committer_name = commit.committer().name();
+        buf.push(
+            u8::try_from(committer_name.len())
+                .map_err(|_| VctrlError::SerializationError("committer name too long".into()))?,
+        );
+        buf.extend_from_slice(committer_name.as_bytes());
+
+        let committer_email = commit.committer().email();
+        buf.push(
+            u8::try_from(committer_email.len())
+                .map_err(|_| VctrlError::SerializationError("committer email too long".into()))?,
+        );
+        buf.extend_from_slice(committer_email.as_bytes());
+
         let msg = commit.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
-        if msg_len as usize
-            > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large")
-        {
+        if msg_len as usize > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::SerializationError(
                 "commit message exceeds size limit".into(),
             ));
         }
-        out.extend_from_slice(&msg_len.to_le_bytes());
-        out.extend_from_slice(msg.as_bytes());
-        out.extend_from_slice(&commit.timestamp().to_le_bytes());
-        out.extend_from_slice(&commit.timezone_offset().to_le_bytes());
-        match commit.encoding() {
+        buf.extend_from_slice(&msg_len.to_le_bytes());
+        buf.extend_from_slice(msg.as_bytes());
+
+        writer.write_all(&buf).map_err(io_err)?;
+
+        writer
+            .write_all(&commit.meta().timestamp().to_le_bytes())
+            .map_err(io_err)?;
+        writer
+            .write_all(&commit.meta().timezone_offset().to_le_bytes())
+            .map_err(io_err)?;
+
+        match commit.meta().encoding() {
             Some(enc) => {
                 let len = u8::try_from(enc.len())
                     .map_err(|_| VctrlError::SerializationError("encoding too long".into()))?;
-                out.push(len);
-                out.extend_from_slice(enc.as_bytes());
+                writer.write_all(&[len]).map_err(io_err)?;
+                writer.write_all(enc.as_bytes()).map_err(io_err)?;
             }
-            None => out.push(0u8),
+            None => writer.write_all(&[0u8]).map_err(io_err)?,
         }
-        Ok(out)
+        Ok(())
     }
 
-    fn encode_tag(&self, tag: &Tag) -> Result<Vec<u8>, VctrlError> {
-        let mut out = vec![VERSION];
-        let name_len = u8::try_from(tag.name().len())
+    fn encode_tag<W: Write + Send>(&self, tag: &Tag, writer: &mut W) -> Result<(), VctrlError> {
+        writer.write_all(&[VERSION]).map_err(io_err)?;
+
+        let name = tag.name();
+        let name_len = u8::try_from(name.len())
             .map_err(|_| VctrlError::SerializationError("tag name too long".into()))?;
-        out.push(name_len);
-        out.extend_from_slice(tag.name().as_bytes());
-        out.extend_from_slice(tag.target().as_bytes());
+        writer.write_all(&[name_len]).map_err(io_err)?;
+        writer.write_all(name.as_bytes()).map_err(io_err)?;
+
+        writer.write_all(tag.target().as_bytes()).map_err(io_err)?;
+
+        let mut buf = Vec::new();
         match tag.tagger() {
             Some(tagger) => {
-                out.push(1u8);
-                let tagger_name_len = u8::try_from(tagger.name().len())
-                    .map_err(|_| VctrlError::SerializationError("tagger name too long".into()))?;
-                out.push(tagger_name_len);
-                out.extend_from_slice(tagger.name().as_bytes());
-                let tagger_email_len = u8::try_from(tagger.email().len())
-                    .map_err(|_| VctrlError::SerializationError("tagger email too long".into()))?;
-                out.push(tagger_email_len);
-                out.extend_from_slice(tagger.email().as_bytes());
+                buf.push(1u8);
+                let tagger_name = tagger.name();
+                buf.push(
+                    u8::try_from(tagger_name.len()).map_err(|_| {
+                        VctrlError::SerializationError("tagger name too long".into())
+                    })?,
+                );
+                buf.extend_from_slice(tagger_name.as_bytes());
+
+                let tagger_email = tagger.email();
+                buf.push(
+                    u8::try_from(tagger_email.len()).map_err(|_| {
+                        VctrlError::SerializationError("tagger email too long".into())
+                    })?,
+                );
+                buf.extend_from_slice(tagger_email.as_bytes());
             }
-            None => out.push(0u8),
+            None => buf.push(0u8),
         }
+
         let msg = tag.message();
         let msg_len = u32::try_from(msg.len())
             .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
-        if msg_len as usize
-            > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large")
-        {
+        if msg_len as usize > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::SerializationError(
                 "tag message exceeds size limit".into(),
             ));
         }
-        out.extend_from_slice(&msg_len.to_le_bytes());
-        out.extend_from_slice(msg.as_bytes());
-        out.extend_from_slice(&tag.timestamp().to_le_bytes());
-        out.extend_from_slice(&tag.timezone_offset().to_le_bytes());
-        match tag.encoding() {
+        buf.extend_from_slice(&msg_len.to_le_bytes());
+        buf.extend_from_slice(msg.as_bytes());
+
+        writer.write_all(&buf).map_err(io_err)?;
+
+        writer
+            .write_all(&tag.meta().timestamp().to_le_bytes())
+            .map_err(io_err)?;
+        writer
+            .write_all(&tag.meta().timezone_offset().to_le_bytes())
+            .map_err(io_err)?;
+
+        match tag.meta().encoding() {
             Some(enc) => {
                 let len = u8::try_from(enc.len())
                     .map_err(|_| VctrlError::SerializationError("encoding too long".into()))?;
-                out.push(len);
-                out.extend_from_slice(enc.as_bytes());
+                writer.write_all(&[len]).map_err(io_err)?;
+                writer.write_all(enc.as_bytes()).map_err(io_err)?;
             }
-            None => out.push(0u8),
+            None => writer.write_all(&[0u8]).map_err(io_err)?,
         }
-        Ok(out)
+        Ok(())
     }
+}
+
+fn io_err(e: std::io::Error) -> VctrlError {
+    VctrlError::IoError(std::sync::Arc::new(e))
 }
