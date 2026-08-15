@@ -1,6 +1,6 @@
 use libvctrl_handler::{
-    Blob, Commit, CommitMeta, Decoder, EntryKind, Hash, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH,
-    MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID, VctrlError,
+    Blob, Commit, CommitMeta, Decoder, EntryKind, HASH_LENGTH, Hash, MAX_BLOB_SIZE,
+    MAX_MESSAGE_LENGTH, MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID, VctrlError,
 };
 use std::str;
 
@@ -24,8 +24,13 @@ impl BinaryDecoder {
 }
 
 impl Decoder for BinaryDecoder {
-    fn decode_blob(&self, data: &[u8]) -> Result<Blob, VctrlError> {
-        let data = Self::check_version(data)?;
+    fn decode_blob<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Blob, VctrlError> {
+        let mut data = Vec::new();
+        reader
+            .read_to_end(&mut data)
+            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+
+        let data = Self::check_version(&data)?;
         if data.len() < 8 {
             return Err(VctrlError::CorruptedData(
                 "blob too short for length prefix".into(),
@@ -34,29 +39,34 @@ impl Decoder for BinaryDecoder {
         let len_bytes: [u8; 8] = data[..8].try_into().unwrap();
         let data_len = usize::try_from(u64::from_le_bytes(len_bytes))
             .map_err(|_| VctrlError::CorruptedData("blob length out of range".into()))?;
-        if data_len > usize::try_from(MAX_BLOB_SIZE).expect("MAX_BLOB_SIZE too large") {
+        if data_len > usize::try_from(MAX_BLOB_SIZE).unwrap_or(usize::MAX) {
             return Err(VctrlError::CorruptedData("blob exceeds size limit".into()));
         }
         if data.len() != 8 + data_len {
             return Err(VctrlError::CorruptedData("blob length mismatch".into()));
         }
-        Ok(Blob::new(data[8..].to_vec()))
+        Blob::new(data[8..].to_vec())
     }
 
-    fn decode_tree(&self, data: &[u8]) -> Result<Tree, VctrlError> {
-        let data = Self::check_version(data)?;
+    fn decode_tree<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Tree, VctrlError> {
+        let mut data = Vec::new();
+        reader
+            .read_to_end(&mut data)
+            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+
+        let data = Self::check_version(&data)?;
         if data.len() < 4 {
             return Err(VctrlError::CorruptedData("tree too short".into()));
         }
         let count_bytes: [u8; 4] = data[..4].try_into().unwrap();
         let count = u32::from_le_bytes(count_bytes) as usize;
-        if count > usize::try_from(MAX_TREE_ENTRIES).expect("MAX_TREE_ENTRIES too large") {
+        if count > usize::try_from(MAX_TREE_ENTRIES).unwrap_or(usize::MAX) {
             return Err(VctrlError::CorruptedData(
                 "tree entry count exceeds limit".into(),
             ));
         }
         let mut pos = 4;
-        let mut entries = Vec::with_capacity(count);
+        let mut entries = Vec::new(); // Fix: Avoid unvalidated allocation
         for _ in 0..count {
             if pos >= data.len() {
                 return Err(VctrlError::CorruptedData("unexpected end of tree".into()));
@@ -82,32 +92,40 @@ impl Decoder for BinaryDecoder {
                 _ => return Err(VctrlError::CorruptedData("unknown entry kind".into())),
             };
             pos += 1;
-            if pos + 64 > data.len() {
+            if pos + HASH_LENGTH > data.len() {
                 return Err(VctrlError::CorruptedData("hash truncated".into()));
             }
-            let hash = Hash::from_bytes(&data[pos..pos + 64])?;
-            pos += 64;
+            let hash = Hash::from_bytes(&data[pos..pos + HASH_LENGTH])?;
+            pos += HASH_LENGTH;
             entries.push(TreeEntry::new(name, kind, hash)?);
+        }
+        if pos != data.len() {
+            return Err(VctrlError::CorruptedData("trailing bytes in tree".into()));
         }
         Tree::new(entries)
     }
 
     #[allow(clippy::too_many_lines)]
-    fn decode_commit(&self, data: &[u8]) -> Result<Commit, VctrlError> {
-        let data = Self::check_version(data)?;
-        if data.len() < 64 + 1 {
+    fn decode_commit<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Commit, VctrlError> {
+        let mut data = Vec::new();
+        reader
+            .read_to_end(&mut data)
+            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+
+        let data = Self::check_version(&data)?;
+        if data.len() < HASH_LENGTH + 1 {
             return Err(VctrlError::CorruptedData("commit too short".into()));
         }
-        let tree = Hash::from_bytes(&data[..64])?;
-        let parent_count = data[64] as usize;
-        let mut pos = 65;
-        let mut parents = Vec::with_capacity(parent_count);
+        let tree = Hash::from_bytes(&data[..HASH_LENGTH])?;
+        let parent_count = data[HASH_LENGTH] as usize;
+        let mut pos = HASH_LENGTH + 1;
+        let mut parents = Vec::new();
         for _ in 0..parent_count {
-            if pos + 64 > data.len() {
+            if pos + HASH_LENGTH > data.len() {
                 return Err(VctrlError::CorruptedData("parent hash truncated".into()));
             }
-            parents.push(Hash::from_bytes(&data[pos..pos + 64])?);
-            pos += 64;
+            parents.push(Hash::from_bytes(&data[pos..pos + HASH_LENGTH])?);
+            pos += HASH_LENGTH;
         }
         if pos >= data.len() {
             return Err(VctrlError::CorruptedData("missing author name".into()));
@@ -167,7 +185,7 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
-        if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large") {
+        if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::CorruptedData(
                 "commit message exceeds size limit".into(),
             ));
@@ -206,19 +224,23 @@ impl Decoder for BinaryDecoder {
         } else {
             None
         };
-        let meta = CommitMeta {
-            timestamp,
-            timezone_offset,
-            encoding,
-        };
-        Ok(Commit::with_meta(
-            tree, parents, author, committer, message, meta,
-        ))
+
+        // Fix: Use CommitMeta::new to enforce validation
+        let meta = CommitMeta::new(timestamp, timezone_offset, encoding)?;
+        if pos != data.len() {
+            return Err(VctrlError::CorruptedData("trailing bytes in commit".into()));
+        }
+        Commit::with_meta(tree, parents, author, committer, message, meta)
     }
 
     #[allow(clippy::too_many_lines)]
-    fn decode_tag(&self, data: &[u8]) -> Result<Tag, VctrlError> {
-        let data = Self::check_version(data)?;
+    fn decode_tag<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Tag, VctrlError> {
+        let mut data = Vec::new();
+        reader
+            .read_to_end(&mut data)
+            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+
+        let data = Self::check_version(&data)?;
         if data.is_empty() {
             return Err(VctrlError::CorruptedData("tag too short".into()));
         }
@@ -231,11 +253,11 @@ impl Decoder for BinaryDecoder {
             .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in tag name".into()))?
             .to_string();
         pos += name_len;
-        if pos + 64 > data.len() {
+        if pos + HASH_LENGTH > data.len() {
             return Err(VctrlError::CorruptedData("target hash truncated".into()));
         }
-        let target = Hash::from_bytes(&data[pos..pos + 64])?;
-        pos += 64;
+        let target = Hash::from_bytes(&data[pos..pos + HASH_LENGTH])?;
+        pos += HASH_LENGTH;
         if pos >= data.len() {
             return Err(VctrlError::CorruptedData(
                 "missing tagger presence byte".into(),
@@ -286,7 +308,7 @@ impl Decoder for BinaryDecoder {
         let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
         let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
         pos += 4;
-        if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).expect("MAX_MESSAGE_LENGTH too large") {
+        if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::SerializationError(
                 "tag message exceeds size limit".into(),
             ));
@@ -325,11 +347,12 @@ impl Decoder for BinaryDecoder {
         } else {
             None
         };
-        let meta = CommitMeta {
-            timestamp,
-            timezone_offset,
-            encoding,
-        };
+
+        // Fix: Use CommitMeta::new to enforce validation
+        let meta = CommitMeta::new(timestamp, timezone_offset, encoding)?;
+        if pos != data.len() {
+            return Err(VctrlError::CorruptedData("trailing bytes in tag".into()));
+        }
         Tag::with_meta(name, target, tagger, message, meta)
     }
 }
