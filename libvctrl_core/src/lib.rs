@@ -14,8 +14,17 @@
 #[cfg(test)]
 use proptest as _;
 
+/// Binary codec for encoding and decoding objects.
 pub mod codec;
+
+/// Hashing algorithms.
 pub mod hash;
+
+/// Object builders for ergonomic construction.
 pub mod object;
+
+/// In-memory object and reference stores.
 pub mod store;
+
+/// Validation helpers for names and hashes.
 pub mod validate;
