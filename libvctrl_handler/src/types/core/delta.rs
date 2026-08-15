@@ -1,6 +1,6 @@
 //! Delta and change types.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::Hash;
 
@@ -116,14 +116,14 @@ impl FileDelta {
 
     /// Returns the path of the changed file.
     #[must_use]
-    pub const fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &Path {
         &self.path
     }
 
     /// Returns the old path if the file was renamed or copied.
     #[must_use]
-    pub const fn old_path(&self) -> Option<&PathBuf> {
-        self.old_path.as_ref()
+    pub fn old_path(&self) -> Option<&Path> {
+        self.old_path.as_deref()
     }
 
     /// Returns the old hash, if the file previously existed.
