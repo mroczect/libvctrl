@@ -1,3 +1,5 @@
+//! Reference implementations of the libvctrl contracts (in-memory store, SHA-512 hasher, binary codec).
+
 #![forbid(unsafe_code)]
 #![deny(
     clippy::all,
