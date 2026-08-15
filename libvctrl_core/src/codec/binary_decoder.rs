@@ -6,6 +6,7 @@ use std::str;
 
 const EXPECTED_VERSION: u8 = 2;
 
+/// A decoder for the binary format of Git objects.
 pub struct BinaryDecoder;
 
 impl BinaryDecoder {
@@ -66,7 +67,7 @@ impl Decoder for BinaryDecoder {
             ));
         }
         let mut pos = 4;
-        let mut entries = Vec::new(); // Fix: Avoid unvalidated allocation
+        let mut entries = Vec::new();
         for _ in 0..count {
             if pos >= data.len() {
                 return Err(VctrlError::CorruptedData("unexpected end of tree".into()));
@@ -220,12 +221,12 @@ impl Decoder for BinaryDecoder {
             let enc = str::from_utf8(&data[pos..pos + encoding_len])
                 .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in encoding".into()))?
                 .to_string();
+            pos += encoding_len; // <-- FIX: advance pos after reading encoding
             Some(enc)
         } else {
             None
         };
 
-        // Fix: Use CommitMeta::new to enforce validation
         let meta = CommitMeta::new(timestamp, timezone_offset, encoding)?;
         if pos != data.len() {
             return Err(VctrlError::CorruptedData("trailing bytes in commit".into()));
@@ -343,12 +344,12 @@ impl Decoder for BinaryDecoder {
             let enc = str::from_utf8(&data[pos..pos + encoding_len])
                 .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in encoding".into()))?
                 .to_string();
+            pos += encoding_len; // <-- FIX: advance pos after reading encoding
             Some(enc)
         } else {
             None
         };
 
-        // Fix: Use CommitMeta::new to enforce validation
         let meta = CommitMeta::new(timestamp, timezone_offset, encoding)?;
         if pos != data.len() {
             return Err(VctrlError::CorruptedData("trailing bytes in tag".into()));
