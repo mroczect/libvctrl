@@ -16,7 +16,8 @@ impl Blob {
     ///
     /// Returns [`VctrlError::ExceededMaxSize`] if the data exceeds `MAX_BLOB_SIZE`.
     pub fn new(data: Vec<u8>) -> Result<Self, VctrlError> {
-        if data.len() > MAX_BLOB_SIZE as usize {
+        let max_size = usize::try_from(MAX_BLOB_SIZE).unwrap_or(usize::MAX);
+        if data.len() > max_size {
             return Err(VctrlError::ExceededMaxSize(format!(
                 "blob size {} exceeds maximum allowed size {}",
                 data.len(),
