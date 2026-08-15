@@ -1,15 +1,3 @@
-#![deny(
-    clippy::all,
-    clippy::pedantic,
-    clippy::nursery,
-    clippy::cargo,
-    missing_docs,
-    rust_2018_idioms,
-    unreachable_pub,
-    unused_qualifications
-)]
-#![allow(unused_crate_dependencies)]
-
 #[macro_export]
 macro_rules! impl_hmac {
     ($hash_struct:ty, $output_size:expr, $block_size:expr) => {

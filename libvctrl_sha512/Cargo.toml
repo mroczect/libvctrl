@@ -35,21 +35,5 @@ harness = false
 path = "benches/sha384_bench.rs"
 required-features = ["sha384"]
 
-[lints.rust]
-missing_docs = "allow"               
-unsafe_code = "warn"
-unused_qualifications = "warn"
-
-[lints.clippy]
-all = "warn"                         
-pedantic = "warn"                    
-nursery = "warn"
-cargo = "warn"
-
-missing_docs_in_private_items = "allow"
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
-missing_safety_doc = "allow"
-
-must_use_candidate = "warn"
-missing_const_for_fn = "warn"
+[lints]
+workspace = true

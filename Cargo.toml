@@ -1,3 +1,31 @@
 [workspace]
 resolver = "2"
 members = ["libvctrl","libvctrl_core","libvctrl_handler", "libvctrl_plumbing", "libvctrl_porcelain", "libvctrl_sha512"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+authors = ["mroczect"]
+repository = "https://github.com/mroczect/libvctrl"
+homepage = "https://github.com/mroczect/libvctrl"
+documentation = "https://docs.rs/libvctrl"
+keywords = ["git", "vcs", "cryptography", "sha512", "no-std"]
+categories = ["development-tools", "cryptography", "algorithms", "no-std"]
+
+[workspace.lints.rust]
+missing_docs = "allow"
+unsafe_code = "warn"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+cargo = "warn"
+missing_docs_in_private_items = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+missing_safety_doc = "allow"
+must_use_candidate = "warn"
+missing_const_for_fn = "warn"

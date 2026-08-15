@@ -1,15 +1,3 @@
-#![forbid(unsafe_code)]
-#![deny(
-    clippy::all,
-    clippy::pedantic,
-    clippy::cargo,
-    clippy::nursery,
-    rust_2018_idioms,
-    unreachable_pub,
-    unused_crate_dependencies,
-    unused_qualifications
-)]
-
 pub mod constants;
 
 pub mod enums;

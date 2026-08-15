@@ -1,24 +1,3 @@
-//! Cat‑file – 1:1 implementation of `git cat-file`
-//!
-//! This module provides an exact replica of the Git plumbing command
-//! `cat-file`. It can operate in two modes:
-//!
-//! * **Non‑batch mode** – given an object name and a flag (`-p`, `-t`,
-//!   `-s`, `-e`, or an explicit `<type>`) prints the requested
-//!   information to an arbitrary writer.
-//!
-//! * **Batch mode** – reads object names (or commands) from an input
-//!   stream and writes results to an output stream, following exactly
-//!   the format described in the official Git documentation.
-//!
-//! The implementation is generic over the underlying object store and
-//! decoder, so it works with any backend (in‑memory, disk, etc.).
-//!
-//! # Safety & Conventions
-//! - All I/O errors are converted to `VctrlError::IoError` using `.map_err`.
-//! - No unsafe code is used.
-//! - The module strictly follows Rust's idiomatic patterns.
-
 use libvctrl::{Decoder, EntryKind, Hash, ObjectStore, VctrlError};
 use std::fmt::Write;
 use std::io::{BufRead, Write as IoWrite};

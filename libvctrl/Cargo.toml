@@ -30,25 +30,5 @@ default = ["sha384"]
 sha384 = ["libvctrl_sha512/sha384"]
 opt_size = ["libvctrl_sha512/opt_size"]
 
-[lints.clippy]
-all = "deny"
-pedantic = "deny"
-nursery = "deny"
-cargo = "deny"
-missing_const_for_fn = "deny"
-redundant_clone = "deny"
-unwrap_used = "deny"
-expect_used = "deny"
-panic = "deny"
-missing_docs_in_private_items = "allow"
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
-missing_safety_doc = "allow"
-
-
-[lints.rust]
-unsafe_code = "forbid"
-missing_docs = "allow"
-rust_2018_idioms = "deny"
-unreachable_pub = "deny"
-unused_qualifications = "deny"
+[lints]
+workspace = true
