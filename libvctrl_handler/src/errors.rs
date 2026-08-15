@@ -93,8 +93,8 @@ impl PartialEq for VctrlError {
                     && a.as_ref().to_string() == b.as_ref().to_string()
             }
             (Self::InvalidTimezoneOffset(a), Self::InvalidTimezoneOffset(b)) => a == b,
-            (Self::DuplicateParent, Self::DuplicateParent) => true,
-            (Self::InvalidBlameRange, Self::InvalidBlameRange) => true,
+            (Self::DuplicateParent, Self::DuplicateParent)
+            | (Self::InvalidBlameRange, Self::InvalidBlameRange) => true,
             _ => false,
         }
     }
