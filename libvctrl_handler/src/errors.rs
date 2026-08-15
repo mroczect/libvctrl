@@ -73,41 +73,26 @@ impl std::error::Error for VctrlError {
 }
 
 impl PartialEq for VctrlError {
+    #[allow(clippy::match_same_arms)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::InvalidHashLength(a), Self::InvalidHashLength(b)) => a == b,
-
-            // Gabungkan semua varian dengan payload String
-            (
-                Self::InvalidName(a)
-                | Self::InvalidEmail(a)
-                | Self::RefNotFound(a)
-                | Self::CorruptedData(a)
-                | Self::SerializationError(a)
-                | Self::Other(a)
-                | Self::InvalidTreeStructure(a)
-                | Self::ExceededMaxSize(a),
-                Self::InvalidName(b)
-                | Self::InvalidEmail(b)
-                | Self::RefNotFound(b)
-                | Self::CorruptedData(b)
-                | Self::SerializationError(b)
-                | Self::Other(b)
-                | Self::InvalidTreeStructure(b)
-                | Self::ExceededMaxSize(b),
-            ) => a == b,
-
+            (Self::InvalidName(a), Self::InvalidName(b)) => a == b,
+            (Self::InvalidEmail(a), Self::InvalidEmail(b)) => a == b,
             (Self::ObjectNotFound(a), Self::ObjectNotFound(b)) => a == b,
+            (Self::RefNotFound(a), Self::RefNotFound(b)) => a == b,
+            (Self::CorruptedData(a), Self::CorruptedData(b)) => a == b,
+            (Self::SerializationError(a), Self::SerializationError(b)) => a == b,
+            (Self::Other(a), Self::Other(b)) => a == b,
+            (Self::InvalidTreeStructure(a), Self::InvalidTreeStructure(b)) => a == b,
+            (Self::ExceededMaxSize(a), Self::ExceededMaxSize(b)) => a == b,
             (Self::IoError(a), Self::IoError(b)) => {
                 a.as_ref().kind() == b.as_ref().kind()
                     && a.as_ref().to_string() == b.as_ref().to_string()
             }
             (Self::InvalidTimezoneOffset(a), Self::InvalidTimezoneOffset(b)) => a == b,
-
-            // Gabungkan varian unit
-            (Self::DuplicateParent, Self::DuplicateParent)
-            | (Self::InvalidBlameRange, Self::InvalidBlameRange) => true,
-
+            (Self::DuplicateParent, Self::DuplicateParent) => true,
+            (Self::InvalidBlameRange, Self::InvalidBlameRange) => true,
             _ => false,
         }
     }
