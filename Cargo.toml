@@ -4,7 +4,7 @@ members = ["libvctrl","libvctrl_core","libvctrl_handler", "libvctrl_plumbing", "
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.96"
 license = "MIT"
 authors = ["mroczect"]
 repository = "https://github.com/mroczect/libvctrl"
