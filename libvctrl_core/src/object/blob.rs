@@ -1,4 +1,4 @@
-use libvctrl_handler::Blob;
+use libvctrl_handler::{Blob, VctrlError};
 
 #[derive(Debug, Default)]
 pub struct BlobBuilder {
@@ -17,8 +17,7 @@ impl BlobBuilder {
         self
     }
 
-    #[must_use]
-    pub fn build(self) -> Blob {
+    pub fn build(self) -> Result<Blob, VctrlError> {
         Blob::new(self.data)
     }
 }
