@@ -133,6 +133,7 @@ pub trait Encoder: Send + Sync {
     /// # Examples
     ///
     /// ```
+    /// # use std::io::Read;
     /// # use libvctrl_handler::traits::core::encoder::Encoder;
     /// # use libvctrl_handler::{Blob, Commit, Tag, Tree, VctrlError};
     /// # use std::io::Write;
@@ -179,8 +180,8 @@ pub trait Encoder: Send + Sync {
     /// # let hash = Hash::from_bytes(&[0_u8; 64])?;
     /// # let user = UserID::new("Alice".to_string(), "alice@example.com".to_string())?;
     /// let encoder = MockEncoder;
-    /// let commit = Commit::new(hash, vec![], user, user, "message".to_string())?;
-    /// let mut buffer = Vec::new();
+    /// let commit = Commit::new(hash, vec![], user.clone(), user, "message".to_string())?;    ///
+    ///  let mut buffer = Vec::new();
     /// assert!(encoder.encode_commit(&commit, &mut buffer).is_ok());
     /// # Ok::<(), VctrlError>(())
     /// ```
