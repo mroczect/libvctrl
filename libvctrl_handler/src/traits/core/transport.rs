@@ -42,6 +42,7 @@ use std::io::Read;
 /// Implementing the trait for a mock in-memory transport:
 ///
 /// ```
+/// # use std::io::Read;
 /// # use libvctrl_handler::traits::core::transport::Transport;
 /// # use libvctrl_handler::{Hash, VctrlError};
 /// # use std::collections::HashMap;
@@ -132,6 +133,7 @@ pub trait Transport: Send + Sync {
     /// # Examples
     ///
     /// ```
+    /// # use std::io::Read;
     /// # use libvctrl_handler::traits::core::transport::Transport;
     /// # use libvctrl_handler::{Hash, VctrlError};
     /// # use std::collections::HashMap;
