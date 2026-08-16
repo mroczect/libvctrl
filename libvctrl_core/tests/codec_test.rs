@@ -82,7 +82,7 @@ fn test_blob_malformed_data() {
 
     // Declared length exceeds MAX_BLOB_SIZE
     let over_size = usize::try_from(MAX_BLOB_SIZE).unwrap() + 1;
-    let mut bytes = vec![0x02u8];
+    let mut bytes = vec![0x03u8];
     bytes.extend_from_slice(&(over_size as u64).to_le_bytes());
     bytes.extend(vec![0x00; over_size]);
     assert!(BinaryDecoder.decode_blob(Cursor::new(&bytes)).is_err());
@@ -130,7 +130,7 @@ fn test_tree_malformed_data() {
 
     // Entry count exceeds MAX_TREE_ENTRIES
     let over = usize::try_from(MAX_TREE_ENTRIES).unwrap() + 1;
-    let mut enc = vec![0x02u8];
+    let mut enc = vec![0x03u8];
     enc.extend_from_slice(&u32::try_from(over).unwrap().to_le_bytes());
     assert!(BinaryDecoder.decode_tree(Cursor::new(&enc)).is_err());
 
