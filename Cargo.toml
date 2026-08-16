@@ -13,7 +13,6 @@ documentation = "https://docs.rs/libvctrl"
 keywords = ["git", "vcs", "cryptography", "sha512", "no-std"]
 categories = ["development-tools", "cryptography", "algorithms", "no-std"]
 
-
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "deny"
@@ -25,7 +24,7 @@ unused_lifetimes = "deny"
 unused_macro_rules = "deny"
 unused_crate_dependencies = "deny"
 unreachable_pub = "deny"
-rust_2018_idioms = "deny"
+rust_2018_idioms = { level = "deny", priority = -1 }
 elided_lifetimes_in_paths = "deny"
 explicit_outlives_requirements = "deny"
 non_ascii_idents = "deny"
@@ -34,11 +33,10 @@ unit_bindings = "deny"
 macro_use_extern_crate = "forbid"
 single_use_lifetimes = "warn"
 redundant_lifetimes = "deny"
-rust_2021_compatibility = "warn"
-rust_2024_compatibility = "warn"
+rust_2021_compatibility = { level = "warn", priority = -1 }
+rust_2024_compatibility = { level = "warn", priority = -1 }
 unused_qualifications = "deny"
 noop_method_call = "deny"
-private_in_public = "warn"
 unnameable_types = "warn"
 
 [workspace.lints.clippy]
@@ -46,7 +44,6 @@ all = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
 cargo = { level = "deny", priority = -1 }
-restriction = { level = "warn", priority = -1 }
 missing_errors_doc = "deny"
 missing_panics_doc = "deny"
 missing_safety_doc = "deny"
@@ -74,12 +71,10 @@ indexing_slicing = "warn"
 range_minus_one = "deny"
 range_plus_one = "deny"
 str_to_string = "deny"
-string_to_string = "deny"
-inefficient_to_string = "deny"
 implicit_clone = "deny"
 clone_on_ref_ptr = "deny"
 format_push_string = "deny"
-single_char_push_string = "deny"
+single_char_add_str = "deny"
 string_add = "warn"
 string_lit_chars_any = "deny"
 zero_sized_map_values = "deny"
@@ -113,12 +108,8 @@ trivially_copy_pass_by_ref = "warn"
 large_types_passed_by_value = "warn"
 option_if_let_else = "deny"
 single_match_else = "warn"
-length_zero_return = "deny"
-mod_module_files = "deny"
-self_named_module_files = "deny"
 enum_glob_use = "deny"
 items_after_statements = "deny"
-let_underscore = "warn"
 map_err_ignore = "deny"
 semicolon_if_nothing_returned = "deny"
 checked_conversions = "deny"
@@ -132,7 +123,6 @@ alloc_instead_of_core = "deny"
 empty_drop = "deny"
 empty_structs_with_brackets = "deny"
 exit = "deny"
-ref_struct_def = "deny"
 shadow_unrelated = "warn"
 shadow_reuse = "warn"
 unseparated_literal_suffix = "deny"
