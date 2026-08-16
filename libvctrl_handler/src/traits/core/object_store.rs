@@ -46,6 +46,7 @@ use std::io::Read;
 /// Implementing the trait for a mock in-memory store:
 ///
 /// ```
+/// # use std::io::Read;
 /// # use libvctrl_handler::traits::core::object_store::ObjectStore;
 /// # use libvctrl_handler::{Hash, VctrlError};
 /// # use std::collections::HashMap;
@@ -102,6 +103,7 @@ pub trait ObjectStore: Send + Sync {
     /// # Examples
     ///
     /// ```
+    /// # use std::io::Read;
     /// # use libvctrl_handler::traits::core::object_store::ObjectStore;
     /// # use libvctrl_handler::{Hash, VctrlError};
     /// # use std::collections::HashMap;
@@ -180,6 +182,7 @@ pub trait ObjectStore: Send + Sync {
     /// # Examples
     ///
     /// ```
+    /// # use std::io::Read;
     /// # use libvctrl_handler::traits::core::object_store::ObjectStore;
     /// # use libvctrl_handler::{Hash, VctrlError};
     /// # use std::collections::HashMap;
@@ -217,6 +220,7 @@ pub trait ObjectStore: Send + Sync {
     /// # Examples
     ///
     /// ```
+    /// # use std::io::Read;
     /// # use libvctrl_handler::traits::core::object_store::ObjectStore;
     /// # use libvctrl_handler::{Hash, VctrlError};
     /// # use std::collections::HashMap;
