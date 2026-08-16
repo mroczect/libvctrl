@@ -1,12 +1,14 @@
 use libvctrl_handler::{Hash, RefStore, VctrlError};
 use std::collections::HashMap;
 
+/// An in-memory implementation of [`RefStore`].
 #[derive(Debug, Default)]
 pub struct MemoryRefStore {
     refs: HashMap<String, Hash>,
 }
 
 impl MemoryRefStore {
+    /// Creates a new empty `MemoryRefStore`.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -19,7 +21,7 @@ impl RefStore for MemoryRefStore {
     type RefsIterator = std::vec::IntoIter<Result<String, VctrlError>>;
 
     fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError> {
-        crate::validate::name::validate_ref_name(name)?;
+        libvctrl_handler::validate_ref_name(name)?;
         let _ = self.refs.insert(name.to_string(), *hash);
         Ok(())
     }
