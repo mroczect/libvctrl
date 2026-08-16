@@ -83,7 +83,7 @@ use crate::types::Hash;
 /// }
 ///
 /// let mut store = MockRefStore::default();
-/// let hash = Hash::from_bytes(&[0u8; 64])?;
+/// let hash = Hash::from_bytes(&[0_u8; 64])?;
 /// store.set_ref("refs/heads/main", &hash)?;
 /// assert_eq!(store.get_ref("refs/heads/main")?, hash);
 /// # Ok::<(), VctrlError>(())
