@@ -35,15 +35,15 @@ use crate::Hash;
 /// # Examples
 ///
 /// ```
-/// # use my_crate::types::core::merge::Conflict;
-/// # use my_crate::Hash;
-/// # let ancestor = Hash::from_bytes(&[0u8; 64])?;
+/// # use libvctrl_handler::types::core::merge::Conflict;
+/// # use libvctrl_handler::Hash;
+/// # let ancestor = Hash::from_bytes(&[0_u8; 64])?;
 /// # let ours = Hash::from_bytes(&[1u8; 64])?;
 /// # let theirs = Hash::from_bytes(&[2u8; 64])?;
 /// let conflict = Conflict::new("src/main.rs".into(), ancestor, ours, theirs);
 /// assert_eq!(conflict.path(), std::path::Path::new("src/main.rs"));
 /// assert_eq!(conflict.our_blob(), ours);
-/// # Ok::<(), my_crate::VctrlError>(())
+/// # Ok::<(), libvctrl_handler::VctrlError>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Conflict {
@@ -129,25 +129,25 @@ impl Conflict {
 /// Handling a successful merge:
 ///
 /// ```
-/// # use my_crate::types::core::merge::MergeResult;
-/// # use my_crate::Hash;
-/// # let tree_hash = Hash::from_bytes(&[0u8; 64])?;
+/// # use libvctrl_handler::types::core::merge::MergeResult;
+/// # use libvctrl_handler::Hash;
+/// # let tree_hash = Hash::from_bytes(&[0_u8; 64])?;
 /// let result = MergeResult::Success(tree_hash);
 /// assert!(result.is_success());
 /// assert!(result.conflicts().is_none());
-/// # Ok::<(), my_crate::VctrlError>(())
+/// # Ok::<(), libvctrl_handler::VctrlError>(())
 /// ```
 ///
 /// Handling a conflicted merge:
 ///
 /// ```
-/// # use my_crate::types::core::merge::{Conflict, MergeResult};
-/// # use my_crate::Hash;
+/// # use libvctrl_handler::types::core::merge::{Conflict, MergeResult};
+/// # use libvctrl_handler::Hash;
 /// # let h = Hash::from_bytes(&[1u8; 64])?;
 /// let result = MergeResult::Conflicts(vec![Conflict::new("file.txt".into(), h, h, h)]);
 /// assert!(result.is_conflicts());
 /// assert_eq!(result.conflicts().unwrap().len(), 1);
-/// # Ok::<(), my_crate::VctrlError>(())
+/// # Ok::<(), libvctrl_handler::VctrlError>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MergeResult {
