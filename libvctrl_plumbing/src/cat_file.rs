@@ -2,6 +2,7 @@ use libvctrl::{Decoder, EntryKind, Hash, ObjectStore, VctrlError};
 use std::fmt::Write;
 use std::io::{BufRead, Write as IoWrite};
 
+#[derive(Clone, Copy)]
 pub enum CatFileMode {
     PrettyPrint,
     ObjectType,
@@ -37,7 +38,8 @@ pub fn cat_file<D: Decoder>(
         CatFileMode::Exists => Ok(()),
         CatFileMode::ObjectType => {
             let obj_type = decode_type(decoder, &encoded)?;
-            writeln!(writer, "{}", obj_type_to_str(obj_type))
+            let type_str = obj_type_to_str(obj_type);
+            writeln!(writer, "{type_str}")
                 .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
             Ok(())
         }
@@ -57,11 +59,10 @@ pub fn cat_file<D: Decoder>(
         CatFileMode::Raw(expected_type) => {
             let actual_type = decode_type(decoder, &encoded)?;
             if actual_type != expected_type {
+                let actual_type_str = obj_type_to_str(actual_type);
+                let expected_type_str = obj_type_to_str(expected_type);
                 return Err(VctrlError::Other(format!(
-                    "object {} is a {}, not a {}",
-                    object_name,
-                    obj_type_to_str(actual_type),
-                    obj_type_to_str(expected_type)
+                    "object {object_name} is a {actual_type_str}, not a {expected_type_str}"
                 )));
             }
             writer
@@ -72,6 +73,7 @@ pub fn cat_file<D: Decoder>(
     }
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Default)]
 pub struct BatchOptions {
     pub format: Option<String>,
@@ -110,35 +112,32 @@ pub fn cat_file_batch<D: Decoder>(
 
         let object_name = trimmed;
 
-        match handle_one_object(store, decoder, object_name, options) {
-            Ok((info, content)) => {
-                out_buf.extend_from_slice(info.as_bytes());
-                out_buf.push(delimiter);
-                if let Some(c) = content {
-                    out_buf.extend_from_slice(&c);
-                    if options.nul_terminated {
-                        out_buf.push(0);
-                    } else {
-                        out_buf.push(b'\n');
-                    }
-                }
-                if !options.buffer {
-                    output
-                        .write_all(&out_buf)
-                        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
-                    out_buf.clear();
+        if let Ok((info, content)) = handle_one_object(store, decoder, object_name, options) {
+            out_buf.extend_from_slice(info.as_bytes());
+            out_buf.push(delimiter);
+            if let Some(c) = content {
+                out_buf.extend_from_slice(&c);
+                if options.nul_terminated {
+                    out_buf.push(0);
+                } else {
+                    out_buf.push(b'\n');
                 }
             }
-            Err(_) => {
-                let error_line = format!("{} missing", object_name);
-                out_buf.extend_from_slice(error_line.as_bytes());
-                out_buf.push(delimiter);
-                if !options.buffer {
-                    output
-                        .write_all(&out_buf)
-                        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
-                    out_buf.clear();
-                }
+            if !options.buffer {
+                output
+                    .write_all(&out_buf)
+                    .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+                out_buf.clear();
+            }
+        } else {
+            let error_line = format!("{object_name} missing");
+            out_buf.extend_from_slice(error_line.as_bytes());
+            out_buf.push(delimiter);
+            if !options.buffer {
+                output
+                    .write_all(&out_buf)
+                    .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+                out_buf.clear();
             }
         }
     }
@@ -168,11 +167,13 @@ fn handle_one_object<D: Decoder>(
     let obj_type = decode_type(decoder, &encoded)?;
     let obj_size = encoded.len() as u64;
 
-    let info = if let Some(ref fmt) = options.format {
-        format_batch_info(fmt, &hash, obj_type, obj_size, None)?
-    } else {
-        format!("{} {} {}", hash, obj_type_to_str(obj_type), obj_size)
-    };
+    let info = options.format.as_ref().map_or_else(
+        || {
+            let type_str = obj_type_to_str(obj_type);
+            format!("{hash} {type_str} {obj_size}")
+        },
+        |fmt| format_batch_info(fmt, &hash, obj_type, obj_size, None),
+    );
 
     let content = if options.print_contents {
         Some(pretty_print(decoder, &encoded)?.into_bytes())
@@ -185,9 +186,9 @@ fn handle_one_object<D: Decoder>(
 
 fn parse_hash(s: &str) -> Result<Hash, VctrlError> {
     if s.len() != 128 {
+        let actual_len = s.len();
         return Err(VctrlError::Other(format!(
-            "invalid hash length: {} (expected 128)",
-            s.len()
+            "invalid hash length: {actual_len} (expected 128)"
         )));
     }
     let mut bytes = [0u8; 64];
@@ -238,7 +239,7 @@ fn pretty_print<D: Decoder>(decoder: &D, encoded: &[u8]) -> Result<String, Vctrl
         let mut out = String::new();
         writeln!(&mut out, "tree {}", commit.tree()).unwrap();
         for parent in commit.parents() {
-            writeln!(&mut out, "parent {}", parent).unwrap();
+            writeln!(&mut out, "parent {parent}").unwrap();
         }
         writeln!(
             &mut out,
@@ -273,7 +274,7 @@ fn pretty_print<D: Decoder>(decoder: &D, encoded: &[u8]) -> Result<String, Vctrl
     Err(VctrlError::CorruptedData("unknown object type".into()))
 }
 
-fn obj_type_to_str(t: ObjectType) -> &'static str {
+const fn obj_type_to_str(t: ObjectType) -> &'static str {
     match t {
         ObjectType::Blob => "blob",
         ObjectType::Tree => "tree",
@@ -282,7 +283,7 @@ fn obj_type_to_str(t: ObjectType) -> &'static str {
     }
 }
 
-fn entry_mode(kind: EntryKind) -> u32 {
+const fn entry_mode(kind: EntryKind) -> u32 {
     match kind {
         EntryKind::Blob => 0o100_644,
         EntryKind::Executable => 0o100_755,
@@ -299,10 +300,10 @@ fn format_batch_info(
     obj_type: ObjectType,
     size: u64,
     _mode: Option<u32>,
-) -> Result<String, VctrlError> {
+) -> String {
     let mut output = format.to_owned();
     output = output.replace("%(objectname)", &hash.to_string());
     output = output.replace("%(objecttype)", obj_type_to_str(obj_type));
     output = output.replace("%(objectsize)", &size.to_string());
-    Ok(output)
+    output
 }
