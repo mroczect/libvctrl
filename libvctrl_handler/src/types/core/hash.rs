@@ -37,9 +37,9 @@ use std::str::FromStr;
 /// Creating a hash from raw bytes:
 ///
 /// ```
-/// # use my_crate::types::core::hash::Hash;
-/// # use my_crate::VctrlError;
-/// let raw_bytes = [0u8; 64];
+/// # use libvctrl_handler::types::core::hash::Hash;
+/// # use libvctrl_handler::VctrlError;
+/// let raw_bytes = [0_u8; 64];
 /// let hash = Hash::from_bytes(&raw_bytes)?;
 /// assert_eq!(hash.as_bytes(), &raw_bytes);
 /// # Ok::<(), VctrlError>(())
@@ -64,8 +64,8 @@ impl Hash {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::hash::Hash;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::types::core::hash::Hash;
+    /// # use libvctrl_handler::VctrlError;
     /// let valid_hash = Hash::from_bytes(&[1u8; 64]);
     /// assert!(valid_hash.is_ok());
     ///
@@ -77,7 +77,7 @@ impl Hash {
         if bytes.len() != HASH_LENGTH {
             return Err(VctrlError::InvalidHashLength(bytes.len()));
         }
-        let mut arr = [0u8; HASH_LENGTH];
+        let mut arr = [0_u8; HASH_LENGTH];
         let mut i = 0;
         while i < HASH_LENGTH {
             arr[i] = bytes[i];
@@ -95,8 +95,8 @@ impl Hash {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::hash::Hash;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::types::core::hash::Hash;
+    /// # use libvctrl_handler::VctrlError;
     /// let hash = Hash::from_bytes(&[0xAB; 64])?;
     /// assert_eq!(hash.as_bytes(), &[0xAB; 64]);
     /// # Ok::<(), VctrlError>(())
@@ -162,19 +162,19 @@ impl FromStr for Hash {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::hash::Hash;
+    /// # use libvctrl_handler::types::core::hash::Hash;
     /// # use std::str::FromStr;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::VctrlError;
     /// let hex_str = "0".repeat(128);
     /// let hash = Hash::from_str(&hex_str)?;
-    /// assert_eq!(hash.as_bytes(), &[0u8; 64]);
+    /// assert_eq!(hash.as_bytes(), &[0_u8; 64]);
     /// # Ok::<(), VctrlError>(())
     /// ```
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != HASH_LENGTH * 2 {
             return Err(VctrlError::InvalidHashLength(s.len()));
         }
-        let mut bytes = [0u8; HASH_LENGTH];
+        let mut bytes = [0_u8; HASH_LENGTH];
         for i in 0..HASH_LENGTH {
             let byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16)
                 .map_err(|_| VctrlError::CorruptedData(format!("invalid hex char in hash: {s}")))?;
@@ -211,10 +211,10 @@ impl fmt::Display for Hash {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::hash::Hash;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::types::core::hash::Hash;
+    /// # use libvctrl_handler::VctrlError;
     /// use std::fmt::Display;
-    /// let hash = Hash::from_bytes(&[0u8; 64])?;
+    /// let hash = Hash::from_bytes(&[0_u8; 64])?;
     /// assert_eq!(format!("{hash}"), "0".repeat(128));
     /// # Ok::<(), VctrlError>(())
     /// ```
