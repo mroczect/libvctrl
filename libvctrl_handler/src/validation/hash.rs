@@ -40,7 +40,7 @@ use crate::errors::VctrlError;
 /// Validating a correctly sized slice:
 ///
 /// ```
-/// # use my_crate::validation::validate_hash_bytes;
+/// # use libvctrl_handler::validation::validate_hash_bytes;
 /// let valid_hash = [0u8; 64];
 /// assert!(validate_hash_bytes(&valid_hash).is_ok());
 /// ```
@@ -48,8 +48,8 @@ use crate::errors::VctrlError;
 /// Handling an invalid slice:
 ///
 /// ```
-/// # use my_crate::validation::validate_hash_bytes;
-/// # use my_crate::VctrlError;
+/// # use libvctrl_handler::validation::validate_hash_bytes;
+/// # use libvctrl_handler::VctrlError;
 /// let invalid_hash = [0u8; 32];
 /// let result = validate_hash_bytes(&invalid_hash);
 /// assert!(matches!(result, Err(VctrlError::InvalidHashLength(32))));

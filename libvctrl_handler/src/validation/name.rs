@@ -39,7 +39,7 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```
-/// # use my_crate::validation::validate_name;
+/// # use libvctrl_handler::validation::validate_name;
 /// assert!(validate_name("valid_name").is_ok());
 /// assert!(validate_name("").is_err());
 /// assert!(validate_name(&"a".repeat(256)).is_err());
@@ -88,7 +88,7 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
 /// # Examples
 ///
 /// ```
-/// # use my_crate::validation::validate_ref_name;
+/// # use libvctrl_handler::validation::validate_ref_name;
 /// assert!(validate_ref_name("refs/heads/main").is_ok());
 /// assert!(validate_ref_name("feature/branch").is_ok());
 ///
@@ -150,7 +150,7 @@ pub fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
 /// # Examples
 ///
 /// ```
-/// # use my_crate::validation::validate_tree_entry_name;
+/// # use libvctrl_handler::validation::validate_tree_entry_name;
 /// assert!(validate_tree_entry_name("file.txt").is_ok());
 /// assert!(validate_tree_entry_name("src").is_ok());
 ///
