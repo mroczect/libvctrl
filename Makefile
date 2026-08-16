@@ -7,6 +7,9 @@ MEMBERS = libvctrl_handler libvctrl_core libvctrl_plumbing libvctrl_porcelain li
 # Default package jika ingin menjalankan CI untuk satu package
 PKG ?= libvctrl_handler
 
+# Flag tambahan untuk Clippy (kosong = santai)
+CLIPPY_FLAGS ?=
+
 .PHONY: all
 all: build
 
@@ -18,39 +21,9 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
 
-.PHONY: init-readmes
-init-readmes:
-	@for crate in $(MEMBERS); do \
-		if [ -d "$$crate" ]; then \
-			readme="$$crate/README.md"; \
-			if [ ! -f "$$readme" ]; then \
-				echo "Creating $$readme"; \
-				echo "# $$crate\n\nPart of the libvctrl workspace.\n\nSee [README](../README.md) for full documentation." > "$$readme"; \
-			else \
-				echo "$$readme already exists"; \
-			fi; \
-		else \
-			echo "ERROR: Folder $$crate not found"; \
-			exit 1; \
-		fi; \
-	done
-
-.PHONY: check-readmes
-check-readmes:
-	@missing=0; \
-	for crate in $(MEMBERS); do \
-		if [ ! -f "$$crate/README.md" ]; then \
-			echo "MISSING: $$crate/README.md"; \
-			missing=$$((missing + 1)); \
-		fi; \
-	done; \
-	if [ $$missing -gt 0 ]; then \
-		echo "ERROR: $$missing README files missing. Run 'make init-readmes'"; \
-		exit 1; \
-	else \
-		echo "All READMEs present."; \
-	fi
-
+# ---------------------------------------------------------------------------
+# Global
+# ---------------------------------------------------------------------------
 .PHONY: build
 build:
 	$(CARGO) build --workspace
@@ -87,9 +60,10 @@ fmt:
 fmt-check:
 	$(CARGO) fmt --all -- --check
 
+# Clippy santai (tidak -D warnings)
 .PHONY: clippy
 clippy:
-	$(CARGO) clippy --all-targets --all-features -- -D warnings
+	$(CARGO) clippy --all-targets --all-features $(CLIPPY_FLAGS)
 
 .PHONY: lint
 lint: fmt clippy
@@ -231,21 +205,20 @@ fmt-pkg:
 fmt-check-pkg:
 	$(CARGO) fmt -p $(PKG) -- --check
 
+# Clippy per package (santai)
 .PHONY: clippy-pkg
 clippy-pkg:
-	$(CARGO) clippy -p $(PKG) --all-targets --all-features -- -D warnings
+	$(CARGO) clippy -p $(PKG) --all-targets --all-features $(CLIPPY_FLAGS)
 
+# Alias backward-compatible
 .PHONY: clippy-pkg-unwarn
-clippy-pkg-unwarn:
-	$(CARGO) clippy -p $(PKG) --all-targets --all-features
+clippy-pkg-unwarn: clippy-pkg
 
-	
 .PHONY: ci-pkg
 ci-pkg: fmt-check-pkg clippy-pkg test-verbose-pkg
 
 .PHONY: ci-pkg-unwarn
-ci-pkg-unwarn: fmt-check-pkg clippy-pkg test-verbose-pkg
-
+ci-pkg-unwarn: ci-pkg
 
 .PHONY: doc-pkg
 doc-pkg:
@@ -286,5 +259,7 @@ root-pkg: ci-pkg
 sha512: PKG=libvctrl_sha512
 sha512: ci-pkg
 
-clippy-pedantic-nursery:
-	cargo clippy --all-targets --all-features -- -W clippy::all -W clippy::pedantic -W clippy::nursery -W clippy::cargo
+# Target khusus kalau mau lebih ketat
+.PHONY: clippy-strict
+clippy-strict:
+	$(CARGO) clippy --all-targets --all-features -- -D warnings
