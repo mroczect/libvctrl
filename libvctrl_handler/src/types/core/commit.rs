@@ -57,8 +57,8 @@ impl CommitMeta {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::commit::CommitMeta;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::types::core::commit::CommitMeta;
+    /// # use libvctrl_handler::VctrlError;
     /// let meta = CommitMeta::new(1600000000, 120, None)?;
     /// assert_eq!(meta.timezone_offset(), 120);
     ///
@@ -96,8 +96,8 @@ impl CommitMeta {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::commit::CommitMeta;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::types::core::commit::CommitMeta;
+    /// # use libvctrl_handler::VctrlError;
     /// let meta = CommitMeta::new(0, -300, None)?;
     /// assert_eq!(meta.timezone_offset(), -300);
     /// # Ok::<(), VctrlError>(())
@@ -155,11 +155,11 @@ impl Commit {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::commit::{Commit, CommitMeta};
-    /// # use my_crate::types::core::hash::Hash;
-    /// # use my_crate::types::core::user_id::UserID;
-    /// # use my_crate::VctrlError;
-    /// # let tree = Hash::from_bytes(&[0u8; 64])?;
+    /// # use libvctrl_handler::types::core::commit::{Commit, CommitMeta};
+    /// # use libvctrl_handler::types::core::hash::Hash;
+    /// # use libvctrl_handler::types::core::user_id::UserID;
+    /// # use libvctrl_handler::VctrlError;
+    /// # let tree = Hash::from_bytes(&[0_u8; 64])?;
     /// # let author = UserID::new("Alice".to_string(), "alice@example.com".to_string())?;
     /// let commit = Commit::new(tree, vec![], author.clone(), author, "initial".to_string())?;
     /// assert_eq!(commit.message(), "initial");
@@ -200,11 +200,11 @@ impl Commit {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::commit::{Commit, CommitMeta};
-    /// # use my_crate::types::core::hash::Hash;
-    /// # use my_crate::types::core::user_id::UserID;
-    /// # use my_crate::VctrlError;
-    /// # let tree = Hash::from_bytes(&[0u8; 64])?;
+    /// # use libvctrl_handler::types::core::commit::{Commit, CommitMeta};
+    /// # use libvctrl_handler::types::core::hash::Hash;
+    /// # use libvctrl_handler::types::core::user_id::UserID;
+    /// # use libvctrl_handler::VctrlError;
+    /// # let tree = Hash::from_bytes(&[0_u8; 64])?;
     /// # let parent = Hash::from_bytes(&[1u8; 64])?;
     /// # let author = UserID::new("Bob".to_string(), "bob@example.com".to_string())?;
     /// # let meta = CommitMeta::new(1000, 0, None)?;
