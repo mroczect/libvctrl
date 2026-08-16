@@ -80,7 +80,7 @@ use std::io::Read;
 /// }
 ///
 /// let mut store = MockStore::default();
-/// let hash = Hash::from_bytes(&[0u8; 64])?;
+/// let hash = Hash::from_bytes(&[0_u8; 64])?;
 /// store.put(&hash, b"blob content")?;
 /// assert!(store.exists(&hash)?);
 /// # Ok::<(), VctrlError>(())
