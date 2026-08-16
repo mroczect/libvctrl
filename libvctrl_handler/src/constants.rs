@@ -34,7 +34,7 @@
 /// # Examples
 ///
 /// ```
-/// # use my_crate::constants::HASH_LENGTH;
+/// # use libvctrl_handler::constants::HASH_LENGTH;
 /// assert_eq!(HASH_LENGTH, 64);
 /// let hash_array = [0u8; HASH_LENGTH];
 /// assert_eq!(hash_array.len(), 64);
@@ -52,7 +52,7 @@ pub const HASH_LENGTH: usize = 64;
 /// # Examples
 ///
 /// ```
-/// # use my_crate::constants::MAX_NAME_LENGTH;
+/// # use libvctrl_handler::constants::MAX_NAME_LENGTH;
 /// assert_eq!(MAX_NAME_LENGTH, 255);
 /// ```
 pub const MAX_NAME_LENGTH: u64 = 255;
@@ -68,7 +68,7 @@ pub const MAX_NAME_LENGTH: u64 = 255;
 /// # Examples
 ///
 /// ```
-/// # use my_crate::constants::MAX_BLOB_SIZE;
+/// # use libvctrl_handler::constants::MAX_BLOB_SIZE;
 /// assert_eq!(MAX_BLOB_SIZE, 100 * 1024 * 1024);
 /// ```
 pub const MAX_BLOB_SIZE: u64 = 100 * 1024 * 1024;
@@ -84,7 +84,7 @@ pub const MAX_BLOB_SIZE: u64 = 100 * 1024 * 1024;
 /// # Examples
 ///
 /// ```
-/// # use my_crate::constants::MAX_TREE_ENTRIES;
+/// # use libvctrl_handler::constants::MAX_TREE_ENTRIES;
 /// assert_eq!(MAX_TREE_ENTRIES, 100_000);
 /// ```
 pub const MAX_TREE_ENTRIES: u64 = 100_000;
@@ -100,7 +100,7 @@ pub const MAX_TREE_ENTRIES: u64 = 100_000;
 /// # Examples
 ///
 /// ```
-/// # use my_crate::constants::MAX_MESSAGE_LENGTH;
+/// # use libvctrl_handler::constants::MAX_MESSAGE_LENGTH;
 /// assert_eq!(MAX_MESSAGE_LENGTH, 1024 * 1024);
 /// ```
 pub const MAX_MESSAGE_LENGTH: u64 = 1024 * 1024;
@@ -117,7 +117,7 @@ pub const MAX_MESSAGE_LENGTH: u64 = 1024 * 1024;
 /// # Examples
 ///
 /// ```
-/// # use my_crate::constants::MAX_PARENT_COUNT;
+/// # use libvctrl_handler::constants::MAX_PARENT_COUNT;
 /// assert_eq!(MAX_PARENT_COUNT, u16::MAX as u64);
 /// ```
 pub const MAX_PARENT_COUNT: u64 = 65535;
@@ -140,7 +140,7 @@ pub mod entry_mode {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::constants::entry_mode::BLOB;
+    /// # use libvctrl_handler::constants::entry_mode::BLOB;
     /// assert_eq!(BLOB, 0o100_644);
     /// ```
     pub const BLOB: u32 = 0o100_644;
@@ -150,7 +150,7 @@ pub mod entry_mode {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::constants::entry_mode::EXECUTABLE;
+    /// # use libvctrl_handler::constants::entry_mode::EXECUTABLE;
     /// assert_eq!(EXECUTABLE, 0o100_755);
     /// ```
     pub const EXECUTABLE: u32 = 0o100_755;
@@ -160,7 +160,7 @@ pub mod entry_mode {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::constants::entry_mode::SYMLINK;
+    /// # use libvctrl_handler::constants::entry_mode::SYMLINK;
     /// assert_eq!(SYMLINK, 0o120_000);
     /// ```
     pub const SYMLINK: u32 = 0o120_000;
@@ -170,7 +170,7 @@ pub mod entry_mode {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::constants::entry_mode::TREE;
+    /// # use libvctrl_handler::constants::entry_mode::TREE;
     /// assert_eq!(TREE, 0o40_000);
     /// ```
     pub const TREE: u32 = 0o40_000;
@@ -180,7 +180,7 @@ pub mod entry_mode {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::constants::entry_mode::SUBMODULE;
+    /// # use libvctrl_handler::constants::entry_mode::SUBMODULE;
     /// assert_eq!(SUBMODULE, 0o160_000);
     /// ```
     pub const SUBMODULE: u32 = 0o160_000;
