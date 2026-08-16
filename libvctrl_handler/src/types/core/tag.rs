@@ -3,8 +3,9 @@ use super::hash::Hash;
 use super::user_id::UserID;
 use crate::constants::MAX_MESSAGE_LENGTH;
 use crate::errors::VctrlError;
-use crate::types::validate_ref_name;
+use crate::validation::validate_ref_name;
 
+/// A Git tag object.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tag {
     name: String,
@@ -15,6 +16,11 @@ pub struct Tag {
 }
 
 impl Tag {
+    /// Creates a new tag with default metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if the name or message fails validation.
     pub fn new(
         name: String,
         target: Hash,
@@ -24,6 +30,11 @@ impl Tag {
         Self::with_meta(name, target, tagger, message, CommitMeta::default())
     }
 
+    /// Creates a new tag with timestamp metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VctrlError`] if the name or message fails validation.
     pub fn with_meta(
         name: String,
         target: Hash,
@@ -47,26 +58,31 @@ impl Tag {
         })
     }
 
+    /// Returns the tag name.
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the target hash.
     #[must_use]
     pub const fn target(&self) -> &Hash {
         &self.target
     }
 
+    /// Returns the tagger, if any.
     #[must_use]
     pub const fn tagger(&self) -> Option<&UserID> {
         self.tagger.as_ref()
     }
 
+    /// Returns the tag message.
     #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
 
+    /// Returns the tag metadata.
     #[must_use]
     pub const fn meta(&self) -> &CommitMeta {
         &self.meta
