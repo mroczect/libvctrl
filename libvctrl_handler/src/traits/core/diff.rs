@@ -63,7 +63,7 @@ use crate::types::TreeDelta;
 /// }
 ///
 /// let differ = MockDiffer;
-/// let old_hash = Hash::from_bytes(&[0u8; 64])?;
+/// let old_hash = Hash::from_bytes(&[0_u8; 64])?;
 /// let new_hash = Hash::from_bytes(&[1u8; 64])?;
 ///
 /// let delta = differ.diff_trees(&old_hash, &new_hash)?;
@@ -108,7 +108,7 @@ pub trait TreeDiffer: Send + Sync {
     /// #     }
     /// # }
     /// let differ = MockDiffer;
-    /// let hash = Hash::from_bytes(&[0u8; 64])?;
+    /// let hash = Hash::from_bytes(&[0_u8; 64])?;
     ///
     /// // Diffing a tree against itself should yield an empty delta.
     /// let delta = differ.diff_trees(&hash, &hash)?;
