@@ -81,7 +81,7 @@ use crate::types::{Hash, ReflogEntry};
 /// }
 ///
 /// let mut store = MockReflogStore::default();
-/// let hash = Hash::from_bytes(&[0u8; 64])?;
+/// let hash = Hash::from_bytes(&[0_u8; 64])?;
 /// store.append(&"refs/heads/main".to_string(), None, Some(hash), "initial commit", 0, 0)?;
 /// assert_eq!(store.entries(&"refs/heads/main".to_string())?.len(), 1);
 /// # Ok::<(), VctrlError>(())
