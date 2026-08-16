@@ -33,8 +33,8 @@ use crate::errors::VctrlError;
 /// Creating a valid blob:
 ///
 /// ```
-/// # use my_crate::types::core::blob::Blob;
-/// # use my_crate::VctrlError;
+/// # use libvctrl_handler::types::core::blob::Blob;
+/// # use libvctrl_handler::VctrlError;
 /// let blob = Blob::new(b"file content".to_vec())?;
 /// assert_eq!(blob.size(), 12);
 /// # Ok::<(), VctrlError>(())
@@ -61,8 +61,8 @@ impl Blob {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::blob::Blob;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::types::core::blob::Blob;
+    /// # use libvctrl_handler::VctrlError;
     /// let data = b"hello world".to_vec();
     /// let blob = Blob::new(data)?;
     /// assert!(!blob.is_empty());
@@ -90,8 +90,8 @@ impl Blob {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::blob::Blob;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::types::core::blob::Blob;
+    /// # use libvctrl_handler::VctrlError;
     /// let blob = Blob::new(b"raw data".to_vec())?;
     /// assert_eq!(blob.data(), b"raw data");
     /// # Ok::<(), VctrlError>(())
@@ -111,8 +111,8 @@ impl Blob {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::blob::Blob;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::types::core::blob::Blob;
+    /// # use libvctrl_handler::VctrlError;
     /// let blob = Blob::new(b"12345".to_vec())?;
     /// assert_eq!(blob.size(), 5);
     /// # Ok::<(), VctrlError>(())
@@ -131,8 +131,8 @@ impl Blob {
     /// # Examples
     ///
     /// ```
-    /// # use my_crate::types::core::blob::Blob;
-    /// # use my_crate::VctrlError;
+    /// # use libvctrl_handler::types::core::blob::Blob;
+    /// # use libvctrl_handler::VctrlError;
     /// let blob = Blob::new(Vec::new())?;
     /// assert!(blob.is_empty());
     /// # Ok::<(), VctrlError>(())
