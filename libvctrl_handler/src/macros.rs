@@ -23,7 +23,7 @@
 /// Creating a simple error message:
 ///
 /// ```
-/// # use my_crate::{VctrlError, vctrl_error_other};
+/// # use libvctrl_handler::{VctrlError, vctrl_error_other};
 /// let err = vctrl_error_other!("file not found");
 /// assert_eq!(err.to_string(), "file not found");
 /// ```
@@ -31,7 +31,7 @@
 /// Formatting arguments into the error message:
 ///
 /// ```
-/// # use my_crate::{VctrlError, vctrl_error_other};
+/// # use libvctrl_handler::{VctrlError, vctrl_error_other};
 /// let filename = "config.toml";
 /// let code = 404;
 /// let err = vctrl_error_other!("missing configuration file: {} (code {})", filename, code);
