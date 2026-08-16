@@ -59,14 +59,14 @@ use std::io::Read;
 ///         let mut buf = Vec::new();
 ///         reader.read_to_end(&mut buf)?;
 ///         // Return a deterministic mock hash
-///         Hash::from_bytes(&[0u8; 64])
+///         Hash::from_bytes(&[0_u8; 64])
 ///     }
 /// }
 ///
 /// let hasher = MockHasher;
 /// let data = std::io::Cursor::new(b"some data".to_vec());
 /// let hash = hasher.hash(data)?;
-/// assert_eq!(hash.as_bytes(), &[0u8; 64]);
+/// assert_eq!(hash.as_bytes(), &[0_u8; 64]);
 /// # Ok::<(), VctrlError>(())
 /// ```
 pub trait Hasher: Send + Sync {
@@ -96,7 +96,7 @@ pub trait Hasher: Send + Sync {
     /// #     fn hash<R: Read + Send>(&self, mut reader: R) -> Result<Hash, VctrlError> {
     /// #         let mut buf = Vec::new();
     /// #         reader.read_to_end(&mut buf)?;
-    /// #         Hash::from_bytes(&[0u8; 64])
+    /// #         Hash::from_bytes(&[0_u8; 64])
     /// #     }
     /// # }
     /// let hasher = MockHasher;
