@@ -34,7 +34,7 @@ use crate::types::Hash;
 /// ```
 /// # use libvctrl_handler::traits::core::blame::BlameEntry;
 /// # use libvctrl_handler::Hash;
-/// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+/// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
 /// let entry = BlameEntry::new(
 ///     hash,
 ///     10,
@@ -73,7 +73,7 @@ impl BlameEntry {
     /// ```
     /// # use libvctrl_handler::traits::core::blame::BlameEntry;
     /// # use libvctrl_handler::Hash;
-    /// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+    /// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
     /// let entry = BlameEntry::new(hash, 1, 10, "file.txt".into(), None);
     /// assert!(entry.is_ok());
     /// ```
@@ -83,7 +83,7 @@ impl BlameEntry {
     /// ```
     /// # use libvctrl_handler::traits::core::blame::BlameEntry;
     /// # use libvctrl_handler::{Hash, VctrlError};
-    /// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+    /// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
     /// let entry = BlameEntry::new(hash, 0, 10, "file.txt".into(), None);
     /// assert!(matches!(entry, Err(VctrlError::InvalidBlameRange)));
     /// ```
@@ -119,7 +119,7 @@ impl BlameEntry {
     /// ```
     /// # use libvctrl_handler::traits::core::blame::BlameEntry;
     /// # use libvctrl_handler::Hash;
-    /// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+    /// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
     /// let entry = BlameEntry::new(hash, 1, 1, "f".into(), None).unwrap();
     /// assert_eq!(entry.commit_id(), hash);
     /// ```
@@ -135,7 +135,7 @@ impl BlameEntry {
     /// ```
     /// # use libvctrl_handler::traits::core::blame::BlameEntry;
     /// # use libvctrl_handler::Hash;
-    /// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+    /// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
     /// let entry = BlameEntry::new(hash, 42, 1, "f".into(), None).unwrap();
     /// assert_eq!(entry.start_line(), 42);
     /// ```
@@ -151,7 +151,7 @@ impl BlameEntry {
     /// ```
     /// # use libvctrl_handler::traits::core::blame::BlameEntry;
     /// # use libvctrl_handler::Hash;
-    /// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+    /// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
     /// let entry = BlameEntry::new(hash, 1, 5, "f".into(), None).unwrap();
     /// assert_eq!(entry.line_count(), 5);
     /// ```
@@ -171,7 +171,7 @@ impl BlameEntry {
     /// ```
     /// # use libvctrl_handler::traits::core::blame::BlameEntry;
     /// # use libvctrl_handler::Hash;
-    /// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+    /// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
     /// let entry = BlameEntry::new(hash, 1, 1, "src/main.rs".into(), None).unwrap();
     /// assert_eq!(entry.path(), "src/main.rs");
     /// ```
@@ -191,7 +191,7 @@ impl BlameEntry {
     /// ```
     /// # use libvctrl_handler::traits::core::blame::BlameEntry;
     /// # use libvctrl_handler::Hash;
-    /// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+    /// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
     /// let entry = BlameEntry::new(hash, 1, 1, "f".into(), Some("Fix bug".into())).unwrap();
     /// assert_eq!(entry.summary(), Some("Fix bug"));
     /// ```
@@ -227,7 +227,7 @@ impl BlameEntry {
 ///
 /// impl Blame for MockRepo {
 ///     fn blame_file(&self, _path: &str) -> Result<Vec<BlameEntry>, VctrlError> {
-///         # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+///         # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
 ///         let entry = BlameEntry::new(hash, 1, 10, "file.txt".into(), None)?;
 ///         Ok(vec![entry])
 ///     }
