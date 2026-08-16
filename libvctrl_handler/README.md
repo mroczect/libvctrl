@@ -216,7 +216,7 @@ To use the handler from a local checkout or a Git repository:
 
 ```toml
 [dependencies]
-libvctrl_handler = { git = "https://github.com/mroczect/libvctrl", branch = "main" }
+libvctrl_handler = { git = "https://github.com/mroczect/libvctrl", branch = "master" }
 ```
 
 ### Configuration
