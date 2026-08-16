@@ -56,7 +56,7 @@ pub mod name;
 ///
 /// ```
 /// # use libvctrl_handler::validation::validate_hash_bytes;
-/// let valid_hash = [0u8; 64];
+/// let valid_hash = [0_u8; 64];
 /// assert!(validate_hash_bytes(&valid_hash).is_ok());
 /// ```
 pub use hash::validate_hash_bytes;
