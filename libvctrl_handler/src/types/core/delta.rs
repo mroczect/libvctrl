@@ -61,9 +61,9 @@ pub enum ChangeKind {
 /// Creating a delta for an added file:
 ///
 /// ```
-/// # use my_crate::types::core::delta::FileDelta;
-/// # use my_crate::Hash;
-/// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+/// # use libvctrl_handler::types::core::delta::FileDelta;
+/// # use libvctrl_handler::Hash;
+/// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
 /// let delta = FileDelta::added("src/main.rs".into(), hash);
 /// assert!(delta.is_added());
 /// assert!(delta.old_hash().is_none());
@@ -287,9 +287,9 @@ impl FileDelta {
 /// Creating a `TreeDelta` and iterating over its changes:
 ///
 /// ```
-/// # use my_crate::types::core::delta::{FileDelta, TreeDelta};
-/// # use my_crate::Hash;
-/// # let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
+/// # use libvctrl_handler::types::core::delta::{FileDelta, TreeDelta};
+/// # use libvctrl_handler::Hash;
+/// # let hash = Hash::from_bytes(&[0_u8; 64]).unwrap();
 /// let delta1 = FileDelta::added("file1.txt".into(), hash);
 /// let delta2 = FileDelta::deleted("file2.txt".into(), hash);
 /// let tree_delta = TreeDelta::from_changes(vec![delta1, delta2]);
