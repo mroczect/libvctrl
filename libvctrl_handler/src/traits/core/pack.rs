@@ -100,8 +100,8 @@ pub trait PackWriter: Send + Sync {
     /// #     fn finish(&mut self) -> Result<(), VctrlError> { Ok(()) }
     /// # }
     /// let mut writer = MockPackWriter { objects: HashMap::new() };
-    /// writer.write_object(&vec![0u8; 20], b"data")?;
-    /// assert!(writer.objects.contains_key(&vec![0u8; 20]));
+    /// writer.write_object(&vec![0_u8; 20], b"data")?;
+    /// assert!(writer.objects.contains_key(&vec![0_u8; 20]));
     /// # Ok::<(), VctrlError>(())
     /// ```
     fn write_object(&mut self, id: &Self::ObjectId, data: &[u8]) -> Result<(), VctrlError>;
