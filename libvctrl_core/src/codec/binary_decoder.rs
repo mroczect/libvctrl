@@ -4,8 +4,9 @@ use libvctrl_handler::{
 };
 use std::str;
 
-const EXPECTED_VERSION: u8 = 2;
+const EXPECTED_VERSION: u8 = 3;
 
+/// A decoder for the binary format of Git objects.
 pub struct BinaryDecoder;
 
 impl BinaryDecoder {
@@ -130,12 +131,13 @@ impl Decoder for BinaryDecoder {
         let data = Self::read_bounded(&mut reader, max_size)?;
 
         let data = Self::check_version(&data)?;
-        if data.len() < HASH_LENGTH + 1 {
+        if data.len() < HASH_LENGTH + 2 {
             return Err(VctrlError::CorruptedData("commit too short".into()));
         }
         let tree = Hash::from_bytes(&data[..HASH_LENGTH])?;
-        let parent_count = data[HASH_LENGTH] as usize;
-        let mut pos = HASH_LENGTH + 1;
+        let parent_count_bytes: [u8; 2] = data[HASH_LENGTH..HASH_LENGTH + 2].try_into().unwrap();
+        let parent_count = u16::from_le_bytes(parent_count_bytes) as usize;
+        let mut pos = HASH_LENGTH + 2;
         let mut parents = Vec::with_capacity(parent_count);
         for _ in 0..parent_count {
             if pos + HASH_LENGTH > data.len() {
