@@ -176,7 +176,7 @@ pub trait Encoder: Send + Sync {
     /// #     fn encode_commit<W: Write + Send>(&self, _commit: &Commit, _writer: &mut W) -> Result<(), VctrlError> { Ok(()) }
     /// #     fn encode_tag<W: Write + Send>(&self, _tag: &Tag, _writer: &mut W) -> Result<(), VctrlError> { Ok(()) }
     /// # }
-    /// # let hash = Hash::from_bytes(&[0u8; 64])?;
+    /// # let hash = Hash::from_bytes(&[0_u8; 64])?;
     /// # let user = UserID::new("Alice".to_string(), "alice@example.com".to_string())?;
     /// let encoder = MockEncoder;
     /// let commit = Commit::new(hash, vec![], user, user, "message".to_string())?;
@@ -215,7 +215,7 @@ pub trait Encoder: Send + Sync {
     /// #     fn encode_commit<W: Write + Send>(&self, _commit: &Commit, _writer: &mut W) -> Result<(), VctrlError> { Ok(()) }
     /// #     fn encode_tag<W: Write + Send>(&self, _tag: &Tag, _writer: &mut W) -> Result<(), VctrlError> { Ok(()) }
     /// # }
-    /// # let hash = Hash::from_bytes(&[0u8; 64])?;
+    /// # let hash = Hash::from_bytes(&[0_u8; 64])?;
     /// # let user = UserID::new("Alice".to_string(), "alice@example.com".to_string())?;
     /// let encoder = MockEncoder;
     /// let tag = Tag::new("v1.0".to_string(), hash, Some(user), "release".to_string())?;
