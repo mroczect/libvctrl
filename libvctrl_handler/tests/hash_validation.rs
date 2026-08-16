@@ -3,7 +3,6 @@
 use libvctrl_handler::*;
 use std::error::Error as StdError;
 
-// ---------------------------------------------------------------------------
 fn make_hash(byte: u8) -> Hash {
     Hash::from_bytes(&[byte; HASH_LENGTH]).unwrap()
 }
@@ -45,7 +44,7 @@ fn debug_format_contains_short_hex_and_ellipsis() {
     let hash = make_hash(0xCD);
     let dbg = format!("{hash:?}");
     assert!(dbg.starts_with("Hash("));
-    assert!(dbg.ends_with("…)"));
+    assert!(dbg.ends_with("...)"), "debug format was: {dbg}");
     assert!(dbg.contains("cdcd"));
 }
 
@@ -111,7 +110,17 @@ fn vctrl_error_is_std_error_and_source_none() {
 }
 
 #[test]
+fn vctrl_error_from_io_wraps_error() {
+    let io_err = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "pipe broke");
+    let vctrl_err = VctrlError::from_io(io_err);
+    let display = vctrl_err.to_string();
+    assert!(display.contains("I/O error"));
+    assert!(display.contains("pipe broke"));
+}
+
+#[test]
 fn constants_have_expected_values() {
     assert_eq!(HASH_LENGTH, 64);
     assert_eq!(MAX_NAME_LENGTH, 255);
+    assert_eq!(MAX_PARENT_COUNT, 65535);
 }

@@ -1,5 +1,3 @@
-//! Delta and change types.
-
 use std::path::{Path, PathBuf};
 
 use crate::Hash;

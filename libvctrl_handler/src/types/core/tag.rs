@@ -1,11 +1,9 @@
-//! Tag object representation.
-
 use super::commit::CommitMeta;
 use super::hash::Hash;
 use super::user_id::UserID;
 use crate::constants::MAX_MESSAGE_LENGTH;
 use crate::errors::VctrlError;
-use crate::types::validate_ref_name;
+use crate::validation::validate_ref_name;
 
 /// A Git tag object.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -18,11 +16,11 @@ pub struct Tag {
 }
 
 impl Tag {
-    /// Creates a new tag without timestamp metadata.
+    /// Creates a new tag with default metadata.
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError`] if validation fails.
+    /// Returns [`VctrlError`] if the name or message fails validation.
     pub fn new(
         name: String,
         target: Hash,
@@ -36,7 +34,7 @@ impl Tag {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError`] if validation fails.
+    /// Returns [`VctrlError`] if the name or message fails validation.
     pub fn with_meta(
         name: String,
         target: Hash,

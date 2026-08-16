@@ -1,3 +1,2 @@
-//! Core enum definitions.
-
+/// Entry kind enum.
 pub mod entry_kind;

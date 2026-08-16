@@ -1,5 +1,3 @@
-//! Blame trait and entry type.
-
 use crate::errors::VctrlError;
 use crate::types::Hash;
 

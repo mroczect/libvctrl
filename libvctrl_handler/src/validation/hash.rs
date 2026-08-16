@@ -1,4 +1,5 @@
-use libvctrl_handler::{HASH_LENGTH, VctrlError};
+use crate::constants::HASH_LENGTH;
+use crate::errors::VctrlError;
 
 /// Validates that a byte slice is exactly `HASH_LENGTH` bytes long.
 ///

@@ -1,5 +1,3 @@
-//! Hashing module.
-
 /// SHA-512 hasher implementation.
 pub mod sha512;
 

@@ -1,6 +1,6 @@
 use libvctrl_handler::{Blob, VctrlError};
 
-/// A builder for creating `Blob` objects.
+/// A builder for creating [`Blob`] objects.
 #[derive(Debug, Default)]
 pub struct BlobBuilder {
     data: Vec<u8>,
@@ -20,7 +20,7 @@ impl BlobBuilder {
         self
     }
 
-    /// Builds the `Blob`.
+    /// Builds the [`Blob`].
     ///
     /// # Errors
     ///

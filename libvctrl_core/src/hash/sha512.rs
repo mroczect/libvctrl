@@ -10,9 +10,7 @@ impl Hasher for Sha512Hasher {
         let mut hasher = Sha512Hash::new();
         let mut buffer = [0u8; 4096];
         loop {
-            let n = reader
-                .read(&mut buffer)
-                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+            let n = reader.read(&mut buffer).map_err(VctrlError::from_io)?;
             if n == 0 {
                 break;
             }

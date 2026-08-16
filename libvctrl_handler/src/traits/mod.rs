@@ -1,3 +1,2 @@
-//! Traits for repository operations.
-
+/// Traits for repository operations.
 pub mod core;

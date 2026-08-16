@@ -1,6 +1,6 @@
 use libvctrl_handler::{EntryKind, Hash, Tree, TreeEntry, VctrlError};
 
-/// A builder for creating `Tree` objects.
+/// A builder for creating [`Tree`] objects.
 #[derive(Debug, Default)]
 pub struct TreeBuilder {
     entries: Vec<TreeEntry>,
@@ -15,14 +15,14 @@ impl TreeBuilder {
         }
     }
 
-    /// Adds an existing `TreeEntry`.
+    /// Adds an existing [`TreeEntry`].
     #[must_use]
     pub fn entry(mut self, entry: TreeEntry) -> Self {
         self.entries.push(entry);
         self
     }
 
-    /// Creates and adds a new `TreeEntry`.
+    /// Creates and adds a new [`TreeEntry`].
     ///
     /// # Errors
     ///
@@ -38,7 +38,7 @@ impl TreeBuilder {
         Ok(self)
     }
 
-    /// Builds the `Tree`.
+    /// Builds the [`Tree`].
     ///
     /// # Errors
     ///
@@ -48,7 +48,7 @@ impl TreeBuilder {
     }
 }
 
-/// A builder for creating `TreeEntry` objects.
+/// A builder for creating [`TreeEntry`] objects.
 #[derive(Debug)]
 pub struct TreeEntryBuilder {
     name: String,
@@ -63,7 +63,7 @@ impl TreeEntryBuilder {
         Self { name, kind, hash }
     }
 
-    /// Builds the `TreeEntry`.
+    /// Builds the [`TreeEntry`].
     ///
     /// # Errors
     ///

@@ -1,4 +1,5 @@
-use libvctrl_handler::{MAX_NAME_LENGTH, VctrlError};
+use crate::constants::MAX_NAME_LENGTH;
+use crate::errors::VctrlError;
 use std::path::Path;
 
 /// Validates a generic name.
@@ -6,7 +7,7 @@ use std::path::Path;
 /// # Errors
 ///
 /// Returns [`VctrlError::InvalidName`] if the name is empty, exceeds the maximum
-/// allowed length, or contains control characters.
+/// allowed length, or contains ASCII control characters.
 pub fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
         return Err(VctrlError::InvalidName("name is empty".into()));
@@ -17,7 +18,7 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
             "name exceeds maximum length {MAX_NAME_LENGTH}: '{name}'"
         )));
     }
-    if name.chars().any(char::is_control) {
+    if name.bytes().any(|b| b.is_ascii_control()) {
         return Err(VctrlError::InvalidName(format!(
             "name contains control characters: '{name}'"
         )));

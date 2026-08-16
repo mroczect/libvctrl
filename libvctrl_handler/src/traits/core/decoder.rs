@@ -1,5 +1,3 @@
-//! Object decoder trait.
-
 use crate::errors::VctrlError;
 use crate::types::{Blob, Commit, Tag, Tree};
 use std::io::Read;

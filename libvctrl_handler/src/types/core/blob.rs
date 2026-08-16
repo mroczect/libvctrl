@@ -1,5 +1,3 @@
-//! Blob object representation.
-
 use crate::constants::MAX_BLOB_SIZE;
 use crate::errors::VctrlError;
 

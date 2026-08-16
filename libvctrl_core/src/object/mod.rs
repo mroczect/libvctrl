@@ -1,4 +1,4 @@
-//! Object builders module.
+//! Object builders for ergonomic construction of Git objects.
 
 /// Blob builder.
 pub mod blob;

@@ -1,5 +1,3 @@
-//! Tree differencing trait.
-
 use crate::errors::VctrlError;
 use crate::types::TreeDelta;
 

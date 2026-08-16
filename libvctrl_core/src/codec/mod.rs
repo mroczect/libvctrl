@@ -1,5 +1,3 @@
-//! Binary codec module.
-
 /// Binary decoder for Git objects.
 pub mod binary_decoder;
 

@@ -1,6 +1,6 @@
 use libvctrl_handler::{Commit, CommitMeta, Hash, UserID, VctrlError};
 
-/// A builder for creating `Commit` objects.
+/// A builder for creating [`Commit`] objects.
 #[derive(Debug, Default)]
 pub struct CommitBuilder {
     tree: Option<Hash>,
@@ -67,11 +67,11 @@ impl CommitBuilder {
         self
     }
 
-    /// Builds the `Commit`.
+    /// Builds the [`Commit`].
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError`] if validation fails.
+    /// Returns [`VctrlError`] if validation fails or required fields are missing.
     pub fn build(self) -> Result<Commit, VctrlError> {
         let tree = self
             .tree

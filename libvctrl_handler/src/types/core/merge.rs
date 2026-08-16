@@ -1,5 +1,3 @@
-//! Merge-related types.
-
 use std::path::{Path, PathBuf};
 
 use crate::Hash;

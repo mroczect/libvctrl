@@ -1,16 +1,22 @@
-//! A library for working with Git objects and repository data.
+//! handler for lnvctrl
 
 #![forbid(unsafe_code)]
 #![deny(
     clippy::all,
     clippy::pedantic,
-    clippy::cargo,
     clippy::nursery,
+    clippy::cargo,
     missing_docs,
     rust_2018_idioms,
     unreachable_pub,
     unused_crate_dependencies,
     unused_qualifications
+)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::missing_safety_doc,
+    clippy::must_use_candidate
 )]
 
 /// Constants related to Git object formats.
@@ -31,18 +37,17 @@ pub mod traits;
 /// Core data types for Git objects.
 pub mod types;
 
-/// Re-export of common constants.
+pub mod validation;
+
 pub use constants::{
-    HASH_LENGTH, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, MAX_TREE_ENTRIES,
+    HASH_LENGTH, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, MAX_PARENT_COUNT,
+    MAX_TREE_ENTRIES,
 };
 
-/// Re-export of the entry kind enum.
 pub use enums::EntryKind;
 
-/// Re-export of the error type.
 pub use errors::VctrlError;
 
-/// Re-export of core traits.
 pub use traits::core::{
     blame::{Blame, BlameEntry},
     config::ConfigStore,
@@ -62,8 +67,11 @@ pub use traits::core::{
     verifier::Verifier,
 };
 
-/// Re-export of core data types.
 pub use types::{
     Blob, ChangeKind, Commit, CommitMeta, Conflict, FileDelta, Hash, MergeResult, ReflogEntry, Tag,
     Tree, TreeDelta, TreeEntry, UserID,
+};
+
+pub use validation::{
+    validate_hash_bytes, validate_name, validate_ref_name, validate_tree_entry_name,
 };

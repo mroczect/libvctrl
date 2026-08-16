@@ -1,6 +1,6 @@
 use libvctrl_handler::{CommitMeta, Hash, Tag, UserID, VctrlError};
 
-/// A builder for creating `Tag` objects.
+/// A builder for creating [`Tag`] objects.
 #[derive(Debug, Default)]
 pub struct TagBuilder {
     name: Option<String>,
@@ -58,11 +58,11 @@ impl TagBuilder {
         self
     }
 
-    /// Builds the `Tag`.
+    /// Builds the [`Tag`].
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError`] if validation fails.
+    /// Returns [`VctrlError`] if validation fails or required fields are missing.
     pub fn build(self) -> Result<Tag, VctrlError> {
         let name = self
             .name

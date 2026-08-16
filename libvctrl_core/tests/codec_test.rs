@@ -1,7 +1,7 @@
 use libvctrl_core::codec::{BinaryDecoder, BinaryEncoder};
 use libvctrl_handler::{
     Blob, Commit, CommitMeta, Decoder, Encoder, EntryKind, Hash, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH,
-    MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID,
+    MAX_PARENT_COUNT, MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID,
 };
 use std::io::Cursor;
 
@@ -69,20 +69,24 @@ fn test_blob_malformed_data() {
     // Empty input
     assert!(BinaryDecoder.decode_blob(Cursor::new(&[])).is_err());
 
-    // Missing length prefix
+    // Correct version but missing length prefix
+    let data = vec![0x03];
+    assert!(BinaryDecoder.decode_blob(Cursor::new(&data)).is_err());
+
+    // Wrong version
     let data = vec![0x02];
     assert!(BinaryDecoder.decode_blob(Cursor::new(&data)).is_err());
 
-    // Length mismatch
+    // Length mismatch (trailing byte)
     let b = Blob::new(vec![0; 5]).unwrap();
     let mut enc = Vec::new();
     BinaryEncoder.encode_blob(&b, &mut enc).unwrap();
-    enc.push(0x00); // Trailing byte
+    enc.push(0x00);
     assert!(BinaryDecoder.decode_blob(Cursor::new(&enc)).is_err());
 
     // Declared length exceeds MAX_BLOB_SIZE
     let over_size = usize::try_from(MAX_BLOB_SIZE).unwrap() + 1;
-    let mut bytes = vec![0x02u8];
+    let mut bytes = vec![0x03u8];
     bytes.extend_from_slice(&(over_size as u64).to_le_bytes());
     bytes.extend(vec![0x00; over_size]);
     assert!(BinaryDecoder.decode_blob(Cursor::new(&bytes)).is_err());
@@ -104,7 +108,7 @@ fn test_tree_roundtrip_and_limits() {
     let dec = BinaryDecoder.decode_tree(Cursor::new(&enc)).unwrap();
     assert_eq!(dec.entries().len(), 5);
 
-    // All entry kinds
+    // All entry kinds roundtrip
     let entries = vec![
         TreeEntry::new("blob".into(), EntryKind::Blob, hash_from_byte(1)).unwrap(),
         TreeEntry::new("dir".into(), EntryKind::Tree, hash_from_byte(4)).unwrap(),
@@ -124,13 +128,17 @@ fn test_tree_malformed_data() {
     // Empty input
     assert!(BinaryDecoder.decode_tree(Cursor::new(&[])).is_err());
 
-    // Missing entry count
+    // Correct version but missing entry count bytes
+    let data = vec![0x03];
+    assert!(BinaryDecoder.decode_tree(Cursor::new(&data)).is_err());
+
+    // Wrong version
     let data = vec![0x02];
     assert!(BinaryDecoder.decode_tree(Cursor::new(&data)).is_err());
 
     // Entry count exceeds MAX_TREE_ENTRIES
     let over = usize::try_from(MAX_TREE_ENTRIES).unwrap() + 1;
-    let mut enc = vec![0x02u8];
+    let mut enc = vec![0x03u8];
     enc.extend_from_slice(&u32::try_from(over).unwrap().to_le_bytes());
     assert!(BinaryDecoder.decode_tree(Cursor::new(&enc)).is_err());
 
@@ -193,6 +201,39 @@ fn test_commit_roundtrip_and_limits() {
     BinaryEncoder.encode_commit(&c, &mut enc).unwrap();
     let dec = BinaryDecoder.decode_commit(Cursor::new(&enc)).unwrap();
     assert_eq!(dec.parents().len(), 3);
+
+    // With many parents (u16 range — test 256 which exceeds old u8 limit)
+    let many_parents: Vec<Hash> = (0u8..=255).map(hash_from_byte).collect();
+    let c = Commit::new(
+        dummy_hash(),
+        many_parents.clone(),
+        user.clone(),
+        user.clone(),
+        "octopus".into(),
+    )
+    .unwrap();
+    let mut enc = Vec::new();
+    BinaryEncoder.encode_commit(&c, &mut enc).unwrap();
+    let dec = BinaryDecoder.decode_commit(Cursor::new(&enc)).unwrap();
+    assert_eq!(dec.parents().len(), 256);
+    assert_eq!(dec.parents(), many_parents);
+
+    // Duplicate parent rejected
+    let dup = vec![dummy_hash(), dummy_hash()];
+    assert!(Commit::new(dummy_hash(), dup, user.clone(), user.clone(), "dup".into()).is_err());
+
+    // Exceeds MAX_PARENT_COUNT rejected
+    let too_many = vec![dummy_hash(); usize::try_from(MAX_PARENT_COUNT).unwrap() + 1];
+    assert!(
+        Commit::new(
+            dummy_hash(),
+            too_many,
+            user.clone(),
+            user.clone(),
+            "toomany".into()
+        )
+        .is_err()
+    );
 
     // With meta
     let meta = CommitMeta::new(1, 2, Some("UTF-8".into())).unwrap();
@@ -268,4 +309,14 @@ fn test_tag_roundtrip_and_limits() {
     let msg_len = usize::try_from(MAX_MESSAGE_LENGTH).unwrap() + 1;
     let msg = "A".repeat(msg_len);
     assert!(Tag::new("v".into(), dummy_hash(), None, msg).is_err());
+}
+
+#[test]
+fn test_wrong_version_rejected() {
+    // Version 2 is no longer supported
+    let b = Blob::new(vec![]).unwrap();
+    let mut enc = Vec::new();
+    BinaryEncoder.encode_blob(&b, &mut enc).unwrap();
+    enc[0] = 0x02; // Corrupt version byte
+    assert!(BinaryDecoder.decode_blob(Cursor::new(&enc)).is_err());
 }

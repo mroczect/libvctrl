@@ -1,4 +1,4 @@
-//! Store module.
+//! In-memory object and reference stores.
 
 /// In-memory object store.
 pub mod memory;

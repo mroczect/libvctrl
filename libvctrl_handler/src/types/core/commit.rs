@@ -1,8 +1,6 @@
-//! Commit object representation.
-
 use super::hash::Hash;
 use super::user_id::UserID;
-use crate::constants::MAX_MESSAGE_LENGTH;
+use crate::constants::{MAX_MESSAGE_LENGTH, MAX_PARENT_COUNT};
 use crate::errors::VctrlError;
 use std::collections::HashSet;
 
@@ -19,7 +17,7 @@ impl CommitMeta {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::InvalidTimezoneOffset`] if the offset is out of range.
+    /// Returns [`VctrlError::InvalidTimezoneOffset`] if the offset is out of range (-1440..=1440).
     pub fn new(
         timestamp: i64,
         timezone_offset: i16,
@@ -41,7 +39,7 @@ impl CommitMeta {
         self.timestamp
     }
 
-    /// Returns the timezone offset.
+    /// Returns the timezone offset in minutes.
     #[must_use]
     pub const fn timezone_offset(&self) -> i16 {
         self.timezone_offset
@@ -66,12 +64,12 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Creates a new commit without timestamp metadata.
+    /// Creates a new commit with default metadata.
     ///
     /// # Errors
     ///
     /// Returns [`VctrlError::DuplicateParent`] if parents contain duplicates.
-    /// Returns [`VctrlError::ExceededMaxSize`] if the message is too long.
+    /// Returns [`VctrlError::ExceededMaxSize`] if the message is too long or too many parents.
     pub fn new(
         tree: Hash,
         parents: Vec<Hash>,
@@ -102,6 +100,14 @@ impl Commit {
         message: String,
         meta: CommitMeta,
     ) -> Result<Self, VctrlError> {
+        let max_parents = usize::try_from(MAX_PARENT_COUNT).unwrap_or(usize::MAX);
+        if parents.len() > max_parents {
+            return Err(VctrlError::ExceededMaxSize(format!(
+                "commit has {} parents, exceeding maximum of {MAX_PARENT_COUNT}",
+                parents.len()
+            )));
+        }
+
         let max_len = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX);
         if message.len() > max_len {
             return Err(VctrlError::ExceededMaxSize(format!(

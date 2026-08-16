@@ -1,5 +1,3 @@
-//! Reflog entry type.
-
 use crate::Hash;
 use crate::errors::VctrlError;
 
@@ -18,7 +16,7 @@ impl ReflogEntry {
     ///
     /// # Errors
     ///
-    /// Returns [`VctrlError::InvalidTimezoneOffset`] if the offset is invalid.
+    /// Returns [`VctrlError::InvalidTimezoneOffset`] if the offset is out of range (-1440..=1440).
     pub fn new(
         old_id: Option<Hash>,
         new_id: Option<Hash>,

@@ -1,12 +1,8 @@
-//! Configuration store trait.
-
 use crate::errors::VctrlError;
 
 /// A trait for reading and writing configuration values.
 pub trait ConfigStore: Send + Sync {
     /// Returns the string value for the given section and key.
-    ///
-    /// Returns `Ok(None)` if the key is not found.
     ///
     /// # Errors
     ///
@@ -21,8 +17,6 @@ pub trait ConfigStore: Send + Sync {
     fn set_string(&mut self, section: &str, key: &str, value: &str) -> Result<(), VctrlError>;
 
     /// Returns the boolean value for the given section and key.
-    ///
-    /// Returns `Ok(None)` if the key is not found.
     ///
     /// # Errors
     ///

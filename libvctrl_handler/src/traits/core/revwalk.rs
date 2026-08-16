@@ -1,5 +1,3 @@
-//! Revision walking trait.
-
 use crate::errors::VctrlError;
 
 /// An iterator over commit history.
@@ -11,10 +9,6 @@ pub trait RevWalk: Send + Sync {
     type CommitId: Send + Sync;
 
     /// Returns an iterator over commit history starting from the given commit.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`VctrlError`] if the walk cannot be initialized.
     fn walk(
         &self,
         start: &Self::CommitId,

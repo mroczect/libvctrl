@@ -1,5 +1,3 @@
-//! Error types for the crate.
-
 use crate::types::Hash;
 use std::fmt;
 use std::sync::Arc;
@@ -99,3 +97,14 @@ impl PartialEq for VctrlError {
 }
 
 impl Eq for VctrlError {}
+
+impl VctrlError {
+    /// Creates a [`VctrlError::IoError`] from a [`std::io::Error`].
+    ///
+    /// This is the canonical way to convert I/O errors within the crate,
+    /// ensuring the `Arc` wrapping is applied consistently.
+    #[must_use]
+    pub fn from_io(e: std::io::Error) -> Self {
+        Self::IoError(Arc::new(e))
+    }
+}

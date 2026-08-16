@@ -1,5 +1,3 @@
-//! Hash type.
-
 use crate::constants::HASH_LENGTH;
 use crate::errors::VctrlError;
 use std::fmt;
@@ -78,7 +76,7 @@ impl fmt::Debug for Hash {
         for &byte in self.0.iter().take(16) {
             write!(f, "{byte:02x}")?;
         }
-        write!(f, "…)") // <-- Changed from "..." to "…"
+        write!(f, "...)")
     }
 }
 

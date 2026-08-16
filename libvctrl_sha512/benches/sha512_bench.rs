@@ -4,7 +4,7 @@ use libvctrl_sha512::{HKDF, HMAC, Hash};
 fn bench_sha512(c: &mut Criterion) {
     let data = [0x42u8; 1024];
     c.bench_function("SHA512/hash_1kb", |b| {
-        b.iter(|| Hash::hash(core::hint::black_box(&data)))
+        b.iter(|| Hash::hash(core::hint::black_box(&data)));
     });
 }
 
@@ -13,7 +13,7 @@ fn bench_hmac(c: &mut Criterion) {
     let data = [0x42u8; 1024];
 
     c.bench_function("HMAC-SHA512/mac_1kb", |b| {
-        b.iter(|| HMAC::mac(core::hint::black_box(&data), core::hint::black_box(&key)))
+        b.iter(|| HMAC::mac(core::hint::black_box(&data), core::hint::black_box(&key)));
     });
 
     c.bench_function("HMAC-SHA512/streaming_1kb_chunked", |b| {
@@ -27,7 +27,7 @@ fn bench_hmac(c: &mut Criterion) {
                 hmac.finalize()
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 }
 
@@ -37,7 +37,7 @@ fn bench_hkdf(c: &mut Criterion) {
     let info = [0xf0u8; 10];
 
     c.bench_function("HKDF-SHA512/extract", |b| {
-        b.iter(|| HKDF::extract(core::hint::black_box(salt), core::hint::black_box(ikm)))
+        b.iter(|| HKDF::extract(core::hint::black_box(salt), core::hint::black_box(ikm)));
     });
 
     let prk = HKDF::extract(salt, ikm);
@@ -50,7 +50,7 @@ fn bench_hkdf(c: &mut Criterion) {
                 core::hint::black_box(info),
             );
             out
-        })
+        });
     });
 }
 

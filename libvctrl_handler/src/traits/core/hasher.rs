@@ -1,5 +1,3 @@
-//! Hasher trait.
-
 use crate::errors::VctrlError;
 use crate::types::Hash;
 use std::io::Read;

@@ -1,5 +1,3 @@
-//! Entry kind enum and mode conversion.
-
 use crate::constants::entry_mode;
 
 /// The kind of an entry in a Git tree.
