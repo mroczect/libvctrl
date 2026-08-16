@@ -36,7 +36,7 @@
 //! ```
 //! # use libvctrl_handler::{EntryKind, Hash};
 //! // Hash requires exactly 64 bytes (SHA-512).
-//! let raw_bytes = [0u8; 64];
+//! let raw_bytes = [0_u8; 64];
 //! let hash = Hash::from_bytes(&raw_bytes);
 //! assert!(hash.is_ok());
 //!
