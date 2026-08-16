@@ -17,7 +17,7 @@
 //! # Facade Pattern
 //! This module acts as a facade. It delegates the definitions to the `core`
 //! submodule and selectively re-exports the public types to the top level. This
-//! provides a clean, flat namespace for consumers (e.g., `my_crate::types::Commit`)
+//! provides a clean, flat namespace for consumers (e.g., `libvctrl_handler::types::Commit`)
 //! while keeping the internal module structure logically separated by domain.
 
 /// Core data type definitions for Git objects and domain concepts.
@@ -32,7 +32,7 @@
 ///
 /// ```
 /// // The core submodule is accessible for advanced or internal use.
-/// use my_crate::types::core;
+/// use libvctrl_handler::types::core;
 /// ```
 pub mod core;
 
@@ -40,8 +40,8 @@ pub mod core;
 ///
 /// # Why this exists
 /// Provides a flattened import path. Consumers can directly use
-/// `my_crate::types::Blob` instead of navigating the full
-/// `my_crate::types::core::blob::Blob` path. This reduces boilerplate in consumer
+/// `libvctrl_handler::types::Blob` instead of navigating the full
+/// `libvctrl_handler::types::core::blob::Blob` path. This reduces boilerplate in consumer
 /// code while keeping the internal module structure logically separated.
 ///
 /// # Examples
@@ -49,9 +49,9 @@ pub mod core;
 /// Importing and using multiple core types:
 ///
 /// ```
-/// # use my_crate::types::{Blob, Hash, Tree};
-/// # use my_crate::VctrlError;
-/// let raw_bytes = [0u8; 64];
+/// # use libvctrl_handler::types::{Blob, Hash, Tree};
+/// # use libvctrl_handler::VctrlError;
+/// let raw_bytes = [0_u8; 64];
 /// let hash = Hash::from_bytes(&raw_bytes)?;
 /// let blob = Blob::new(b"content".to_vec())?;
 /// let tree = Tree::new(vec![])?;
