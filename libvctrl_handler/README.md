@@ -1,6 +1,6 @@
 # libvctrl_handler
 
-**A rigorously typed, trait-driven Git object framework in Rust**
+**Fundamental contracts for building a version control system – no implementations, only traits and types**
 
 _Constitution (handler), reference implementation (core), and plumbing commands_
 
