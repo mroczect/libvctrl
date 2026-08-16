@@ -305,7 +305,7 @@ fn raw_with_wrong_type_errors() {
 #[test]
 fn batch_check_single_object() {
     let repo = TestRepo::new();
-    let input = format!("{}\n", repo.blob_hash);
+    let input = format!("{0}\n", repo.blob_hash);
     let mut output = Vec::new();
     let options = BatchOptions::default();
     cat_file_batch(
@@ -317,7 +317,7 @@ fn batch_check_single_object() {
     )
     .unwrap();
     let out_str = String::from_utf8(output).unwrap();
-    let expected_prefix = format!("{} blob", repo.blob_hash);
+    let expected_prefix = format!("{0} blob", repo.blob_hash);
     assert!(out_str.starts_with(&expected_prefix));
     assert!(out_str.ends_with('\n'));
 }
@@ -325,7 +325,7 @@ fn batch_check_single_object() {
 #[test]
 fn batch_with_contents() {
     let repo = TestRepo::new();
-    let input = format!("{}\n", repo.blob_hash);
+    let input = format!("{0}\n", repo.blob_hash);
     let mut output = Vec::new();
     let options = BatchOptions {
         print_contents: true,
@@ -347,7 +347,7 @@ fn batch_with_contents() {
 #[test]
 fn batch_with_buffer() {
     let repo = TestRepo::new();
-    let input = format!("{}\n{}\n", repo.blob_hash, repo.tree_hash);
+    let input = format!("{0}\n{1}\n", repo.blob_hash, repo.tree_hash);
     let mut output = Vec::new();
     let options = BatchOptions {
         buffer: true,
@@ -369,7 +369,7 @@ fn batch_with_buffer() {
 #[test]
 fn batch_nul_terminated() {
     let repo = TestRepo::new();
-    let input = format!("{}\0{}\0", repo.blob_hash, repo.tree_hash);
+    let input = format!("{0}\0{1}\0", repo.blob_hash, repo.tree_hash);
     let mut output = Vec::new();
     let options = BatchOptions {
         nul_terminated: true,
@@ -392,7 +392,7 @@ fn batch_nul_terminated() {
 #[test]
 fn batch_custom_format() {
     let repo = TestRepo::new();
-    let input = format!("{}\n", repo.blob_hash);
+    let input = format!("{0}\n", repo.blob_hash);
     let mut output = Vec::new();
     let options = BatchOptions {
         format: Some("%(objectname) %(objecttype)".into()),
@@ -407,7 +407,7 @@ fn batch_custom_format() {
     )
     .unwrap();
     let out_str = String::from_utf8(output).unwrap().trim().to_string();
-    let expected = format!("{} blob", repo.blob_hash);
+    let expected = format!("{0} blob", repo.blob_hash);
     assert_eq!(out_str, expected);
 }
 
@@ -415,7 +415,7 @@ fn batch_custom_format() {
 fn batch_missing_object() {
     let repo = TestRepo::new();
     let fake_hash = "a".repeat(128);
-    let input = format!("{}\n", fake_hash);
+    let input = format!("{fake_hash}\n");
     let mut output = Vec::new();
     let options = BatchOptions::default();
     cat_file_batch(
