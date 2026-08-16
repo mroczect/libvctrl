@@ -4,13 +4,13 @@ use libvctrl_handler::*;
 
 #[test]
 fn tree_entry_rejects_empty_name() {
-    let hash = Hash::from_bytes(&[0u8; HASH_LENGTH]).unwrap();
+    let hash = Hash::from_bytes(&[0_u8; HASH_LENGTH]).unwrap();
     assert!(TreeEntry::new(String::new(), EntryKind::Blob, hash).is_err());
 }
 
 #[test]
 fn tree_entry_rejects_too_long_name() {
-    let hash = Hash::from_bytes(&[0u8; HASH_LENGTH]).unwrap();
+    let hash = Hash::from_bytes(&[0_u8; HASH_LENGTH]).unwrap();
     let long_name =
         "a".repeat(usize::try_from(MAX_NAME_LENGTH).expect("MAX_NAME_LENGTH too large") + 1);
     assert!(TreeEntry::new(long_name, EntryKind::Blob, hash).is_err());
@@ -28,7 +28,7 @@ fn user_id_rejects_empty_email() {
 
 #[test]
 fn tag_rejects_empty_name() {
-    let hash = Hash::from_bytes(&[0u8; HASH_LENGTH]).unwrap();
+    let hash = Hash::from_bytes(&[0_u8; HASH_LENGTH]).unwrap();
     assert!(Tag::new(String::new(), hash, None, "msg".into()).is_err());
 }
 
