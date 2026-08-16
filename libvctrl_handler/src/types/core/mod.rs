@@ -17,16 +17,16 @@
 //!
 //! # Facade Re-exports
 //! While definitions live in submodules, the types are re-exported directly here.
-//! This allows consumers to use ergonomic paths like `my_crate::types::core::Blob`
-//! instead of the deeper `my_crate::types::core::blob::Blob`.
+//! This allows consumers to use ergonomic paths like `libvctrl_handler::types::core::Blob`
+//! instead of the deeper `libvctrl_handler::types::core::blob::Blob`.
 //!
 //! # Examples
-//! *Note: The following examples assume this crate is named `my_crate`.*
+//! *Note: The following examples assume this crate is named `libvctrl_handler`.*
 //!
 //! ```
-//! # use my_crate::types::core::{Blob, Hash, Tree};
-//! # use my_crate::VctrlError;
-//! let raw_bytes = [0u8; 64];
+//! # use libvctrl_handler::types::core::{Blob, Hash, Tree};
+//! # use libvctrl_handler::VctrlError;
+//! let raw_bytes = [0_u8; 64];
 //! let hash = Hash::from_bytes(&raw_bytes)?;
 //! let blob = Blob::new(b"content".to_vec())?;
 //! let tree = Tree::new(vec![])?;
