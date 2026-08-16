@@ -36,12 +36,9 @@
 
 use crate::constants::HASH_LENGTH;
 use crate::types::Hash;
-#[allow(clippy::std_instead_of_core)]
 use std::error::Error;
-#[allow(clippy::std_instead_of_alloc)]
 use std::fmt;
 use std::io;
-#[allow(clippy::std_instead_of_alloc)]
 use std::sync::Arc;
 
 /// The main error type for all operations in this crate.
@@ -93,86 +90,86 @@ pub enum VctrlError {
 impl fmt::Display for VctrlError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Self::CorruptedData(ref msg) => return write!(f, "Corrupted data: {msg}"),
-            Self::DuplicateParent => return write!(f, "Duplicate parent in commit"),
-            Self::ExceededMaxSize(ref msg) => return write!(f, "Exceeded max size: {msg}"),
-            Self::InvalidBlameRange => return write!(f, "Invalid blame range"),
-            Self::InvalidEmail(ref msg) => return write!(f, "Invalid email: '{msg}'"),
+        match self {
+            Self::CorruptedData(msg) => write!(f, "Corrupted data: {msg}"),
+            Self::DuplicateParent => write!(f, "Duplicate parent in commit"),
+            Self::ExceededMaxSize(msg) => write!(f, "Exceeded max size: {msg}"),
+            Self::InvalidBlameRange => write!(f, "Invalid blame range"),
+            Self::InvalidEmail(msg) => write!(f, "Invalid email: '{msg}'"),
             Self::InvalidHashLength(len) => {
-                return write!(
+                write!(
                     f,
-                    "Invalid hash length: expected {} bytes, got {len}",
-                    HASH_LENGTH,
-                );
+                    "Invalid hash length: expected {HASH_LENGTH} bytes, got {len}"
+                )
             }
-            Self::InvalidName(ref name) => return write!(f, "Invalid name: '{name}'"),
+            Self::InvalidName(name) => write!(f, "Invalid name: '{name}'"),
             Self::InvalidTimezoneOffset(offset) => {
-                return write!(f, "Invalid timezone offset: {offset}");
+                write!(f, "Invalid timezone offset: {offset}")
             }
-            Self::InvalidTreeStructure(ref msg) => {
-                return write!(f, "Invalid tree structure: {msg}");
-            }
-            Self::IoError(ref err) => return write!(f, "I/O error: {}", err.as_ref()),
-            Self::ObjectNotFound(hash) => return write!(f, "Object not found: {hash}"),
-            Self::Other(ref msg) => return write!(f, "{msg}"),
-            Self::RefNotFound(ref name) => return write!(f, "Reference not found: '{name}'"),
-            Self::SerializationError(ref msg) => return write!(f, "Serialization error: {msg}"),
+            Self::InvalidTreeStructure(msg) => write!(f, "Invalid tree structure: {msg}"),
+            Self::IoError(err) => write!(f, "I/O error: {}", err.as_ref()),
+            Self::ObjectNotFound(hash) => write!(f, "Object not found: {hash}"),
+            Self::Other(msg) => write!(f, "{msg}"),
+            Self::RefNotFound(name) => write!(f, "Reference not found: '{name}'"),
+            Self::SerializationError(msg) => write!(f, "Serialization error: {msg}"),
         }
     }
 }
 
-#[allow(clippy::missing_trait_methods)]
 impl Error for VctrlError {
     #[inline]
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match *self {
-            Self::IoError(ref err) => return Some(err.as_ref()),
-            Self::CorruptedData(_)
-            | Self::DuplicateParent
-            | Self::ExceededMaxSize(_)
-            | Self::InvalidBlameRange
-            | Self::InvalidEmail(_)
-            | Self::InvalidHashLength(_)
-            | Self::InvalidName(_)
-            | Self::InvalidTimezoneOffset(_)
-            | Self::InvalidTreeStructure(_)
-            | Self::ObjectNotFound(_)
-            | Self::Other(_)
-            | Self::RefNotFound(_)
-            | Self::SerializationError(_) => return None,
+        match self {
+            Self::IoError(err) => Some(err.as_ref()),
+            _ => None,
         }
     }
 }
 
-#[allow(clippy::missing_trait_methods)]
 impl PartialEq for VctrlError {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::CorruptedData(a), Self::CorruptedData(b)) => return a == b,
-            (Self::DuplicateParent, Self::DuplicateParent) => return true,
-            (Self::ExceededMaxSize(a), Self::ExceededMaxSize(b)) => return a == b,
-            (Self::InvalidBlameRange, Self::InvalidBlameRange) => return true,
-            (Self::InvalidEmail(a), Self::InvalidEmail(b)) => return a == b,
-            (Self::InvalidHashLength(a), Self::InvalidHashLength(b)) => return a == b,
-            (Self::InvalidName(a), Self::InvalidName(b)) => return a == b,
-            (Self::InvalidTimezoneOffset(a), Self::InvalidTimezoneOffset(b)) => return a == b,
-            (Self::InvalidTreeStructure(a), Self::InvalidTreeStructure(b)) => return a == b,
             (Self::IoError(a), Self::IoError(b)) => {
-                return a.as_ref().kind() == b.as_ref().kind()
-                    && a.as_ref().to_string() == b.as_ref().to_string();
+                a.as_ref().kind() == b.as_ref().kind()
+                    && a.as_ref().to_string() == b.as_ref().to_string()
             }
-            (Self::ObjectNotFound(a), Self::ObjectNotFound(b)) => return a == b,
-            (Self::Other(a), Self::Other(b)) => return a == b,
-            (Self::RefNotFound(a), Self::RefNotFound(b)) => return a == b,
-            (Self::SerializationError(a), Self::SerializationError(b)) => return a == b,
-            _ => return false,
+            (Self::DuplicateParent, Self::DuplicateParent)
+            | (Self::InvalidBlameRange, Self::InvalidBlameRange) => true,
+            (
+                Self::CorruptedData(a)
+                | Self::ExceededMaxSize(a)
+                | Self::InvalidEmail(a)
+                | Self::InvalidName(a)
+                | Self::InvalidTreeStructure(a)
+                | Self::Other(a)
+                | Self::RefNotFound(a)
+                | Self::SerializationError(a),
+                Self::CorruptedData(b)
+                | Self::ExceededMaxSize(b)
+                | Self::InvalidEmail(b)
+                | Self::InvalidName(b)
+                | Self::InvalidTreeStructure(b)
+                | Self::Other(b)
+                | Self::RefNotFound(b)
+                | Self::SerializationError(b),
+            ) => a == b,
+            (Self::InvalidHashLength(a), Self::InvalidHashLength(b)) => a == b,
+            (Self::InvalidTimezoneOffset(a), Self::InvalidTimezoneOffset(b)) => a == b,
+            (Self::ObjectNotFound(a), Self::ObjectNotFound(b)) => a == b,
+            _ => false,
         }
     }
 }
 
 impl Eq for VctrlError {}
+
+impl From<io::Error> for VctrlError {
+    #[inline]
+    fn from(err: io::Error) -> Self {
+        Self::IoError(Arc::new(err))
+    }
+}
 
 impl VctrlError {
     /// Creates a [`VctrlError::IoError`] from a [`std::io::Error`].
@@ -200,6 +197,6 @@ impl VctrlError {
     #[must_use]
     #[inline]
     pub fn from_io(err: io::Error) -> Self {
-        return Self::IoError(Arc::new(err));
+        Self::IoError(Arc::new(err))
     }
 }
