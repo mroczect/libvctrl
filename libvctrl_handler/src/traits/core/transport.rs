@@ -67,7 +67,7 @@ use std::io::Read;
 /// }
 ///
 /// let mut transport = MockTransport::default();
-/// let hash = Hash::from_bytes(&[0u8; 64])?;
+/// let hash = Hash::from_bytes(&[0_u8; 64])?;
 /// transport.push_object(&hash, b"raw object data")?;
 /// assert!(transport.fetch_object(&hash).is_ok());
 /// # Ok::<(), VctrlError>(())
