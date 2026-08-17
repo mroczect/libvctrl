@@ -155,10 +155,12 @@ impl Tree {
         sorted.sort_by(compare_tree_entries);
 
         for window in sorted.windows(2) {
-            if window[0].name == window[1].name {
+            if let (Some(first), Some(second)) = (window.first(), window.get(1))
+                && first.name == second.name
+            {
                 return Err(VctrlError::InvalidTreeStructure(format!(
                     "duplicate entry name: '{}'",
-                    window[0].name
+                    first.name
                 )));
             }
         }
@@ -212,17 +214,17 @@ fn compare_tree_entries(a: &TreeEntry, b: &TreeEntry) -> Ordering {
     let a_is_tree = a.kind == EntryKind::Tree;
     let b_is_tree = b.kind == EntryKind::Tree;
 
-    // Effective length: tree entries get an extra byte for the trailing '/'
     let a_len = a_bytes.len() + usize::from(a_is_tree);
     let b_len = b_bytes.len() + usize::from(b_is_tree);
     let min_len = a_len.min(b_len);
 
     for i in 0..min_len {
-        let a_byte = if i < a_bytes.len() { a_bytes[i] } else { b'/' };
-        let b_byte = if i < b_bytes.len() { b_bytes[i] } else { b'/' };
+        let a_byte = a_bytes.get(i).copied().unwrap_or(b'/');
+        let b_byte = b_bytes.get(i).copied().unwrap_or(b'/');
         match a_byte.cmp(&b_byte) {
             Ordering::Equal => {}
-            ord => return ord,
+            Ordering::Less => return Ordering::Less,
+            Ordering::Greater => return Ordering::Greater,
         }
     }
 
@@ -234,34 +236,37 @@ mod tests {
     use super::*;
     use crate::constants::HASH_LENGTH;
 
-    fn zero_hash() -> Hash {
-        Hash::from_bytes(&[0_u8; HASH_LENGTH]).unwrap()
+    fn zero_hash() -> Result<Hash, VctrlError> {
+        Hash::from_bytes(&[0_u8; HASH_LENGTH])
     }
 
     #[test]
-    fn git_sort_tree_after_blob_with_same_prefix() {
-        let h = zero_hash();
-        let blob_a = TreeEntry::new("a".into(), EntryKind::Blob, h).unwrap();
-        let tree_a = TreeEntry::new("a".into(), EntryKind::Tree, h).unwrap();
-        let blob_ab = TreeEntry::new("ab".into(), EntryKind::Blob, h).unwrap();
+    fn git_sort_tree_after_blob_with_same_prefix() -> Result<(), VctrlError> {
+        let h = zero_hash()?;
+        let blob_a = TreeEntry::new("a".into(), EntryKind::Blob, h)?;
+        let tree_a = TreeEntry::new("a".into(), EntryKind::Tree, h)?;
+        let blob_ab = TreeEntry::new("ab".into(), EntryKind::Blob, h)?;
 
-        // Git order: a (blob) < a/ (tree) < ab (blob)
         assert_eq!(compare_tree_entries(&blob_a, &tree_a), Ordering::Less);
         assert_eq!(compare_tree_entries(&tree_a, &blob_ab), Ordering::Less);
+
+        Ok(())
     }
 
     #[test]
-    fn tree_new_sorts_and_rejects_duplicates() {
-        let h = zero_hash();
-        let e1 = TreeEntry::new("b".into(), EntryKind::Blob, h).unwrap();
-        let e2 = TreeEntry::new("a".into(), EntryKind::Blob, h).unwrap();
+    fn tree_new_sorts_and_rejects_duplicates() -> Result<(), VctrlError> {
+        let h = zero_hash()?;
+        let e1 = TreeEntry::new("b".into(), EntryKind::Blob, h)?;
+        let e2 = TreeEntry::new("a".into(), EntryKind::Blob, h)?;
 
-        let tree = Tree::new(vec![e1, e2]).unwrap();
-        assert_eq!(tree.entries()[0].name(), "a");
-        assert_eq!(tree.entries()[1].name(), "b");
+        let tree = Tree::new(vec![e1, e2])?;
+        assert_eq!(tree.entries().first().map(|e| e.name()), Some("a"));
+        assert_eq!(tree.entries().get(1).map(|e| e.name()), Some("b"));
 
-        let dup1 = TreeEntry::new("x".into(), EntryKind::Blob, h).unwrap();
-        let dup2 = TreeEntry::new("x".into(), EntryKind::Tree, h).unwrap();
+        let dup1 = TreeEntry::new("x".into(), EntryKind::Blob, h)?;
+        let dup2 = TreeEntry::new("x".into(), EntryKind::Tree, h)?;
         assert!(Tree::new(vec![dup1, dup2]).is_err());
+
+        Ok(())
     }
 }
