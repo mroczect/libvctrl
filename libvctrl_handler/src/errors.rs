@@ -121,7 +121,19 @@ impl Error for VctrlError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::IoError(err) => Some(err.as_ref()),
-            _ => None,
+            Self::CorruptedData(_)
+            | Self::DuplicateParent
+            | Self::ExceededMaxSize(_)
+            | Self::InvalidBlameRange
+            | Self::InvalidEmail(_)
+            | Self::InvalidHashLength(_)
+            | Self::InvalidName(_)
+            | Self::InvalidTimezoneOffset(_)
+            | Self::InvalidTreeStructure(_)
+            | Self::ObjectNotFound(_)
+            | Self::Other(_)
+            | Self::RefNotFound(_)
+            | Self::SerializationError(_) => None,
         }
     }
 }
