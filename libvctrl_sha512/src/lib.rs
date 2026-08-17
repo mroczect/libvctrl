@@ -1,3 +1,85 @@
+//! Zero-dependency cryptographic primitives: SHA-512, HMAC-SHA512, HKDF-SHA512,
+//! and optional SHA-384.
+//!
+//! # Why this crate exists
+//!
+//! `libvctrl_sha512` provides a pure Rust, `no_std`-compatible implementation
+//! of several widely used cryptographic algorithms. It is designed to serve as
+//! the content-addressing and message-authentication backbone for the larger
+//! `libvcrtl` version control system, while remaining usable as a standalone
+//! cryptography crate.
+//!
+//! The implementation prioritizes:
+//! - **Auditability** — no external dependencies and readable, well-structured code.
+//! - **Security** — constant-time verification, zeroization of intermediate state.
+//! - **Performance** — aggressive inlining, specialized block processing, and an
+//!   optional `opt_size` feature for size-constrained builds.
+//!
+//! # Module organization
+//!
+//! - [`sha512`] — SHA-512 hash function.
+//! - [`hmac`] — HMAC keyed-hash message authentication code instantiated with SHA-512.
+//! - [`hkdf`] — HKDF key derivation function instantiated with SHA-512.
+//! - [`utils`] — shared byte-order and verification helpers.
+//! - [`sha384`] — optional SHA-384 implementation behind the `sha384` feature.
+//!
+//! The HMAC and HKDF modules are generated using the exported macros
+//! [`impl_hmac!`] and [`impl_hkdf!`], which allow downstream crates to
+//! instantiate these algorithms with other hash functions if needed.
+//!
+//! # Examples
+//!
+//! Compute a SHA-512 digest:
+//!
+//! ```
+//! use libvctrl_sha512::Hash;
+//!
+//! let digest = Hash::hash(b"hello world");
+//! assert_eq!(digest.len(), 64);
+//! ```
+//!
+//! Compute an HMAC-SHA512 authentication tag:
+//!
+//! ```
+//! use libvctrl_sha512::HMAC;
+//!
+//! let tag = HMAC::mac(b"message", b"secret-key");
+//! assert_eq!(tag.len(), 64);
+//! ```
+
+/// Defines an HMAC (Hash-based Message Authentication Code) type based on the
+/// provided hash struct.
+///
+/// # Why this macro exists
+///
+/// HMAC is a generic construction that can be built on top of any
+/// cryptographic hash function. Rather than duplicating the implementation for
+/// each hash algorithm, this macro generates a complete HMAC type from a hash
+/// struct, output size, and block size. The generated type provides both
+/// one-shot and incremental APIs.
+///
+/// # How it works
+///
+/// The macro expands to a struct named `HMAC` that wraps the chosen hash
+/// implementation. It follows RFC 2104:
+///
+/// 1. Normalizes the key to the hash block size by hashing it if necessary.
+/// 2. Computes the inner hash over the key XOR `0x36` and the message.
+/// 3. Computes the outer hash over the key XOR `0x5c` and the inner digest.
+///
+/// The generated struct implements [`Drop`] to zeroize internal key material
+/// and padded buffers when the context goes out of scope.
+///
+/// # Examples
+///
+/// The `libvctrl_sha512` crate already instantiates this macro for SHA-512:
+///
+/// ```
+/// use libvctrl_sha512::HMAC;
+///
+/// let tag = HMAC::mac(b"message", b"key");
+/// assert_eq!(tag.len(), 64);
+/// ```
 #[macro_export]
 macro_rules! impl_hmac {
     ($hash_struct:ty, $output_size:expr, $block_size:expr) => {
@@ -97,6 +179,39 @@ macro_rules! impl_hmac {
     };
 }
 
+/// Defines an HKDF (HMAC-based Extract-and-Expand Key Derivation Function)
+/// type based on the provided hash struct.
+///
+/// # Why this macro exists
+///
+/// HKDF is a key derivation function standardized in RFC 5869. It uses HMAC
+/// internally and can be instantiated with any hash function that has an
+/// associated HMAC implementation. This macro generates a complete `HKDF`
+/// type from a hash struct, output size, and block size.
+///
+/// # How it works
+///
+/// The macro expands to a struct named `HKDF` with two associated functions:
+///
+/// - `extract` — computes a pseudorandom key (PRK) from the input key material
+///   and an optional salt.
+/// - `expand` — derives output keying material (OKM) of arbitrary length from
+///   the PRK and optional context info.
+///
+/// The generated code enforces RFC 5869 limits on output length and PRK size.
+///
+/// # Examples
+///
+/// The `libvctrl_sha512` crate already instantiates this macro for SHA-512:
+///
+/// ```
+/// use libvctrl_sha512::HKDF;
+///
+/// let prk = HKDF::extract(b"salt", b"input key material");
+/// let mut okm = [0u8; 32];
+/// HKDF::expand(&mut okm, prk, b"info");
+/// assert_eq!(okm.len(), 32);
+/// ```
 #[macro_export]
 macro_rules! impl_hkdf {
     ($hash_struct:ty, $output_size:expr, $block_size:expr) => {
@@ -144,23 +259,64 @@ macro_rules! impl_hkdf {
     };
 }
 
+/// HMAC implementation generated for SHA-512.
+///
+/// This module contains the [`HMAC`](crate::HMAC) type, produced by the
+/// [`impl_hmac!`] macro. It provides HMAC-SHA512 one-shot and incremental
+/// authentication.
 pub mod hmac;
 
+/// HKDF implementation generated for SHA-512.
+///
+/// This module contains the [`HKDF`](crate::HKDF) type, produced by the
+/// [`impl_hkdf!`] macro. It provides HKDF-SHA512 key derivation.
 pub mod hkdf;
 
+/// SHA-512 hash function implementation.
+///
+/// This module contains the [`Hash`](crate::Hash) type, which provides
+/// incremental and one-shot SHA-512 hashing, along with verification and
+/// zeroization support.
 pub mod sha512;
 
+/// Shared byte-order and verification helpers.
+///
+/// This module contains the [`load_be`](crate::utils::load_be),
+/// [`store_be`](crate::utils::store_be), and
+/// [`verify`](crate::utils::verify) functions, as well as the
+/// [`BLOCKBYTES`](crate::utils::BLOCKBYTES) and
+/// [`BYTES`](crate::utils::BYTES) constants.
 pub mod utils;
 
+/// Optional SHA-384 implementation.
+///
+/// This module is only available when the `sha384` feature is enabled. It
+/// contains a SHA-384 hash type generated from the SHA-512 core.
 #[cfg(feature = "sha384")]
 pub mod sha384;
 
+/// Re-export of the SHA-512 hash type.
+///
+/// This makes the primary hash type directly available as
+/// `libvctrl_sha512::Hash`.
 pub use sha512::Hash;
 
+/// Re-export of the HMAC-SHA512 type.
+///
+/// This makes the HMAC type directly available as
+/// `libvctrl_sha512::HMAC`.
 pub use hmac::HMAC;
 
+/// Re-export of the HKDF-SHA512 type.
+///
+/// This makes the HKDF type directly available as
+/// `libvctrl_sha512::HKDF`.
 pub use hkdf::HKDF;
 
+/// Re-export of the SHA-512 utility constants.
+///
+/// This provides convenient access to [`BLOCKBYTES`](crate::utils::BLOCKBYTES)
+/// and [`BYTES`](crate::utils::BYTES) at the crate root.
 pub use utils::{BLOCKBYTES, BYTES};
 
 #[cfg(test)]
