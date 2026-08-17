@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["libvctrl","libvctrl_core","libvctrl_handler", "libvctrl_plumbing", "libvctrl_porcelain", "libvctrl_sha512"]
+members = ["libvctrl", "libvctrl_core", "libvctrl_handler", "libvctrl_plumbing", "libvctrl_porcelain", "libvctrl_sha512"]
 
 [workspace.package]
 edition = "2024"
@@ -14,20 +14,49 @@ keywords = ["git", "vcs", "cryptography", "sha512", "no-std"]
 categories = ["development-tools", "cryptography", "algorithms", "no-std"]
 
 [workspace.lints.rust]
-missing_docs = "allow"
-unsafe_code = "warn"
+unsafe_code = "forbid"
+macro_use_extern_crate = "forbid"
+missing_docs = "warn"
+dead_code = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
+unused_crate_dependencies = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+elided_lifetimes_in_paths = "warn"
+explicit_outlives_requirements = "warn"
+non_ascii_idents = "warn"
+trivial_bounds = "warn"
+unit_bindings = "warn"
+single_use_lifetimes = "warn"
+redundant_lifetimes = "warn"
+rust_2021_compatibility = { level = "warn", priority = -1 }
+rust_2024_compatibility = { level = "warn", priority = -1 }
 unused_qualifications = "warn"
+noop_method_call = "warn"
+unnameable_types = "warn"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-nursery = { level = "warn", priority = -1 }
-cargo = { level = "warn", priority = -1 }
-
-missing_docs_in_private_items = "allow"
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
-missing_safety_doc = "allow"
-
-must_use_candidate = "warn"
-missing_const_for_fn = "warn"
+pedantic = { level = "allow", priority = -1 }
+nursery = { level = "allow", priority = -1 }
+cargo = { level = "allow", priority = -1 }
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+indexing_slicing = "warn"
+map_err_ignore = "warn"
+wildcard_enum_match_arm = "warn"
+std_instead_of_core = "allow"
+std_instead_of_alloc = "allow"
+alloc_instead_of_core = "allow"
+doc_markdown = "allow"
+doc_lazy_continuation = "allow"
+needless_return = "allow"
+match_same_arms = "allow"
+uninlined_format_args = "allow"

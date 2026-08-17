@@ -1,8 +1,4 @@
 //! Integration tests for the cat-file plumbing command.
-//!
-//! These tests exercise every mode (exists, type, size, pretty‑print, raw)
-//! as well as the batch processing with various options (buffer, NUL
-//! termination, custom format, missing objects).
 
 use libvctrl::{BinaryDecoder, BinaryEncoder};
 use libvctrl::{
@@ -10,14 +6,13 @@ use libvctrl::{
     VctrlError,
 };
 use libvctrl::{MemoryStore, Sha512Hasher};
+use libvctrl_core as _;
 use libvctrl_plumbing::cat_file::{
     BatchOptions, CatFileMode, ObjectType, cat_file, cat_file_batch,
 };
 use std::io::Cursor;
 
-// ------------------------------------------------------------------
 // Helper: build a minimal repository with one object of each type
-// ------------------------------------------------------------------
 struct TestRepo {
     store: MemoryStore,
     decoder: BinaryDecoder,
@@ -28,26 +23,27 @@ struct TestRepo {
 }
 
 impl TestRepo {
-    fn new() -> Self {
+    fn new() -> Result<Self, VctrlError> {
         let mut store = MemoryStore::new();
         let encoder = BinaryEncoder;
         let hasher = Sha512Hasher;
-        let user = UserID::new("Alice".into(), "alice@example.com".into()).unwrap();
+
+        let user = UserID::new("Alice".into(), "alice@example.com".into())?;
 
         // Blob
-        let blob = Blob::new(b"hello, world\n".to_vec()).unwrap();
+        let blob = Blob::new(b"hello, world\n".to_vec())?;
         let mut enc_blob = Vec::new();
-        encoder.encode_blob(&blob, &mut enc_blob).unwrap();
-        let blob_hash = hasher.hash(enc_blob.as_slice()).unwrap();
-        store.put(&blob_hash, &enc_blob).unwrap();
+        encoder.encode_blob(&blob, &mut enc_blob)?;
+        let blob_hash = hasher.hash(enc_blob.as_slice())?;
+        store.put(&blob_hash, &enc_blob)?;
 
         // Tree with one entry pointing to the blob
-        let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash).unwrap();
-        let tree = Tree::new(vec![entry]).unwrap();
+        let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash)?;
+        let tree = Tree::new(vec![entry])?;
         let mut enc_tree = Vec::new();
-        encoder.encode_tree(&tree, &mut enc_tree).unwrap();
-        let tree_hash = hasher.hash(enc_tree.as_slice()).unwrap();
-        store.put(&tree_hash, &enc_tree).unwrap();
+        encoder.encode_tree(&tree, &mut enc_tree)?;
+        let tree_hash = hasher.hash(enc_tree.as_slice())?;
+        store.put(&tree_hash, &enc_tree)?;
 
         // Commit
         let commit = Commit::new(
@@ -56,38 +52,38 @@ impl TestRepo {
             user.clone(),
             user.clone(),
             "Initial commit\n".into(),
-        )
-        .unwrap();
+        )?;
         let mut enc_commit = Vec::new();
-        encoder.encode_commit(&commit, &mut enc_commit).unwrap();
-        let commit_hash = hasher.hash(enc_commit.as_slice()).unwrap();
-        store.put(&commit_hash, &enc_commit).unwrap();
+        encoder.encode_commit(&commit, &mut enc_commit)?;
+        let commit_hash = hasher.hash(enc_commit.as_slice())?;
+        store.put(&commit_hash, &enc_commit)?;
 
         // Tag pointing to the commit
-        let tag = Tag::new("v1.0".into(), commit_hash, Some(user), "Release\n".into()).unwrap();
+        let tag = Tag::new("v1.0".into(), commit_hash, Some(user), "Release\n".into())?;
         let mut enc_tag = Vec::new();
-        encoder.encode_tag(&tag, &mut enc_tag).unwrap();
-        let tag_hash = hasher.hash(enc_tag.as_slice()).unwrap();
-        store.put(&tag_hash, &enc_tag).unwrap();
+        encoder.encode_tag(&tag, &mut enc_tag)?;
+        let tag_hash = hasher.hash(enc_tag.as_slice())?;
+        store.put(&tag_hash, &enc_tag)?;
 
-        Self {
+        Ok(Self {
             store,
             decoder: BinaryDecoder,
             blob_hash,
             tree_hash,
             commit_hash,
             tag_hash,
-        }
+        })
     }
 }
 
-// ---------------------------------------------------------------
-// Non‑batch mode tests
-// ---------------------------------------------------------------
+fn utf8_string(bytes: Vec<u8>) -> Result<String, VctrlError> {
+    String::from_utf8(bytes)
+        .map_err(|e| VctrlError::Other(format!("invalid UTF-8 in test output: {e}")))
+}
 
 #[test]
-fn exists_valid_object() {
-    let repo = TestRepo::new();
+fn exists_valid_object() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -95,14 +91,14 @@ fn exists_valid_object() {
         &repo.blob_hash.to_string(),
         CatFileMode::Exists,
         &mut out,
-    )
-    .unwrap();
+    )?;
     assert!(out.is_empty());
+    Ok(())
 }
 
 #[test]
-fn exists_invalid_hash() {
-    let repo = TestRepo::new();
+fn exists_invalid_hash() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     let result = cat_file(
         &repo.store,
@@ -112,11 +108,12 @@ fn exists_invalid_hash() {
         &mut out,
     );
     assert!(result.is_err());
+    Ok(())
 }
 
 #[test]
-fn object_type_blob() {
-    let repo = TestRepo::new();
+fn object_type_blob() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -124,14 +121,14 @@ fn object_type_blob() {
         &repo.blob_hash.to_string(),
         CatFileMode::ObjectType,
         &mut out,
-    )
-    .unwrap();
-    assert_eq!(String::from_utf8(out).unwrap().trim(), "blob");
+    )?;
+    assert_eq!(utf8_string(out)?.trim(), "blob");
+    Ok(())
 }
 
 #[test]
-fn object_type_tree() {
-    let repo = TestRepo::new();
+fn object_type_tree() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -139,14 +136,14 @@ fn object_type_tree() {
         &repo.tree_hash.to_string(),
         CatFileMode::ObjectType,
         &mut out,
-    )
-    .unwrap();
-    assert_eq!(String::from_utf8(out).unwrap().trim(), "tree");
+    )?;
+    assert_eq!(utf8_string(out)?.trim(), "tree");
+    Ok(())
 }
 
 #[test]
-fn object_type_commit() {
-    let repo = TestRepo::new();
+fn object_type_commit() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -154,14 +151,14 @@ fn object_type_commit() {
         &repo.commit_hash.to_string(),
         CatFileMode::ObjectType,
         &mut out,
-    )
-    .unwrap();
-    assert_eq!(String::from_utf8(out).unwrap().trim(), "commit");
+    )?;
+    assert_eq!(utf8_string(out)?.trim(), "commit");
+    Ok(())
 }
 
 #[test]
-fn object_type_tag() {
-    let repo = TestRepo::new();
+fn object_type_tag() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -169,14 +166,14 @@ fn object_type_tag() {
         &repo.tag_hash.to_string(),
         CatFileMode::ObjectType,
         &mut out,
-    )
-    .unwrap();
-    assert_eq!(String::from_utf8(out).unwrap().trim(), "tag");
+    )?;
+    assert_eq!(utf8_string(out)?.trim(), "tag");
+    Ok(())
 }
 
 #[test]
-fn object_size() {
-    let repo = TestRepo::new();
+fn object_size() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -184,15 +181,18 @@ fn object_size() {
         &repo.blob_hash.to_string(),
         CatFileMode::ObjectSize,
         &mut out,
-    )
-    .unwrap();
-    let size: usize = String::from_utf8(out).unwrap().trim().parse().unwrap();
+    )?;
+    let size: usize = utf8_string(out)?
+        .trim()
+        .parse::<usize>()
+        .map_err(|e: std::num::ParseIntError| VctrlError::Other(e.to_string()))?;
     assert!(size > 0);
+    Ok(())
 }
 
 #[test]
-fn pretty_print_blob() {
-    let repo = TestRepo::new();
+fn pretty_print_blob() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -200,15 +200,15 @@ fn pretty_print_blob() {
         &repo.blob_hash.to_string(),
         CatFileMode::PrettyPrint,
         &mut out,
-    )
-    .unwrap();
-    let text = String::from_utf8(out).unwrap();
+    )?;
+    let text = utf8_string(out)?;
     assert!(text.contains("hello, world"));
+    Ok(())
 }
 
 #[test]
-fn pretty_print_tree() {
-    let repo = TestRepo::new();
+fn pretty_print_tree() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -216,16 +216,16 @@ fn pretty_print_tree() {
         &repo.tree_hash.to_string(),
         CatFileMode::PrettyPrint,
         &mut out,
-    )
-    .unwrap();
-    let text = String::from_utf8(out).unwrap();
+    )?;
+    let text = utf8_string(out)?;
     assert!(text.contains("file.txt"));
     assert!(text.contains("100644"));
+    Ok(())
 }
 
 #[test]
-fn pretty_print_commit() {
-    let repo = TestRepo::new();
+fn pretty_print_commit() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -233,17 +233,17 @@ fn pretty_print_commit() {
         &repo.commit_hash.to_string(),
         CatFileMode::PrettyPrint,
         &mut out,
-    )
-    .unwrap();
-    let text = String::from_utf8(out).unwrap();
+    )?;
+    let text = utf8_string(out)?;
     assert!(text.contains("tree "));
     assert!(text.contains("author Alice <alice@example.com>"));
     assert!(text.contains("Initial commit"));
+    Ok(())
 }
 
 #[test]
-fn pretty_print_tag() {
-    let repo = TestRepo::new();
+fn pretty_print_tag() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -251,17 +251,17 @@ fn pretty_print_tag() {
         &repo.tag_hash.to_string(),
         CatFileMode::PrettyPrint,
         &mut out,
-    )
-    .unwrap();
-    let text = String::from_utf8(out).unwrap();
+    )?;
+    let text = utf8_string(out)?;
     assert!(text.contains("object "));
     assert!(text.contains("tag v1.0"));
     assert!(text.contains("Release"));
+    Ok(())
 }
 
 #[test]
-fn raw_with_correct_type() {
-    let repo = TestRepo::new();
+fn raw_with_correct_type() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     cat_file(
         &repo.store,
@@ -269,18 +269,18 @@ fn raw_with_correct_type() {
         &repo.blob_hash.to_string(),
         CatFileMode::Raw(ObjectType::Blob),
         &mut out,
-    )
-    .unwrap();
+    )?;
     let encoder = BinaryEncoder;
-    let blob = Blob::new(b"hello, world\n".to_vec()).unwrap();
+    let blob = Blob::new(b"hello, world\n".to_vec())?;
     let mut expected = Vec::new();
-    encoder.encode_blob(&blob, &mut expected).unwrap();
+    encoder.encode_blob(&blob, &mut expected)?;
     assert_eq!(out, expected);
+    Ok(())
 }
 
 #[test]
-fn raw_with_wrong_type_errors() {
-    let repo = TestRepo::new();
+fn raw_with_wrong_type_errors() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let mut out = Vec::new();
     let result = cat_file(
         &repo.store,
@@ -289,22 +289,20 @@ fn raw_with_wrong_type_errors() {
         CatFileMode::Raw(ObjectType::Tree),
         &mut out,
     );
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    if let VctrlError::Other(msg) = err {
-        assert!(msg.contains("is a blob, not a tree"));
-    } else {
-        panic!("Expected VctrlError::Other");
+    match result {
+        Err(VctrlError::Other(msg)) => assert!(msg.contains("is a blob, not a tree")),
+        other => {
+            return Err(VctrlError::Other(format!(
+                "expected VctrlError::Other with type mismatch, got {other:?}"
+            )));
+        }
     }
+    Ok(())
 }
 
-// ---------------------------------------------------------------
-// Batch mode tests
-// ---------------------------------------------------------------
-
 #[test]
-fn batch_check_single_object() {
-    let repo = TestRepo::new();
+fn batch_check_single_object() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let input = format!("{0}\n", repo.blob_hash);
     let mut output = Vec::new();
     let options = BatchOptions::default();
@@ -314,17 +312,17 @@ fn batch_check_single_object() {
         &mut Cursor::new(input),
         &mut output,
         &options,
-    )
-    .unwrap();
-    let out_str = String::from_utf8(output).unwrap();
+    )?;
+    let out_str = utf8_string(output)?;
     let expected_prefix = format!("{0} blob", repo.blob_hash);
     assert!(out_str.starts_with(&expected_prefix));
     assert!(out_str.ends_with('\n'));
+    Ok(())
 }
 
 #[test]
-fn batch_with_contents() {
-    let repo = TestRepo::new();
+fn batch_with_contents() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let input = format!("{0}\n", repo.blob_hash);
     let mut output = Vec::new();
     let options = BatchOptions {
@@ -337,16 +335,16 @@ fn batch_with_contents() {
         &mut Cursor::new(input),
         &mut output,
         &options,
-    )
-    .unwrap();
-    let out_str = String::from_utf8(output).unwrap();
+    )?;
+    let out_str = utf8_string(output)?;
     assert!(out_str.contains("hello, world"));
     assert!(out_str.lines().count() >= 2);
+    Ok(())
 }
 
 #[test]
-fn batch_with_buffer() {
-    let repo = TestRepo::new();
+fn batch_with_buffer() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let input = format!("{0}\n{1}\n", repo.blob_hash, repo.tree_hash);
     let mut output = Vec::new();
     let options = BatchOptions {
@@ -359,16 +357,16 @@ fn batch_with_buffer() {
         &mut Cursor::new(input),
         &mut output,
         &options,
-    )
-    .unwrap();
-    let out_str = String::from_utf8(output).unwrap();
+    )?;
+    let out_str = utf8_string(output)?;
     assert!(out_str.contains(&repo.blob_hash.to_string()));
     assert!(out_str.contains(&repo.tree_hash.to_string()));
+    Ok(())
 }
 
 #[test]
-fn batch_nul_terminated() {
-    let repo = TestRepo::new();
+fn batch_nul_terminated() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let input = format!("{0}\0{1}\0", repo.blob_hash, repo.tree_hash);
     let mut output = Vec::new();
     let options = BatchOptions {
@@ -381,17 +379,17 @@ fn batch_nul_terminated() {
         &mut Cursor::new(input),
         &mut output,
         &options,
-    )
-    .unwrap();
+    )?;
     assert!(output.ends_with(&[0u8]));
     let out_str = String::from_utf8_lossy(&output);
     assert!(out_str.contains(&repo.blob_hash.to_string()));
     assert!(out_str.contains(&repo.tree_hash.to_string()));
+    Ok(())
 }
 
 #[test]
-fn batch_custom_format() {
-    let repo = TestRepo::new();
+fn batch_custom_format() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let input = format!("{0}\n", repo.blob_hash);
     let mut output = Vec::new();
     let options = BatchOptions {
@@ -404,16 +402,16 @@ fn batch_custom_format() {
         &mut Cursor::new(input),
         &mut output,
         &options,
-    )
-    .unwrap();
-    let out_str = String::from_utf8(output).unwrap().trim().to_string();
+    )?;
+    let out_str = utf8_string(output)?.trim().to_string();
     let expected = format!("{0} blob", repo.blob_hash);
     assert_eq!(out_str, expected);
+    Ok(())
 }
 
 #[test]
-fn batch_missing_object() {
-    let repo = TestRepo::new();
+fn batch_missing_object() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let fake_hash = "a".repeat(128);
     let input = format!("{fake_hash}\n");
     let mut output = Vec::new();
@@ -424,15 +422,15 @@ fn batch_missing_object() {
         &mut Cursor::new(input),
         &mut output,
         &options,
-    )
-    .unwrap();
-    let out_str = String::from_utf8(output).unwrap().trim().to_string();
+    )?;
+    let out_str = utf8_string(output)?.trim().to_string();
     assert!(out_str.ends_with("missing"));
+    Ok(())
 }
 
 #[test]
-fn batch_empty_input() {
-    let repo = TestRepo::new();
+fn batch_empty_input() -> Result<(), VctrlError> {
+    let repo = TestRepo::new()?;
     let input = "";
     let mut output = Vec::new();
     let options = BatchOptions::default();
@@ -442,7 +440,7 @@ fn batch_empty_input() {
         &mut Cursor::new(input),
         &mut output,
         &options,
-    )
-    .unwrap();
+    )?;
     assert!(output.is_empty());
+    Ok(())
 }

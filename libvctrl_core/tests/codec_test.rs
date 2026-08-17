@@ -1,22 +1,62 @@
+//! # Codec Round-Trip and Limit Tests
+//!
+//! This test module validates the binary encoder and decoder for all core
+//! object types: [`Blob`], [`Tree`], [`Commit`], and [`Tag`].
+//!
+//! The tests verify:
+//!
+//! - Successful round-trip serialization for valid objects.
+//! - Malformed byte streams are rejected with [`VctrlError`].
+//! - System limits (`MAX_BLOB_SIZE`, `MAX_TREE_ENTRIES`,
+//!   `MAX_PARENT_COUNT`, `MAX_MESSAGE_LENGTH`) are enforced.
+//! - Version byte is checked.
+//! - All [`EntryKind`] variants survive encoding and decoding.
+//!
+//! These tests are integration-style but located within the same crate.
+//! They help ensure the codec remains backward-compatible and robust against
+//! corrupted or malicious input.
+
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(missing_docs)]
+#![allow(unused_crate_dependencies)]
+
 use libvctrl_core::codec::{BinaryDecoder, BinaryEncoder};
 use libvctrl_handler::{
     Blob, Commit, CommitMeta, Decoder, Encoder, EntryKind, Hash, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH,
     MAX_PARENT_COUNT, MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID,
 };
+use libvctrl_sha512 as _;
+use proptest as _;
 use std::io::Cursor;
 
+/// Returns a hash filled with the byte `0xAB`.
+///
+/// This is useful as a placeholder for an arbitrary valid object ID.
 fn dummy_hash() -> Hash {
     Hash::from_bytes(&[0xAB; 64]).unwrap()
 }
 
+/// Returns a hash filled with the given byte.
+///
+/// The byte `b` is repeated 64 times to form a valid [`Hash`]. This helper
+/// creates distinguishable hashes for testing equality and ordering.
 fn hash_from_byte(b: u8) -> Hash {
     Hash::from_bytes(&[b; 64]).unwrap()
 }
 
+/// Creates a [`Blob`] of the specified size, filled with `0x42`.
+///
+/// The size must not exceed [`MAX_BLOB_SIZE`]. The resulting blob is used to
+/// test size limits and round-trip behavior.
 fn blob_of_size(size: usize) -> Blob {
     Blob::new(vec![0x42; size]).unwrap()
 }
 
+/// Creates a [`Tree`] with `n` entries.
+///
+/// Each entry is named `entry_XXX` (zero-padded) and points to
+/// [`dummy_hash`]. The entries are sorted by name to satisfy [`Tree`]
+/// ordering requirements.
 fn tree_with_n_entries(n: usize) -> Tree {
     let mut entries = Vec::with_capacity(n);
     for i in 0..n {
@@ -26,15 +66,29 @@ fn tree_with_n_entries(n: usize) -> Tree {
     Tree::new(entries).unwrap()
 }
 
+/// Creates a minimal, parentless commit with a fixed author and message.
+///
+/// The tree is [`dummy_hash`], the author and committer are both
+/// "author <author@example.com>", and the message is "message".
 fn minimal_commit() -> Commit {
     let user = UserID::new("author".into(), "author@example.com".into()).unwrap();
     Commit::new(dummy_hash(), vec![], user.clone(), user, "message".into()).unwrap()
 }
 
+/// Creates a lightweight tag (no tagger, empty message) with the given name.
+///
+/// The target is [`dummy_hash`].
 fn lightweight_tag(name: &str) -> Tag {
     Tag::new(name.into(), dummy_hash(), None, String::new()).unwrap()
 }
 
+/// Tests blob encoding/decoding and blob size limits.
+///
+/// Checks:
+/// - Empty blob round-trips.
+/// - Small blob round-trips.
+/// - Blob of exactly `MAX_BLOB_SIZE` round-trips.
+/// - Blob exceeding `MAX_BLOB_SIZE` fails at construction.
 #[test]
 fn test_blob_roundtrip_and_limits() {
     // 1. Empty blob
@@ -64,6 +118,14 @@ fn test_blob_roundtrip_and_limits() {
     assert!(Blob::new(vec![0; over_size]).is_err());
 }
 
+/// Tests that malformed blob inputs are rejected.
+///
+/// Covers:
+/// - Empty input.
+/// - Correct version but missing length prefix.
+/// - Wrong version byte.
+/// - Length mismatch (trailing byte).
+/// - Declared length exceeding `MAX_BLOB_SIZE`.
 #[test]
 fn test_blob_malformed_data() {
     // Empty input
@@ -92,6 +154,12 @@ fn test_blob_malformed_data() {
     assert!(BinaryDecoder.decode_blob(Cursor::new(&bytes)).is_err());
 }
 
+/// Tests tree encoding/decoding and limit enforcement.
+///
+/// Verifies:
+/// - Empty tree round-trips.
+/// - Tree with multiple entries round-trips.
+/// - All [`EntryKind`] variants survive round-trip.
 #[test]
 fn test_tree_roundtrip_and_limits() {
     // Empty tree
@@ -123,6 +191,17 @@ fn test_tree_roundtrip_and_limits() {
     assert_eq!(dec.entries().len(), 5);
 }
 
+/// Tests that malformed tree inputs are rejected.
+///
+/// Covers:
+/// - Empty input.
+/// - Missing entry count.
+/// - Wrong version.
+/// - Entry count exceeding `MAX_TREE_ENTRIES`.
+/// - Truncated name.
+/// - Invalid entry kind byte.
+/// - Truncated hash.
+/// - Trailing bytes.
 #[test]
 fn test_tree_malformed_data() {
     // Empty input
@@ -173,6 +252,16 @@ fn test_tree_malformed_data() {
     assert!(BinaryDecoder.decode_tree(Cursor::new(&enc)).is_err());
 }
 
+/// Tests commit encoding/decoding and limit enforcement.
+///
+/// Verifies:
+/// - Minimal commit round-trips.
+/// - Commits with 0–256 parents round-trip.
+/// - Duplicate parents are rejected.
+/// - Parent count exceeding `MAX_PARENT_COUNT` is rejected.
+/// - Metadata encoding survives round-trip.
+/// - Invalid timezone offset is rejected.
+/// - Message exceeding `MAX_MESSAGE_LENGTH` is rejected.
 #[test]
 fn test_commit_roundtrip_and_limits() {
     let user = UserID::new("author".into(), "author@example.com".into()).unwrap();
@@ -260,6 +349,14 @@ fn test_commit_roundtrip_and_limits() {
     assert!(Commit::new(dummy_hash(), vec![], user.clone(), user, msg).is_err());
 }
 
+/// Tests tag encoding/decoding and limit enforcement.
+///
+/// Verifies:
+/// - Lightweight tag round-trips.
+/// - Annotated tag (with tagger and message) round-trips.
+/// - Metadata encoding survives round-trip.
+/// - Tag name longer than 255 bytes is rejected.
+/// - Message exceeding `MAX_MESSAGE_LENGTH` is rejected.
 #[test]
 fn test_tag_roundtrip_and_limits() {
     let tagger = UserID::new("tagger".into(), "tag@example.com".into()).unwrap();
@@ -311,6 +408,11 @@ fn test_tag_roundtrip_and_limits() {
     assert!(Tag::new("v".into(), dummy_hash(), None, msg).is_err());
 }
 
+/// Tests that a corrupted version byte is rejected.
+///
+/// The version byte is the first byte of every encoded object. Changing it
+/// to an unsupported value must cause decoding to fail with
+/// [`VctrlError::CorruptedData`].
 #[test]
 fn test_wrong_version_rejected() {
     // Version 2 is no longer supported

@@ -1,14 +1,13 @@
-name: Rust
+name: CI
 
 on:
   push:
-    branches: ["master"]
+    branches: ["master", "main"]
   pull_request:
-    branches: ["master"]
+    branches: ["master", "main"]
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
 
 jobs:
   fmt:
@@ -30,21 +29,38 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --all-targets --all-features
+      - name: Run clippy with warnings denied
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   test:
-    name: Test (${{ matrix.toolchain }})
+    name: Test
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        toolchain:
-          - stable
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.toolchain }}
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --workspace --verbose
-      - run: cargo test --workspace --verbose
+      - run: cargo test --workspace --all-targets --all-features
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Run cargo audit
+        run: cargo audit
+
+  deny:
+    name: License & Bans Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - name: Run cargo deny check
+        run: cargo deny check

@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use libvctrl_sha512::{HKDF, HMAC, Hash};
 

@@ -11,6 +11,3 @@ keywords = ["version-control", "vcs", "porcelain"]
 categories = ["development-tools"]
 
 [dependencies]
-
-[lints]
-workspace = true

@@ -1,13 +1,44 @@
+//! # Store and RefStore Integration Tests
+//!
+//! This module contains integration-style tests for the in-memory object and
+//! reference store implementations:
+//!
+//! - `MemoryStore` implements `ObjectStore` and provides CRUD operations plus
+//!   streaming reads via `Box<dyn Read>`.
+//! - `MemoryRefStore` implements `RefStore` and manages named references with
+//!   strict name validation and deterministic sorted iteration.
+//!
+//! The tests verify both normal behavior and defensive handling of malformed
+//! or potentially hostile inputs.
+
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(missing_docs)]
+#![allow(unused_crate_dependencies)]
+
 use libvctrl_core::hash::Sha512Hasher;
 use libvctrl_core::store::{MemoryRefStore, MemoryStore};
 use libvctrl_handler::{Hash, Hasher, MAX_NAME_LENGTH, ObjectStore, RefStore};
+use libvctrl_sha512 as _;
+use proptest as _;
 use std::io::Read;
 
+/// Computes a SHA-512 content hash for the given data.
+///
+/// This helper uses `Sha512Hasher` to derive a stable, content-addressed
+/// identifier. It is used to generate distinct `Hash` values for objects and
+/// references in the tests.
 fn dummy_hash_from_data(data: &[u8]) -> Hash {
     let hasher = Sha512Hasher;
     hasher.hash(data).unwrap()
 }
 
+/// Tests CRUD operations and streaming reads for `MemoryStore`.
+///
+/// Verifies:
+/// - `put` stores data and `exists` reports it correctly.
+/// - `get` returns a stream that yields the exact stored bytes.
+/// - `delete` removes the object and subsequent `get` fails.
+/// - Deleting or reading a non-existent object does not panic.
 #[test]
 fn test_memory_store_crud_and_streaming() {
     let mut store = MemoryStore::new();
@@ -40,6 +71,11 @@ fn test_memory_store_crud_and_streaming() {
     assert!(store.get(&hash).is_err());
 }
 
+/// Tests that `MemoryStore` can stream a large object without requiring a
+/// full contiguous copy beyond the stored data.
+///
+/// The object is 10 MiB; reading it back through the returned reader must
+/// yield the exact original bytes.
 #[test]
 fn test_memory_store_large_object_streaming() {
     let mut store = MemoryStore::new();
@@ -57,6 +93,12 @@ fn test_memory_store_large_object_streaming() {
     assert_eq!(buf, data);
 }
 
+/// Tests CRUD operations and sorted iteration for `MemoryRefStore`.
+///
+/// Verifies:
+/// - References can be set and retrieved.
+/// - `list_refs` returns names in sorted order.
+/// - Deleting a reference removes it from the store and from the listing.
 #[test]
 fn test_memory_ref_store_crud_and_sorting() {
     let mut store = MemoryRefStore::new();
@@ -90,6 +132,15 @@ fn test_memory_ref_store_crud_and_sorting() {
     assert_eq!(refs, vec!["refs/heads/feature"]);
 }
 
+/// Tests that `MemoryRefStore` enforces strict reference name validation.
+///
+/// The following invalid names are rejected:
+/// - Empty string.
+/// - Names exceeding `MAX_NAME_LENGTH`.
+/// - Path traversal attempts (`../`, `..\\`, `..`).
+/// - Git illegal characters (`~`, `^`, `:`, space, `@{`, ending with `.lock`).
+///
+/// A normal valid name is accepted.
 #[test]
 fn test_memory_ref_store_strict_validation() {
     let mut store = MemoryRefStore::new();
