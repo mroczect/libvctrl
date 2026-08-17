@@ -1,16 +1,12 @@
-name: Publish to crates.io
+name: Publish Release
 
 on:
   push:
-    tags:
-      - "libvctrl@*"
-      - "libvctrl_core@*"
-      - "libvctrl_handler@*"
-      - "libvctrl_plumbing@*"
-      - "libvctrl_porcelain@*"
-      - "libvctrl_sha512@*"
+    branches: ["master"]
+    paths:
+      - 'release.json'
+  workflow_dispatch:
 
-# Grant write access to repository contents so the job can create releases
 permissions:
   contents: write
 
@@ -19,61 +15,57 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
 
-      - name: Parse tag
-        id: parse
-        run: |
-          TAG="${{ github.ref_name }}"
-          CRATE_NAME=$(echo "$TAG" | cut -d'@' -f1)
-          VERSION=$(echo "$TAG" | cut -d'@' -f2)
-          if [ -z "$CRATE_NAME" ] || [ -z "$VERSION" ]; then
-            echo "Error: tag must be in format 'crate@version' (e.g., libvctrl_sha512@0.1.0)"
-            exit 1
-          fi
-          echo "crate_name=$CRATE_NAME" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION"      >> "$GITHUB_OUTPUT"
-          echo "Detected crate: $CRATE_NAME, version: $VERSION"
-
-      - name: Verify Cargo.toml version
-        run: |
-          CRATE="${{ steps.parse.outputs.crate_name }}"
-          if [ ! -d "$CRATE" ]; then
-            echo "Error: directory '$CRATE' does not exist"
-            exit 1
-          fi
-          cd "$CRATE"
-          MANIFEST_VERSION=$(cargo pkgid | cut -d'#' -f2 | cut -d: -f1)
-          TAG_VERSION="${{ steps.parse.outputs.version }}"
-          if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
-            echo "Error: tag version '$TAG_VERSION' != Cargo.toml version '$MANIFEST_VERSION'"
-            exit 1
-          fi
-          echo "Version verified: $MANIFEST_VERSION"
-
-      - name: Build & Test
-        run: cargo test -p "${{ steps.parse.outputs.crate_name }}" --all-targets
-
-      - name: Clippy
-        run: cargo clippy -p "${{ steps.parse.outputs.crate_name }}" --all-targets -- -D warnings
-
-      - name: Publish to crates.io
-        run: cargo publish -p "${{ steps.parse.outputs.crate_name }}"
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Create GitHub release
+      - name: Validate release.json and tags
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ github.ref_name }}"
-          CRATE_NAME="${{ steps.parse.outputs.crate_name }}"
-          VERSION="${{ steps.parse.outputs.version }}"
-          gh release create "$TAG" \
-            --generate-notes \
-            --title "$CRATE_NAME v$VERSION"
+          if ! jq -e '.crates | type == "array" and length > 0' release.json >/dev/null; then
+            echo "::error::release.json invalid: crates must be a non-empty array"
+            exit 1
+          fi
+
+          while read -r name version; do
+            tag="${name}@${version}"
+            echo "Checking tag $tag"
+            if ! git ls-remote --tags origin "refs/tags/${tag}" | grep -q "refs/tags/${tag}"; then
+              echo "::error::Missing tag: $tag"
+              exit 1
+            fi
+          done < <(jq -r '.crates[] | "\(.name) \(.version)"' release.json)
+
+      - name: Test and publish each crate in order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          while read -r name version; do
+            echo "=========================================="
+            echo "Processing $name v$version"
+            echo "=========================================="
+
+            # Build & test
+            cargo test -p "$name" --all-targets || {
+              echo "::error::Tests failed for $name"
+              exit 1
+            }
+
+            # Clippy with warnings denied
+            cargo clippy -p "$name" --all-targets -- -D warnings || {
+              echo "::error::Clippy failed for $name"
+              exit 1
+            }
+
+            # Publish
+            cargo publish -p "$name" || {
+              echo "::error::Publish failed for $name"
+              exit 1
+            }
+
+            echo "Successfully published $name v$version"
+          done < <(jq -r '.crates[] | "\(.name) \(.version)"' release.json)
