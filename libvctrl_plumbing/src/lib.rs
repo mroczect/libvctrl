@@ -80,6 +80,9 @@
 //! # }
 //! ```
 
+#[cfg(test)]
+use libvctrl_core as _;
+
 /// Plumbing command for inspecting object content and metadata.
 ///
 /// This module implements the `cat-file` command, which retrieves an object by
@@ -87,3 +90,5 @@
 /// depending on the requested mode. It also supports batch processing of
 /// multiple objects with configurable formatting.
 pub mod cat_file;
+
+pub use cat_file::{BatchOptions, CatFileMode, ObjectType, cat_file, cat_file_batch};
