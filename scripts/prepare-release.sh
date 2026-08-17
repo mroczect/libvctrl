@@ -102,12 +102,19 @@ push_tags() {
         local version
         version=$(get_version "$crate")
         local tag="${crate}@${version}"
-        if git rev-parse "$tag" >/dev/null 2>&1; then
-            log WARN "Tag $tag already exists locally, skipping creation"
-        else
+
+        # Cek remote dulu
+        if git ls-remote --tags origin "refs/tags/${tag}" | grep -q "refs/tags/${tag}"; then
+            log WARN "Tag $tag already exists on remote, skipping push"
+            continue
+        fi
+
+        # Buat tag lokal jika belum ada
+        if ! git rev-parse "$tag" >/dev/null 2>&1; then
             log INFO "Creating tag $tag"
             git tag -a "$tag" -m "Release $crate v$version"
         fi
+
         log INFO "Pushing tag $tag"
         git push origin "$tag"
     done
@@ -152,11 +159,15 @@ done)
 - Pastikan tag untuk setiap crate sudah di-push sebelum merge (atau jalankan script ini dengan argumen --push-tags).
 EOF
 
-    gh pr create \
+    local pr_url
+    pr_url=$(gh pr create \
         --title "chore(release): add release.json for ordered publishing" \
         --body-file /tmp/pr_body.md \
         --base "$(git rev-parse --abbrev-ref origin/HEAD | sed 's|origin/||')" \
-        --head "$branch_name"
+        --head "$branch_name")
+
+    local pr_number
+    pr_number=$(basename "$pr_url")
 
     # 6. Interactive confirmation for tags
     read -r -p "Do you want to push release tags now? (y/n) " confirm
@@ -166,6 +177,7 @@ EOF
         log INFO "Tags not pushed. You can push them later with: bash scripts/prepare-release.sh --push-tags"
     fi
 
+    log INFO "Pull request created: $pr_url"
     log INFO "All done. Merge PR #$pr_number to trigger publishing."
 }
 
