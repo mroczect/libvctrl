@@ -71,16 +71,18 @@ impl BinaryDecoder {
     /// Returns the remaining bytes if valid, otherwise a
     /// [`VctrlError::CorruptedData`].
     fn check_version(data: &[u8]) -> Result<&[u8], VctrlError> {
-        if data.is_empty() {
-            return Err(VctrlError::CorruptedData("missing version byte".into()));
-        }
-        if data[0] != EXPECTED_VERSION {
+        let version = data
+            .first()
+            .copied()
+            .ok_or_else(|| VctrlError::CorruptedData("missing version byte".into()))?;
+        if version != EXPECTED_VERSION {
             return Err(VctrlError::CorruptedData(format!(
                 "unsupported version: {} (expected {})",
-                data[0], EXPECTED_VERSION
+                version, EXPECTED_VERSION
             )));
         }
-        Ok(&data[1..])
+        data.get(1..)
+            .ok_or_else(|| VctrlError::CorruptedData("missing payload after version".into()))
     }
 
     /// Reads the reader into memory while enforcing a hard size bound.
@@ -107,9 +109,30 @@ impl BinaryDecoder {
                     "stream exceeds maximum allowed size".into(),
                 ));
             }
-            buf.extend_from_slice(&chunk[..n]);
+            buf.extend_from_slice(chunk.get(..n).unwrap_or(&[]));
         }
         Ok(buf)
+    }
+
+    /// Returns a single byte at `pos`, or a structured error.
+    fn require_byte(data: &[u8], pos: usize, what: &str) -> Result<u8, VctrlError> {
+        data.get(pos)
+            .copied()
+            .ok_or_else(|| VctrlError::CorruptedData(format!("missing {what}")))
+    }
+
+    /// Returns a slice `data[start..start+len]`, with overflow and bounds checks.
+    fn require_slice<'a>(
+        data: &'a [u8],
+        start: usize,
+        len: usize,
+        what: &str,
+    ) -> Result<&'a [u8], VctrlError> {
+        let end = start
+            .checked_add(len)
+            .ok_or_else(|| VctrlError::CorruptedData(format!("invalid {what} length")))?;
+        data.get(start..end)
+            .ok_or_else(|| VctrlError::CorruptedData(format!("{what} truncated")))
     }
 }
 
@@ -148,21 +171,26 @@ impl Decoder for BinaryDecoder {
         let data = Self::read_bounded(&mut reader, max_size)?;
 
         let data = Self::check_version(&data)?;
-        if data.len() < 8 {
-            return Err(VctrlError::CorruptedData(
-                "blob too short for length prefix".into(),
-            ));
-        }
-        let len_bytes: [u8; 8] = data[..8].try_into().unwrap();
+        let len_bytes: [u8; 8] = Self::require_slice(data, 0, 8, "blob length prefix")?
+            .try_into()
+            .map_err(|e| VctrlError::CorruptedData(format!("invalid blob length prefix: {e}")))?;
+
         let data_len = usize::try_from(u64::from_le_bytes(len_bytes))
-            .map_err(|_| VctrlError::CorruptedData("blob length out of range".into()))?;
+            .map_err(|e| VctrlError::CorruptedData(format!("blob length out of range: {e}")))?;
+
         if data_len > usize::try_from(MAX_BLOB_SIZE).unwrap_or(usize::MAX) {
             return Err(VctrlError::CorruptedData("blob exceeds size limit".into()));
         }
-        if data.len() != 8 + data_len {
+
+        let total_len = 8usize
+            .checked_add(data_len)
+            .ok_or_else(|| VctrlError::CorruptedData("blob length overflow".into()))?;
+        if data.len() != total_len {
             return Err(VctrlError::CorruptedData("blob length mismatch".into()));
         }
-        Blob::new(data[8..].to_vec())
+
+        let payload = Self::require_slice(data, 8, data_len, "blob data")?;
+        Blob::new(payload.to_vec())
     }
 
     /// Decodes a binary tree.
@@ -202,53 +230,57 @@ impl Decoder for BinaryDecoder {
         let data = Self::read_bounded(&mut reader, max_size)?;
 
         let data = Self::check_version(&data)?;
-        if data.len() < 4 {
-            return Err(VctrlError::CorruptedData("tree too short".into()));
-        }
-        let count_bytes: [u8; 4] = data[..4].try_into().unwrap();
+        let count_bytes: [u8; 4] = Self::require_slice(data, 0, 4, "tree entry count")?
+            .try_into()
+            .map_err(|e| VctrlError::CorruptedData(format!("invalid tree count: {e}")))?;
         let count = u32::from_le_bytes(count_bytes) as usize;
+
         if count > usize::try_from(MAX_TREE_ENTRIES).unwrap_or(usize::MAX) {
             return Err(VctrlError::CorruptedData(
                 "tree entry count exceeds limit".into(),
             ));
         }
-        let mut pos = 4;
+
+        let mut pos = 4usize;
         let mut entries = Vec::with_capacity(count);
+
         for _ in 0..count {
-            if pos >= data.len() {
-                return Err(VctrlError::CorruptedData("unexpected end of tree".into()));
-            }
-            let name_len = data[pos] as usize;
+            let name_len = Self::require_byte(data, pos, "tree entry name length")? as usize;
             pos += 1;
-            if pos + name_len > data.len() {
-                return Err(VctrlError::CorruptedData("name exceeds data".into()));
-            }
-            let name = str::from_utf8(&data[pos..pos + name_len])
-                .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in name".into()))?
+
+            let name_bytes = Self::require_slice(data, pos, name_len, "tree entry name")?;
+            let name = str::from_utf8(name_bytes)
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid UTF-8 in name: {e}")))?
                 .to_string();
             pos += name_len;
-            if pos >= data.len() {
-                return Err(VctrlError::CorruptedData("missing kind".into()));
-            }
-            let kind = match data[pos] {
+
+            let kind_byte = Self::require_byte(data, pos, "tree entry kind")?;
+            pos += 1;
+
+            let kind = match kind_byte {
                 0 => EntryKind::Blob,
                 1 => EntryKind::Executable,
                 2 => EntryKind::Symlink,
                 3 => EntryKind::Tree,
                 4 => EntryKind::Submodule,
-                _ => return Err(VctrlError::CorruptedData("unknown entry kind".into())),
+                other => {
+                    return Err(VctrlError::CorruptedData(format!(
+                        "unknown entry kind: {other}"
+                    )));
+                }
             };
-            pos += 1;
-            if pos + HASH_LENGTH > data.len() {
-                return Err(VctrlError::CorruptedData("hash truncated".into()));
-            }
-            let hash = Hash::from_bytes(&data[pos..pos + HASH_LENGTH])?;
+
+            let hash_bytes = Self::require_slice(data, pos, HASH_LENGTH, "tree entry hash")?;
+            let hash = Hash::from_bytes(hash_bytes)?;
             pos += HASH_LENGTH;
+
             entries.push(TreeEntry::new(name, kind, hash)?);
         }
+
         if pos != data.len() {
             return Err(VctrlError::CorruptedData("trailing bytes in tree".into()));
         }
+
         Tree::new(entries)
     }
 
@@ -296,115 +328,119 @@ impl Decoder for BinaryDecoder {
     fn decode_commit<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Commit, VctrlError> {
         let max_size = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) + 1024;
         let data = Self::read_bounded(&mut reader, max_size)?;
-
         let data = Self::check_version(&data)?;
-        if data.len() < HASH_LENGTH + 2 {
-            return Err(VctrlError::CorruptedData("commit too short".into()));
-        }
-        let tree = Hash::from_bytes(&data[..HASH_LENGTH])?;
-        let parent_count_bytes: [u8; 2] = data[HASH_LENGTH..HASH_LENGTH + 2].try_into().unwrap();
-        let parent_count = u16::from_le_bytes(parent_count_bytes) as usize;
+
+        // Tree hash
+        let tree_hash = Self::require_slice(data, 0, HASH_LENGTH, "commit tree hash")?;
+        let tree = Hash::from_bytes(tree_hash)?;
+
+        // Parent count and parents
+        let parent_count_bytes = Self::require_slice(data, HASH_LENGTH, 2, "commit parent count")?;
+        let parent_count = u16::from_le_bytes(
+            parent_count_bytes
+                .try_into()
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid parent count: {e}")))?,
+        ) as usize;
+
         let mut pos = HASH_LENGTH + 2;
         let mut parents = Vec::with_capacity(parent_count);
         for _ in 0..parent_count {
-            if pos + HASH_LENGTH > data.len() {
-                return Err(VctrlError::CorruptedData("parent hash truncated".into()));
-            }
-            parents.push(Hash::from_bytes(&data[pos..pos + HASH_LENGTH])?);
+            let parent_bytes = Self::require_slice(data, pos, HASH_LENGTH, "parent hash")?;
+            parents.push(Hash::from_bytes(parent_bytes)?);
             pos += HASH_LENGTH;
         }
-        if pos >= data.len() {
-            return Err(VctrlError::CorruptedData("missing author name".into()));
-        }
-        let author_name_len = data[pos] as usize;
+
+        // Author name
+        let author_name_len = Self::require_byte(data, pos, "author name length")? as usize;
         pos += 1;
-        if pos + author_name_len > data.len() {
-            return Err(VctrlError::CorruptedData("author name truncated".into()));
-        }
-        let author_name = str::from_utf8(&data[pos..pos + author_name_len])
-            .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in author name".into()))?
+        let author_name_bytes = Self::require_slice(data, pos, author_name_len, "author name")?;
+        let author_name = str::from_utf8(author_name_bytes)
+            .map_err(|e| VctrlError::CorruptedData(format!("invalid UTF-8 in author name: {e}")))?
             .to_string();
         pos += author_name_len;
-        if pos >= data.len() {
-            return Err(VctrlError::CorruptedData("missing author email".into()));
-        }
-        let author_email_len = data[pos] as usize;
+
+        // Author email
+        let author_email_len = Self::require_byte(data, pos, "author email length")? as usize;
         pos += 1;
-        if pos + author_email_len > data.len() {
-            return Err(VctrlError::CorruptedData("author email truncated".into()));
-        }
-        let author_email = str::from_utf8(&data[pos..pos + author_email_len])
-            .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in author email".into()))?
+        let author_email_bytes = Self::require_slice(data, pos, author_email_len, "author email")?;
+        let author_email = str::from_utf8(author_email_bytes)
+            .map_err(|e| VctrlError::CorruptedData(format!("invalid UTF-8 in author email: {e}")))?
             .to_string();
         pos += author_email_len;
+
         let author = UserID::new(author_name, author_email)?;
-        if pos >= data.len() {
-            return Err(VctrlError::CorruptedData("missing committer name".into()));
-        }
-        let committer_name_len = data[pos] as usize;
+
+        // Committer name
+        let committer_name_len = Self::require_byte(data, pos, "committer name length")? as usize;
         pos += 1;
-        if pos + committer_name_len > data.len() {
-            return Err(VctrlError::CorruptedData("committer name truncated".into()));
-        }
-        let committer_name = str::from_utf8(&data[pos..pos + committer_name_len])
-            .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in committer name".into()))?
+        let committer_name_bytes =
+            Self::require_slice(data, pos, committer_name_len, "committer name")?;
+        let committer_name = str::from_utf8(committer_name_bytes)
+            .map_err(|e| {
+                VctrlError::CorruptedData(format!("invalid UTF-8 in committer name: {e}"))
+            })?
             .to_string();
         pos += committer_name_len;
-        if pos >= data.len() {
-            return Err(VctrlError::CorruptedData("missing committer email".into()));
-        }
-        let committer_email_len = data[pos] as usize;
+
+        // Committer email
+        let committer_email_len = Self::require_byte(data, pos, "committer email length")? as usize;
         pos += 1;
-        if pos + committer_email_len > data.len() {
-            return Err(VctrlError::CorruptedData(
-                "committer email truncated".into(),
-            ));
-        }
-        let committer_email = str::from_utf8(&data[pos..pos + committer_email_len])
-            .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in committer email".into()))?
+        let committer_email_bytes =
+            Self::require_slice(data, pos, committer_email_len, "committer email")?;
+        let committer_email = str::from_utf8(committer_email_bytes)
+            .map_err(|e| {
+                VctrlError::CorruptedData(format!("invalid UTF-8 in committer email: {e}"))
+            })?
             .to_string();
         pos += committer_email_len;
+
         let committer = UserID::new(committer_name, committer_email)?;
-        if pos + 4 > data.len() {
-            return Err(VctrlError::CorruptedData("missing message length".into()));
-        }
-        let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
-        let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
+
+        // Message
+        let msg_len_bytes = Self::require_slice(data, pos, 4, "commit message length")?;
+        let msg_len = u32::from_le_bytes(
+            msg_len_bytes
+                .try_into()
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid message length: {e}")))?,
+        ) as usize;
         pos += 4;
+
         if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::CorruptedData(
                 "commit message exceeds size limit".into(),
             ));
         }
-        if pos + msg_len > data.len() {
-            return Err(VctrlError::CorruptedData("message truncated".into()));
-        }
-        let message = str::from_utf8(&data[pos..pos + msg_len])
-            .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in message".into()))?
+
+        let msg_bytes = Self::require_slice(data, pos, msg_len, "commit message")?;
+        let message = str::from_utf8(msg_bytes)
+            .map_err(|e| VctrlError::CorruptedData(format!("invalid UTF-8 in message: {e}")))?
             .to_string();
         pos += msg_len;
 
-        if pos + 8 > data.len() {
-            return Err(VctrlError::CorruptedData("missing timestamp".into()));
-        }
-        let timestamp = i64::from_le_bytes(data[pos..pos + 8].try_into().unwrap());
+        // Timestamp and timezone
+        let timestamp_bytes = Self::require_slice(data, pos, 8, "commit timestamp")?;
+        let timestamp = i64::from_le_bytes(
+            timestamp_bytes
+                .try_into()
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid timestamp: {e}")))?,
+        );
         pos += 8;
-        if pos + 2 > data.len() {
-            return Err(VctrlError::CorruptedData("missing timezone offset".into()));
-        }
-        let timezone_offset = i16::from_le_bytes(data[pos..pos + 2].try_into().unwrap());
+
+        let tz_bytes = Self::require_slice(data, pos, 2, "commit timezone offset")?;
+        let timezone_offset = i16::from_le_bytes(
+            tz_bytes
+                .try_into()
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid timezone offset: {e}")))?,
+        );
         pos += 2;
-        if pos >= data.len() {
-            return Err(VctrlError::CorruptedData("missing encoding length".into()));
-        }
-        let encoding_len = data[pos] as usize;
+
+        // Optional encoding
+        let encoding_len = Self::require_byte(data, pos, "commit encoding length")? as usize;
         pos += 1;
         let encoding = if encoding_len > 0 {
-            if pos + encoding_len > data.len() {
-                return Err(VctrlError::CorruptedData("encoding truncated".into()));
-            }
-            let enc = str::from_utf8(&data[pos..pos + encoding_len])
-                .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in encoding".into()))?
+            let enc_bytes = Self::require_slice(data, pos, encoding_len, "commit encoding")?;
+            let enc = str::from_utf8(enc_bytes)
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid UTF-8 in encoding: {e}")))?
                 .to_string();
             pos += encoding_len;
             Some(enc)
@@ -412,10 +448,11 @@ impl Decoder for BinaryDecoder {
             None
         };
 
-        let meta = CommitMeta::new(timestamp, timezone_offset, encoding)?;
         if pos != data.len() {
             return Err(VctrlError::CorruptedData("trailing bytes in commit".into()));
         }
+
+        let meta = CommitMeta::new(timestamp, timezone_offset, encoding)?;
         Commit::with_meta(tree, parents, author, committer, message, meta)
     }
 
@@ -460,109 +497,106 @@ impl Decoder for BinaryDecoder {
     fn decode_tag<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Tag, VctrlError> {
         let max_size = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) + 1024;
         let data = Self::read_bounded(&mut reader, max_size)?;
-
         let data = Self::check_version(&data)?;
-        if data.is_empty() {
-            return Err(VctrlError::CorruptedData("tag too short".into()));
-        }
-        let name_len = data[0] as usize;
-        let mut pos = 1;
-        if pos + name_len > data.len() {
-            return Err(VctrlError::CorruptedData("tag name truncated".into()));
-        }
-        let name = str::from_utf8(&data[pos..pos + name_len])
-            .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in tag name".into()))?
+
+        // Tag name
+        let name_len = Self::require_byte(data, 0, "tag name length")? as usize;
+        let name_bytes = Self::require_slice(data, 1, name_len, "tag name")?;
+        let name = str::from_utf8(name_bytes)
+            .map_err(|e| VctrlError::CorruptedData(format!("invalid UTF-8 in tag name: {e}")))?
             .to_string();
-        pos += name_len;
-        if pos + HASH_LENGTH > data.len() {
-            return Err(VctrlError::CorruptedData("target hash truncated".into()));
-        }
-        let target = Hash::from_bytes(&data[pos..pos + HASH_LENGTH])?;
+        let mut pos = 1 + name_len;
+
+        // Target hash
+        let target_bytes = Self::require_slice(data, pos, HASH_LENGTH, "tag target hash")?;
+        let target = Hash::from_bytes(target_bytes)?;
         pos += HASH_LENGTH;
-        if pos >= data.len() {
-            return Err(VctrlError::CorruptedData(
-                "missing tagger presence byte".into(),
-            ));
-        }
-        let has_tagger = match data[pos] {
+
+        // Tagger presence
+        let has_tagger = match Self::require_byte(data, pos, "tagger presence byte")? {
             0 => false,
             1 => true,
-            _ => {
-                return Err(VctrlError::CorruptedData(
-                    "invalid tagger presence byte".into(),
-                ));
+            other => {
+                return Err(VctrlError::CorruptedData(format!(
+                    "invalid tagger presence byte: {other}"
+                )));
             }
         };
         pos += 1;
+
+        // Optional tagger
         let tagger = if has_tagger {
-            if pos >= data.len() {
-                return Err(VctrlError::CorruptedData("missing tagger name".into()));
-            }
-            let tagger_name_len = data[pos] as usize;
+            let tagger_name_len = Self::require_byte(data, pos, "tagger name length")? as usize;
             pos += 1;
-            if pos + tagger_name_len > data.len() {
-                return Err(VctrlError::CorruptedData("tagger name truncated".into()));
-            }
-            let tagger_name = str::from_utf8(&data[pos..pos + tagger_name_len])
-                .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in tagger name".into()))?
+            let tagger_name_bytes = Self::require_slice(data, pos, tagger_name_len, "tagger name")?;
+            let tagger_name = str::from_utf8(tagger_name_bytes)
+                .map_err(|e| {
+                    VctrlError::CorruptedData(format!("invalid UTF-8 in tagger name: {e}"))
+                })?
                 .to_string();
             pos += tagger_name_len;
-            if pos >= data.len() {
-                return Err(VctrlError::CorruptedData("missing tagger email".into()));
-            }
-            let tagger_email_len = data[pos] as usize;
+
+            let tagger_email_len = Self::require_byte(data, pos, "tagger email length")? as usize;
             pos += 1;
-            if pos + tagger_email_len > data.len() {
-                return Err(VctrlError::CorruptedData("tagger email truncated".into()));
-            }
-            let tagger_email = str::from_utf8(&data[pos..pos + tagger_email_len])
-                .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in tagger email".into()))?
+            let tagger_email_bytes =
+                Self::require_slice(data, pos, tagger_email_len, "tagger email")?;
+            let tagger_email = str::from_utf8(tagger_email_bytes)
+                .map_err(|e| {
+                    VctrlError::CorruptedData(format!("invalid UTF-8 in tagger email: {e}"))
+                })?
                 .to_string();
             pos += tagger_email_len;
+
             Some(UserID::new(tagger_name, tagger_email)?)
         } else {
             None
         };
-        if pos + 4 > data.len() {
-            return Err(VctrlError::CorruptedData("missing message length".into()));
-        }
-        let msg_len_bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
-        let msg_len = u32::from_le_bytes(msg_len_bytes) as usize;
+
+        // Message
+        let msg_len_bytes = Self::require_slice(data, pos, 4, "tag message length")?;
+        let msg_len = u32::from_le_bytes(
+            msg_len_bytes
+                .try_into()
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid message length: {e}")))?,
+        ) as usize;
         pos += 4;
+
         if msg_len > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::SerializationError(
                 "tag message exceeds size limit".into(),
             ));
         }
-        if pos + msg_len > data.len() {
-            return Err(VctrlError::CorruptedData("message truncated".into()));
-        }
-        let message = str::from_utf8(&data[pos..pos + msg_len])
-            .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in message".into()))?
+
+        let msg_bytes = Self::require_slice(data, pos, msg_len, "tag message")?;
+        let message = str::from_utf8(msg_bytes)
+            .map_err(|e| VctrlError::CorruptedData(format!("invalid UTF-8 in message: {e}")))?
             .to_string();
         pos += msg_len;
 
-        if pos + 8 > data.len() {
-            return Err(VctrlError::CorruptedData("missing timestamp".into()));
-        }
-        let timestamp = i64::from_le_bytes(data[pos..pos + 8].try_into().unwrap());
+        // Timestamp and timezone
+        let timestamp_bytes = Self::require_slice(data, pos, 8, "tag timestamp")?;
+        let timestamp = i64::from_le_bytes(
+            timestamp_bytes
+                .try_into()
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid timestamp: {e}")))?,
+        );
         pos += 8;
-        if pos + 2 > data.len() {
-            return Err(VctrlError::CorruptedData("missing timezone offset".into()));
-        }
-        let timezone_offset = i16::from_le_bytes(data[pos..pos + 2].try_into().unwrap());
+
+        let tz_bytes = Self::require_slice(data, pos, 2, "tag timezone offset")?;
+        let timezone_offset = i16::from_le_bytes(
+            tz_bytes
+                .try_into()
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid timezone offset: {e}")))?,
+        );
         pos += 2;
-        if pos >= data.len() {
-            return Err(VctrlError::CorruptedData("missing encoding length".into()));
-        }
-        let encoding_len = data[pos] as usize;
+
+        // Optional encoding
+        let encoding_len = Self::require_byte(data, pos, "tag encoding length")? as usize;
         pos += 1;
         let encoding = if encoding_len > 0 {
-            if pos + encoding_len > data.len() {
-                return Err(VctrlError::CorruptedData("encoding truncated".into()));
-            }
-            let enc = str::from_utf8(&data[pos..pos + encoding_len])
-                .map_err(|_| VctrlError::CorruptedData("invalid UTF-8 in encoding".into()))?
+            let enc_bytes = Self::require_slice(data, pos, encoding_len, "tag encoding")?;
+            let enc = str::from_utf8(enc_bytes)
+                .map_err(|e| VctrlError::CorruptedData(format!("invalid UTF-8 in encoding: {e}")))?
                 .to_string();
             pos += encoding_len;
             Some(enc)
@@ -570,10 +604,11 @@ impl Decoder for BinaryDecoder {
             None
         };
 
-        let meta = CommitMeta::new(timestamp, timezone_offset, encoding)?;
         if pos != data.len() {
             return Err(VctrlError::CorruptedData("trailing bytes in tag".into()));
         }
+
+        let meta = CommitMeta::new(timestamp, timezone_offset, encoding)?;
         Tag::with_meta(name, target, tagger, message, meta)
     }
 }
