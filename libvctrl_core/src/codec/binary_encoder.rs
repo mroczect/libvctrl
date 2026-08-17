@@ -43,7 +43,7 @@ use std::io::Write;
 /// # use libvctrl_core::codec::VERSION;
 /// assert_eq!(VERSION, 3);
 /// ```
-pub const VERSION: u8 = 3;
+pub const VERSION: u8 = 1;
 
 /// An encoder for the binary format of Git objects.
 ///
