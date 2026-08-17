@@ -162,7 +162,7 @@ impl Encoder for BinaryEncoder {
         let entries = tree.entries();
         writer.write_all(&[VERSION]).map_err(VctrlError::from_io)?;
         let entry_count = u32::try_from(entries.len())
-            .map_err(|_| VctrlError::SerializationError("too many entries".into()))?;
+            .map_err(|e| VctrlError::SerializationError(format!("too many entries: {e}")))?;
         writer
             .write_all(&entry_count.to_le_bytes())
             .map_err(VctrlError::from_io)?;
@@ -170,7 +170,7 @@ impl Encoder for BinaryEncoder {
         for entry in entries {
             let name = entry.name();
             let name_len = u8::try_from(name.len())
-                .map_err(|_| VctrlError::SerializationError("name too long".into()))?;
+                .map_err(|e| VctrlError::SerializationError(format!("name too long: {e}")))?;
             writer.write_all(&[name_len]).map_err(VctrlError::from_io)?;
             writer
                 .write_all(name.as_bytes())
@@ -182,7 +182,9 @@ impl Encoder for BinaryEncoder {
                 EntryKind::Symlink => 2,
                 EntryKind::Tree => 3,
                 EntryKind::Submodule => 4,
-                _ => return Err(VctrlError::SerializationError("unknown entry kind".into())),
+                _ => {
+                    return Err(VctrlError::SerializationError("unknown entry kind".into()));
+                }
             };
             writer
                 .write_all(&[kind_byte])
@@ -267,7 +269,7 @@ impl Encoder for BinaryEncoder {
 
         let parents = commit.parents();
         let parent_count = u16::try_from(parents.len())
-            .map_err(|_| VctrlError::SerializationError("too many parents".into()))?;
+            .map_err(|e| VctrlError::SerializationError(format!("too many parents: {e}")))?;
         writer
             .write_all(&parent_count.to_le_bytes())
             .map_err(VctrlError::from_io)?;
@@ -280,8 +282,9 @@ impl Encoder for BinaryEncoder {
 
         let author_name = commit.author().name();
         writer
-            .write_all(&[u8::try_from(author_name.len())
-                .map_err(|_| VctrlError::SerializationError("author name too long".into()))?])
+            .write_all(&[u8::try_from(author_name.len()).map_err(|e| {
+                VctrlError::SerializationError(format!("author name too long: {e}"))
+            })?])
             .map_err(VctrlError::from_io)?;
         writer
             .write_all(author_name.as_bytes())
@@ -289,8 +292,9 @@ impl Encoder for BinaryEncoder {
 
         let author_email = commit.author().email();
         writer
-            .write_all(&[u8::try_from(author_email.len())
-                .map_err(|_| VctrlError::SerializationError("author email too long".into()))?])
+            .write_all(&[u8::try_from(author_email.len()).map_err(|e| {
+                VctrlError::SerializationError(format!("author email too long: {e}"))
+            })?])
             .map_err(VctrlError::from_io)?;
         writer
             .write_all(author_email.as_bytes())
@@ -298,8 +302,9 @@ impl Encoder for BinaryEncoder {
 
         let committer_name = commit.committer().name();
         writer
-            .write_all(&[u8::try_from(committer_name.len())
-                .map_err(|_| VctrlError::SerializationError("committer name too long".into()))?])
+            .write_all(&[u8::try_from(committer_name.len()).map_err(|e| {
+                VctrlError::SerializationError(format!("committer name too long: {e}"))
+            })?])
             .map_err(VctrlError::from_io)?;
         writer
             .write_all(committer_name.as_bytes())
@@ -307,8 +312,9 @@ impl Encoder for BinaryEncoder {
 
         let committer_email = commit.committer().email();
         writer
-            .write_all(&[u8::try_from(committer_email.len())
-                .map_err(|_| VctrlError::SerializationError("committer email too long".into()))?])
+            .write_all(&[u8::try_from(committer_email.len()).map_err(|e| {
+                VctrlError::SerializationError(format!("committer email too long: {e}"))
+            })?])
             .map_err(VctrlError::from_io)?;
         writer
             .write_all(committer_email.as_bytes())
@@ -316,7 +322,7 @@ impl Encoder for BinaryEncoder {
 
         let msg = commit.message();
         let msg_len = u32::try_from(msg.len())
-            .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
+            .map_err(|e| VctrlError::SerializationError(format!("message too long: {e}")))?;
         if msg_len as usize > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::SerializationError(
                 "commit message exceeds size limit".into(),
@@ -338,8 +344,9 @@ impl Encoder for BinaryEncoder {
 
         match commit.meta().encoding() {
             Some(enc) => {
-                let len = u8::try_from(enc.len())
-                    .map_err(|_| VctrlError::SerializationError("encoding too long".into()))?;
+                let len = u8::try_from(enc.len()).map_err(|e| {
+                    VctrlError::SerializationError(format!("encoding too long: {e}"))
+                })?;
                 writer.write_all(&[len]).map_err(VctrlError::from_io)?;
                 writer
                     .write_all(enc.as_bytes())
@@ -411,7 +418,7 @@ impl Encoder for BinaryEncoder {
 
         let name = tag.name();
         let name_len = u8::try_from(name.len())
-            .map_err(|_| VctrlError::SerializationError("tag name too long".into()))?;
+            .map_err(|e| VctrlError::SerializationError(format!("tag name too long: {e}")))?;
         writer.write_all(&[name_len]).map_err(VctrlError::from_io)?;
         writer
             .write_all(name.as_bytes())
@@ -427,8 +434,8 @@ impl Encoder for BinaryEncoder {
 
                 let tagger_name = tagger.name();
                 writer
-                    .write_all(&[u8::try_from(tagger_name.len()).map_err(|_| {
-                        VctrlError::SerializationError("tagger name too long".into())
+                    .write_all(&[u8::try_from(tagger_name.len()).map_err(|e| {
+                        VctrlError::SerializationError(format!("tagger name too long: {e}"))
                     })?])
                     .map_err(VctrlError::from_io)?;
                 writer
@@ -437,8 +444,8 @@ impl Encoder for BinaryEncoder {
 
                 let tagger_email = tagger.email();
                 writer
-                    .write_all(&[u8::try_from(tagger_email.len()).map_err(|_| {
-                        VctrlError::SerializationError("tagger email too long".into())
+                    .write_all(&[u8::try_from(tagger_email.len()).map_err(|e| {
+                        VctrlError::SerializationError(format!("tagger email too long: {e}"))
                     })?])
                     .map_err(VctrlError::from_io)?;
                 writer
@@ -450,7 +457,7 @@ impl Encoder for BinaryEncoder {
 
         let msg = tag.message();
         let msg_len = u32::try_from(msg.len())
-            .map_err(|_| VctrlError::SerializationError("message too long".into()))?;
+            .map_err(|e| VctrlError::SerializationError(format!("message too long: {e}")))?;
         if msg_len as usize > usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) {
             return Err(VctrlError::SerializationError(
                 "tag message exceeds size limit".into(),
@@ -472,8 +479,9 @@ impl Encoder for BinaryEncoder {
 
         match tag.meta().encoding() {
             Some(enc) => {
-                let len = u8::try_from(enc.len())
-                    .map_err(|_| VctrlError::SerializationError("encoding too long".into()))?;
+                let len = u8::try_from(enc.len()).map_err(|e| {
+                    VctrlError::SerializationError(format!("encoding too long: {e}"))
+                })?;
                 writer.write_all(&[len]).map_err(VctrlError::from_io)?;
                 writer
                     .write_all(enc.as_bytes())
