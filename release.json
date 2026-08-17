@@ -1,0 +1,10 @@
+{
+  "crates": [
+    { "name": "libvctrl_sha512", "version": "3.0.0" },
+    { "name": "libvctrl_handler", "version": "5.0.0" },
+    { "name": "libvctrl_core", "version": "3.0.0" },
+    { "name": "libvctrl", "version": "2.1.2" },
+    { "name": "libvctrl_plumbing", "version": "0.2.0" },
+    { "name": "libvctrl_porcelain", "version": "0.1.0" }
+  ]
+}
