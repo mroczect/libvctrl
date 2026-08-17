@@ -130,7 +130,8 @@ impl TreeBuilder {
     ///     .add_entry("a.txt".to_owned(), EntryKind::Blob, hash)
     ///     .unwrap();
     ///
-    /// assert_eq!(builder.entries.len(), 1);
+    /// let tree = builder.build().unwrap();
+    /// assert_eq!(tree.len(), 1);
     /// # Ok::<(), libvctrl_handler::VctrlError>(())
     /// ```
     ///
