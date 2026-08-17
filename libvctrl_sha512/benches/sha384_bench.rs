@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(feature = "sha384")]
 
 use criterion::{Criterion, criterion_group, criterion_main};
