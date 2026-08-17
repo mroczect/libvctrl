@@ -57,6 +57,7 @@
 //! assert_eq!(decoded, encoded);
 //! ```
 
+#![allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::map_err_ignore)]
 #[cfg(test)]
 use proptest as _;
 
