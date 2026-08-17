@@ -1,4 +1,4 @@
-//! # libvctrl_handler
+//! # `libvctrl_handler`
 //!
 //! A robust, pure-Rust implementation of Git internals, designed for
 //! high-performance and enterprise-grade reliability.
