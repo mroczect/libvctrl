@@ -11,9 +11,15 @@
 //! The tests verify both normal behavior and defensive handling of malformed
 //! or potentially hostile inputs.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(missing_docs)]
+#![allow(unused_crate_dependencies)]
+
 use libvctrl_core::hash::Sha512Hasher;
 use libvctrl_core::store::{MemoryRefStore, MemoryStore};
 use libvctrl_handler::{Hash, Hasher, MAX_NAME_LENGTH, ObjectStore, RefStore};
+use libvctrl_sha512 as _;
+use proptest as _;
 use std::io::Read;
 
 /// Computes a SHA-512 content hash for the given data.
