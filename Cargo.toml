@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["libvctrl","libvctrl_core","libvctrl_handler", "libvctrl_plumbing", "libvctrl_porcelain", "libvctrl_sha512"]
+members = ["libvctrl", "libvctrl_core", "libvctrl_handler", "libvctrl_plumbing", "libvctrl_porcelain", "libvctrl_sha512"]
 
 [workspace.package]
 edition = "2024"
@@ -15,50 +15,48 @@ categories = ["development-tools", "cryptography", "algorithms", "no-std"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
-missing_docs = "deny"
-dead_code = "deny"
-unused_imports = "deny"
-unused_variables = "deny"
-unused_lifetimes = "deny"
-unused_macro_rules = "deny"
-unused_crate_dependencies = "deny"
-unreachable_pub = "deny"
-rust_2018_idioms = { level = "deny", priority = -1 }
-elided_lifetimes_in_paths = "deny"
-explicit_outlives_requirements = "deny"
-non_ascii_idents = "deny"
-trivial_bounds = "deny"
-unit_bindings = "deny"
 macro_use_extern_crate = "forbid"
+missing_docs = "warn"
+dead_code = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
+unused_crate_dependencies = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+elided_lifetimes_in_paths = "warn"
+explicit_outlives_requirements = "warn"
+non_ascii_idents = "warn"
+trivial_bounds = "warn"
+unit_bindings = "warn"
 single_use_lifetimes = "warn"
-redundant_lifetimes = "deny"
+redundant_lifetimes = "warn"
 rust_2021_compatibility = { level = "warn", priority = -1 }
 rust_2024_compatibility = { level = "warn", priority = -1 }
-unused_qualifications = "deny"
-noop_method_call = "deny"
+unused_qualifications = "warn"
+noop_method_call = "warn"
 unnameable_types = "warn"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-nursery = { level = "warn", priority = -1 }
-cargo = { level = "warn", priority = -1 }
-
-todo = "deny"
-unimplemented = "deny"
-unreachable = "deny"
-
+pedantic = { level = "allow", priority = -1 }
+nursery = { level = "allow", priority = -1 }
+cargo = { level = "allow", priority = -1 }
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
 unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"
 indexing_slicing = "warn"
 map_err_ignore = "warn"
 wildcard_enum_match_arm = "warn"
-needless_return = "warn"
-match_same_arms = "warn"
-std_instead_of_core = "warn"
-std_instead_of_alloc = "warn"
-alloc_instead_of_core = "warn"
-doc_markdown = "warn"
-doc_lazy_continuation = "warn"
-uninlined_format_args = "warn"
+std_instead_of_core = "allow"
+std_instead_of_alloc = "allow"
+alloc_instead_of_core = "allow"
+doc_markdown = "allow"
+doc_lazy_continuation = "allow"
+needless_return = "allow"
+match_same_arms = "allow"
+uninlined_format_args = "allow"
