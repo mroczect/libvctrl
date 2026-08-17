@@ -16,11 +16,17 @@
 //! They help ensure the codec remains backward-compatible and robust against
 //! corrupted or malicious input.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(missing_docs)]
+#![allow(unused_crate_dependencies)]
+
 use libvctrl_core::codec::{BinaryDecoder, BinaryEncoder};
 use libvctrl_handler::{
     Blob, Commit, CommitMeta, Decoder, Encoder, EntryKind, Hash, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH,
     MAX_PARENT_COUNT, MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID,
 };
+use libvctrl_sha512 as _;
+use proptest as _;
 use std::io::Cursor;
 
 /// Returns a hash filled with the byte `0xAB`.
