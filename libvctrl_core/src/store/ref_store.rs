@@ -68,7 +68,8 @@ impl MemoryRefStore {
     /// # Examples
     ///
     /// ```
-    /// use libvctrl_handler::traits::core::ref_store::RefStore;
+    /// use libvctrl_core::store::MemoryRefStore;
+    /// use libvctrl_handler::RefStore;
     /// let store = MemoryRefStore::new();
     /// assert!(store.list_refs().unwrap().next().is_none());
     /// ```
@@ -102,7 +103,7 @@ impl RefStore for MemoryRefStore {
     /// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
     ///
     /// store.set_ref("refs/heads/main", &hash).unwrap();
-    /// assert!(store.exists("refs/heads/main").unwrap_or(false));
+    /// assert!(store.get_ref("refs/heads/main").is_ok());
     /// ```
     fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError> {
         libvctrl_handler::validate_ref_name(name)?;
