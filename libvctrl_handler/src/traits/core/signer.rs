@@ -34,7 +34,7 @@ use crate::errors::VctrlError;
 /// # Design Rationale: Owned `Vec<u8>` Return
 /// The signature is returned as an owned `Vec<u8>` rather than a fixed-size array.
 /// Different signing algorithms produce different signature lengths (e.g., RSA signatures
-/// are significantly larger than EdDSA signatures). Returning a vector accommodates
+/// are significantly larger than `EdDSA` signatures). Returning a vector accommodates
 /// all algorithms uniformly.
 ///
 /// # Examples
