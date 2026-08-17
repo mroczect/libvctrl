@@ -58,8 +58,7 @@ ensure_clean_workspace() {
     fi
 }
 
-# Urutan publish yang benar (hardcoded, sesuai dependensi)
-# libvctrl_sha512 -> libvctrl_handler -> libvctrl_core -> libvctrl -> libvctrl_plumbing -> libvctrl_porcelain
+# Urutan publish yang benar
 readonly CRATE_ORDER=(
     "libvctrl_sha512"
     "libvctrl_handler"
@@ -77,51 +76,7 @@ get_version() {
     (cd "$crate" && cargo pkgid | cut -d'#' -f2 | cut -d: -f1)
 }
 
-prepare_crate() {
-    local crate_name="$1"
-    local version
-    version=$(get_version "$crate_name")
-
-    log INFO "-----------------------------------------------"
-    log INFO "Preparing $crate_name v$version"
-
-    # Build & test
-    log INFO "Running tests for $crate_name..."
-    if ! cargo test -p "$crate_name" --all-targets; then
-        error_exit "Tests failed for $crate_name"
-    fi
-
-    # Clippy
-    log INFO "Running clippy for $crate_name..."
-    if ! cargo clippy -p "$crate_name" --all-targets -- -D warnings; then
-        error_exit "Clippy failed for $crate_name"
-    fi
-
-    # Buat tag jika belum ada
-    local tag="${crate_name}@${version}"
-    if git rev-parse "$tag" >/dev/null 2>&1; then
-        log WARN "Tag $tag already exists, skipping creation"
-    else
-        log INFO "Creating tag $tag"
-        git tag -a "$tag" -m "Release $crate_name v$version"
-    fi
-
-    # Push tag
-    log INFO "Pushing tag $tag"
-    git push origin "$tag"
-}
-
-main() {
-    log INFO "Release preparation started"
-    check_prerequisites
-    ensure_clean_workspace
-
-    # Prepare all crates (test & tag)
-    for crate in "${CRATE_ORDER[@]}"; do
-        prepare_crate "$crate"
-    done
-
-    # Generate release.json based on Cargo.toml versions
+generate_release_json() {
     log INFO "Generating $RELEASE_JSON"
     {
         echo '{'
@@ -140,17 +95,85 @@ main() {
         echo '  ]'
         echo '}'
     } > "$RELEASE_JSON"
-
-    # Commit release.json
-    log INFO "Committing $RELEASE_JSON"
-    git add "$RELEASE_JSON"
-    git commit -m "release: add $RELEASE_JSON for publishing"
-
-    # Push release.json
-    log INFO "Pushing $RELEASE_JSON to origin"
-    git push origin HEAD
-
-    log INFO "All tags pushed and $RELEASE_JSON published. CI will now publish crates in order."
 }
+
+push_tags() {
+    for crate in "${CRATE_ORDER[@]}"; do
+        local version
+        version=$(get_version "$crate")
+        local tag="${crate}@${version}"
+        if git rev-parse "$tag" >/dev/null 2>&1; then
+            log WARN "Tag $tag already exists locally, skipping creation"
+        else
+            log INFO "Creating tag $tag"
+            git tag -a "$tag" -m "Release $crate v$version"
+        fi
+        log INFO "Pushing tag $tag"
+        git push origin "$tag"
+    done
+}
+
+main() {
+    log INFO "Release preparation started"
+    check_prerequisites
+    ensure_clean_workspace
+
+    # 1. Generate release.json
+    generate_release_json
+
+    # 2. Create new branch
+    local branch_name
+    branch_name="release/$(date +%Y%m%d%H%M%S)"
+    log INFO "Creating branch $branch_name"
+    git checkout -b "$branch_name"
+
+    # 3. Commit release.json
+    log INFO "Committing $RELEASE_JSON (force add)"
+    git add -f "$RELEASE_JSON"
+    git commit -m "chore(release): add $RELEASE_JSON for ordered publishing"
+
+    # 4. Push branch
+    log INFO "Pushing branch $branch_name"
+    git push -u origin "$branch_name"
+
+    # 5. Create PR
+    log INFO "Creating pull request"
+    cat > /tmp/pr_body.md <<EOF
+## Summary
+Add release.json untuk publish crate berurutan ke crates.io.
+
+## Crates
+$(for crate in "${CRATE_ORDER[@]}"; do
+    echo "- $crate v$(get_version "$crate")"
+done)
+
+## Note
+- Setelah PR ini di-merge, workflow publish akan membaca release.json dan mempublish crate sesuai urutan.
+- Pastikan tag untuk setiap crate sudah di-push sebelum merge (atau jalankan script ini dengan argumen --push-tags).
+EOF
+
+    gh pr create \
+        --title "chore(release): add release.json for ordered publishing" \
+        --body-file /tmp/pr_body.md \
+        --base "$(git rev-parse --abbrev-ref origin/HEAD | sed 's|origin/||')" \
+        --head "$branch_name"
+
+    # 6. Interactive confirmation for tags
+    read -r -p "Do you want to push release tags now? (y/n) " confirm
+    if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+        push_tags
+    else
+        log INFO "Tags not pushed. You can push them later with: bash scripts/prepare-release.sh --push-tags"
+    fi
+
+    log INFO "All done. Merge PR #$pr_number to trigger publishing."
+}
+
+# Allow --push-tags mode
+if [ "${1:-}" = "--push-tags" ]; then
+    check_prerequisites
+    push_tags
+    exit 0
+fi
 
 main "$@"
