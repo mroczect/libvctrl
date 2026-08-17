@@ -1,138 +1,168 @@
 # libvctrl_handler
 
-**Fundamental contracts for building a version control system – no implementations, only traits and types**
+Fundamental contracts for building a version control system — no implementations, only
+traits, types, and validation. `libvctrl_handler` is the "constitution" layer of the
+`libvctrl` ecosystem: it defines _what_ a VCS object model looks like without prescribing
+_how_ it is stored, serialised, signed, or transported. Every other crate in the workspace
+implements or consumes these contracts.
 
-_Constitution (handler), reference implementation (core), and plumbing commands_
+- **Crate:** `libvctrl_handler` 5.0.1 (library, `std`-only, zero external dependencies)
+- **Language:** Rust, edition 2024 — MSRV **1.96.0**
+- **License:** MIT
+- **Repository:** https://github.com/mroczect/libvctrl
+- **Documentation:** https://docs.rs/libvctrl_handler
+
+> Most users should depend on the **`libvctrl` facade**, which re-exports this crate
+> alongside the reference implementation and the crypto primitives. Reach for
+> `libvctrl_handler` directly only when you are implementing a custom backend or need the
+> contract surface without the reference implementation.
 
 ---
 
 ## Overview
 
-`libvctrl` is a modular framework for building version control systems, structured around a strict separation between **contracts** and **implementations**. This repository contains the foundational contract layer, packaged as the crate `libvctrl_handler`.
+`libvctrl_handler` is a pure contracts crate. It contains no concrete implementations —
+no storage backends, no serializers, no hashing engines. Instead it provides:
 
-The handler crate defines:
+- **Traits** defining every major VCS operation: object storage, encoding, decoding,
+  hashing, indexing, reference management, reflogs, remote transport, packing, signing,
+  verification, revision walking, diffing, blame, and configuration.
+- **Immutable data types** representing Git objects (`Blob`, `Tree`, `Commit`, `Tag`) and
+  supporting structures (`Hash`, `UserID`, `TreeEntry`, `CommitMeta`, deltas, merges,
+  reflog entries).
+- **Constants** enforcing safe size and count limits to prevent resource exhaustion.
+- **Validation functions** that define the security boundary for names, references, tree
+  entries, and hashes.
+- A unified **error type** (`VctrlError`) that all trait implementations must return.
 
-- A complete set of **traits** for every major VCS operation: object storage, encoding, decoding, hashing, indexing, reference management, reflogs, remote transport, packing, signing, verification, revision walking, diffing, blame, and configuration.
-- **Data types** representing Git objects (`Blob`, `Tree`, `Commit`, `Tag`) and supporting structures (`Hash`, `UserID`, `TreeEntry`, deltas, merges, reflog entries).
-- **Constants** enforcing safe size and count limits.
-- **Validation functions** that define the security boundary for names, references, tree entries, and hashes.
-- A unified **error type** (`VctrlError`) that all trait implementations must use.
-
-`libvctrl_handler` contains **no concrete implementations**. It is the "constitution" upon which all other crates in the `libvctrl` ecosystem are built. The reference implementation `libvctrl_core` provides working implementations of the traits (in-memory object store, binary encoder/decoder, SHA-512 hasher, etc.). Higher-level crates `libvctrl_plumbing` and `libvctrl_porcelain` build on top of `libvctrl_core`.
-
-The primary facade crate is `libvctrl`, which re-exports the handler types and the reference implementation so integrators can use the whole framework with a single dependency.
+The crate depends only on the Rust standard library. It is `std`-only and exposes no
+crate-level feature flags. There is no `no_std` build path at present.
 
 ---
 
 ## Architecture
 
-The architecture enforces a one-way dependency flow:
-
-- **Handler (contract layer)** — this crate — depends only on the Rust standard library.
-- **Core (reference implementation)** depends on the handler and provides concrete implementations.
-- **Plumbing/Porcelain** depend on the core and provide command-level or high-level VCS operations.
-
-The following diagram illustrates the crate dependency structure:
+`libvctrl_handler` is the foundation of a strictly layered, one-way dependency graph. It
+sits at the bottom; the reference implementation (`libvctrl_core`) implements its traits;
+the facade (`libvctrl`) re-exports both; and the command crates (`libvctrl_plumbing`,
+`libvctrl_porcelain`) build on top.
 
 ```mermaid
-graph TD
-    subgraph Contract Layer
-        H[libvctrl_handler]
-        H --> C[constants]
-        H --> E[enums]
-        H --> ER[errors]
-        H --> M[macros]
-        H --> T[traits]
-        H --> TY[types]
-        H --> V[validation]
+flowchart TD
+    subgraph Apps["Application layer"]
+        FACADE["libvctrl<br/>facade (re-exports)"]
+        PL["libvctrl_plumbing"]
+        PO["libvctrl_porcelain"]
     end
 
-    subgraph Reference Implementation
-        CORE[libvctrl_core]
-        CORE --> H
+    subgraph Ref["Reference implementation"]
+        CORE["libvctrl_core<br/>codec, builders, stores, hasher"]
     end
 
-    subgraph Applications
-        PL[libvctrl_plumbing]
-        PO[libvctrl_porcelain]
-        PL --> CORE
-        PO --> CORE
+    subgraph Contracts["Contract layer — libvctrl_handler (this crate)"]
+        HANDLER["traits + types + constants<br/>enums + errors + macros + validation<br/>std-only, zero dependencies"]
     end
 
-    FACADE[libvctrl facade crate]
-    FACADE --> H
+    subgraph Crypto["Cryptography"]
+        SHA["libvctrl_sha512<br/>raw SHA-512 engine"]
+    end
+
+    FACADE --> HANDLER
     FACADE --> CORE
+    FACADE --> SHA
+    PL --> CORE
+    PO --> CORE
+    CORE --> HANDLER
+    CORE --> SHA
 ```
 
-Within the handler crate, the module organization is as follows:
+### Internal module organization
+
+The crate is separated into seven modules, each with a single responsibility. The crate
+root (`lib.rs`) re-exports the most commonly used items for ergonomic access.
 
 ```mermaid
-graph TD
-    ROOT[lib.rs]
-    ROOT --> CONST[constants]
-    ROOT --> ENUMS[enums]
-    ROOT --> ERR[errors]
-    ROOT --> MAC[macros]
-    ROOT --> TRAITS[traits]
-    ROOT --> TYPES[types]
-    ROOT --> VAL[validation]
+flowchart LR
+    LIB["lib.rs<br/>crate root + root re-exports"]
+    LIB --> CONST["constants<br/>limits + entry_mode"]
+    LIB --> ENUMS["enums<br/>EntryKind"]
+    LIB --> ERRORS["errors<br/>VctrlError"]
+    LIB --> MACROS["macros<br/>vctrl_error_other!"]
+    LIB --> TRAITS["traits/core<br/>17 contracts"]
+    LIB --> TYPES["types/core<br/>14 immutable data types"]
+    LIB --> VAL["validation<br/>4 input checks"]
 
-    ENUMS --> EK[enums::core::entry_kind]
-    TRAITS --> TC[traits::core]
-    TC --> BLAME[blame]
-    TC --> CFG[config]
-    TC --> DEC[decoder]
-    TC --> DIFF[diff]
-    TC --> ENC[encoder]
-    TC --> HASHER[hasher]
-    TC --> IDX[index]
-    TC --> OS[object_store]
-    TC --> PACK[pack]
-    TC --> RF[ref_store]
-    TC --> RL[reflog]
-    TC --> REM[remote]
-    TC --> RW[revwalk]
-    TC --> SIGN[signer]
-    TC --> TRAN[transport]
-    TC --> VER[verifier]
+    VAL -.gates construction.-> TYPES
+    TRAITS -.consume / return.-> TYPES
+    TYPES -.return.-> ERRORS
+    TRAITS -.return.-> ERRORS
+    ENUMS -.used by.-> TYPES
+    CONST -.used by.-> TYPES
+    CONST -.used by.-> VAL
+```
 
-    TYPES --> TYC[types::core]
-    TYC --> BLOB[blob]
-    TYC --> COMMIT[commit]
-    TYC --> DELTA[delta]
-    TYC --> HASH[hash]
-    TYC --> MERGE[merge]
-    TYC --> REFLOG[reflog]
-    TYC --> TAG[tag]
-    TYC --> TREE[tree]
-    TYC --> UID[user_id]
+### Invalid states are unrepresentable
+
+A core design idiom is that all public data types are constructed via **fallible
+constructors** that enforce invariants at construction time. Once built, objects are
+immutable and expose only `&self` accessors. This pushes validation to the boundary of the
+system and guarantees that invalid objects cannot exist at runtime.
+
+```mermaid
+flowchart LR
+    INPUT[Raw input<br/>name / hash bytes / ref name / tree entry]
+    INPUT --> VALFN[validation function<br/>validate_name / validate_hash_bytes / ...]
+    VALFN -->|invalid| ERR1[VctrlError<br/>InvalidName / InvalidHashLength / ...]
+    VALFN -->|valid| CTOR[Fallible constructor<br/>Blob::new / Tree::new / UserID::new / ...]
+    CTOR -->|invariant violated| ERR2[VctrlError]
+    CTOR -->|ok| OBJ[Immutable validated object<br/>only &self accessors]
+    OBJ -.Send + Sync.-> THREADS[Cross-thread consumers]
 ```
 
 ---
 
 ## Core Features
 
-- **Trait-only contracts** — Every VCS subsystem is expressed as a `trait` with clear method signatures, error returns, and `Send + Sync` bounds. Implementations are decoupled from consumers.
-- **Git-compatible data types** — `Blob`, `Tree`, `TreeEntry`, `Commit`, `Tag`, `UserID`, and their supporting types mirror the Git object model and enforce Git-like invariants.
-- **Fixed-size hash** — `Hash` is a newtype over `[u8; 64]` (SHA-512 length), with hexadecimal parsing, display, and ordering.
-- **Validation as a security boundary** — Dedicated functions validate names, references, tree entry names, and hash lengths. Implementation crates must call these functions, never duplicate the logic.
-- **Comprehensive error hierarchy** — `VctrlError` covers invalid lengths, missing objects, corrupted data, I/O failures, serialization issues, tree structure errors, duplicate parents, size limit breaches, and invalid blame ranges.
-- **Strict compile-time guarantees** — The crate uses `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, and a suite of Clippy lints to ensure safe, well-documented, idiomatic code.
+- **Pure contracts.** No implementations — only traits, types, constants, and
+  validation. Backend authors implement the traits; tool authors depend on the types.
+- **Invalid states unrepresentable.** All data types use fallible constructors that reject
+  malformed input at construction time; objects are immutable thereafter.
+- **Resource-exhaustion prevention.** Hard `MAX_*` limits act as fail-fast circuit
+  breakers during construction, bounding memory allocation against malicious input.
+- **Strong typing over raw integers.** Git mode bits are represented by the `EntryKind`
+  enum with `const fn` conversions to and from raw `u32` modes, preventing invalid
+  combinations at compile time.
+- **Forward-compatible enums and errors.** `EntryKind` and `VctrlError` are
+  `#[non_exhaustive]`, allowing new variants without breaking API compatibility.
+- **Thread-safe contracts.** Traits carry `Send + Sync` bounds so backends can be shared
+  across threads; `&mut self` is required only for write operations.
+- **Cloneable I/O errors.** `std::io::Error` is wrapped in `Arc` inside `VctrlError` so
+  the error remains `Clone` despite `io::Error` not being `Clone`.
+- **Compile-time computation.** `const fn` is used where possible (`EntryKind::mode`,
+  `from_mode`) to shift work to compile time.
+- **Strict safety.** `#![forbid(unsafe_code)]` and a comprehensive set of denied Clippy
+  and documentation lints are inherited from the workspace.
 
 ---
 
 ## Technology Stack
 
-- **Language:** Rust (edition 2024)
-- **Standard library only:** No external dependencies. The handler crate uses only `std` types (`std::io`, `std::collections::HashSet`, `std::path`, etc.).
-- **Frameworks/Libraries:** None. This crate is a pure contract definition.
-- **Toolchain:** Requires Rust 1.85 or newer (for edition 2024 support).
+- **Language:** Rust (edition 2024, MSRV 1.96.0)
+- **Dependencies:** none (standard library only)
+- **Dev-dependencies:** `proptest` 1.11.0
+- **Lint policy:** workspace-inherited, `#![forbid(unsafe_code)]`, denied `missing_docs`,
+  `rust_2018_idioms`, and a broad set of Clippy lints (including `pedantic` and `nursery`
+  groups). See the repository for the authoritative lint configuration.
+- **Feature flags:** none.
+
+> Note on the MSRV field: this crate's `Cargo.toml` does not yet declare
+> `rust-version = "1.96"`. The workspace standard is Rust 1.96.0, and this README
+> documents that as the MSRV. Adding `rust-version = "1.96"` to
+> `libvctrl_handler/Cargo.toml` is recommended in a future maintenance pass.
 
 ---
 
 ## Project Structure
-
-The source tree of `libvctrl_handler` is organized as follows:
 
 ```text
 libvctrl_handler/
@@ -140,13 +170,13 @@ libvctrl_handler/
 └── src/
     ├── lib.rs
     ├── constants.rs
+    ├── errors.rs
+    ├── macros.rs
     ├── enums/
     │   ├── mod.rs
     │   └── core/
     │       ├── mod.rs
     │       └── entry_kind.rs
-    ├── errors.rs
-    ├── macros.rs
     ├── traits/
     │   ├── mod.rs
     │   └── core/
@@ -170,16 +200,7 @@ libvctrl_handler/
     ├── types/
     │   ├── mod.rs
     │   └── core/
-    │       ├── mod.rs
-    │       ├── blob.rs
-    │       ├── commit.rs
-    │       ├── delta.rs
-    │       ├── hash.rs
-    │       ├── merge.rs
-    │       ├── reflog.rs
-    │       ├── tag.rs
-    │       ├── tree.rs
-    │       └── user_id.rs
+    │       └── ... (data type definitions)
     └── validation/
         ├── mod.rs
         ├── hash.rs
@@ -192,571 +213,360 @@ libvctrl_handler/
 
 ### Prerequisites
 
-- **Rust 1.85 or newer** — required for the 2024 edition.
-- **Cargo** — the Rust package manager.
-- No system-level dependencies are required; the handler crate is pure Rust.
+- Rust toolchain **1.96.0** or newer (edition 2024 is required)
+- Cargo
+
+No system libraries or external services are required.
 
 ### Installation
 
-For most integrators, the recommended entry point is the `libvctrl` facade crate, which re-exports both the handler contracts and the reference implementation:
+For most users, depend on the facade instead:
 
 ```toml
 [dependencies]
-libvctrl = "4.4"
+libvctrl = "2.1"
 ```
 
-If you are developing an implementation crate and need to depend directly on the contract layer:
+To depend on `libvctrl_handler` directly (contracts only, no reference implementation):
 
 ```toml
 [dependencies]
-libvctrl_handler = "4.4"
+libvctrl_handler = "5.0"
 ```
 
-To use the handler from a local checkout or a Git repository:
+Or via Cargo:
 
-```toml
-[dependencies]
-libvctrl_handler = { git = "https://github.com/mroczect/libvctrl", branch = "master" }
+```bash
+cargo add libvctrl_handler
 ```
+
+Because the crate has no external dependencies, adding it is essentially zero-weight
+beyond the standard library.
 
 ### Configuration
 
-The handler crate itself requires no configuration or environment variables. All size and count limits are defined as constants in `libvctrl_handler::constants` and are enforced by the validation functions and type constructors.
-
-However, the `ConfigStore` trait defines an abstraction for reading and writing configuration values. The reference implementation and higher-level crates may use this trait to handle user configuration.
+`libvctrl_handler` exposes **no crate-level feature flags** and requires **no runtime
+configuration**. The contract surface is fixed; behavioural configuration (such as the
+`sha384` / `opt_size` crypto features) lives at the facade or `libvctrl_sha512` level.
 
 ---
 
 ## Usage
 
-The handler crate is not meant to be used directly by end users; it is consumed by implementors and integrators. The following examples illustrate how the contracts are used.
-
-### Implementing a trait
-
-Implementations must satisfy the trait's method signatures and return `VctrlError` on failure. The following example shows a minimal in-memory object store:
+### Create a Hash and inspect an EntryKind
 
 ```rust
-use libvctrl_handler::{ObjectStore, Hash, VctrlError};
-use std::collections::HashMap;
-use std::io::{self, Read};
+use libvctrl_handler::{EntryKind, Hash};
 
-pub struct MemoryStore {
-    objects: HashMap<Hash, Vec<u8>>,
-}
+// Hash requires exactly 64 bytes (SHA-512).
+let raw_bytes = [0_u8; 64];
+let hash = Hash::from_bytes(&raw_bytes);
+assert!(hash.is_ok());
 
-impl MemoryStore {
-    pub fn new() -> Self {
-        Self { objects: HashMap::new() }
-    }
-}
-
-impl ObjectStore for MemoryStore {
-    fn put(&mut self, hash: &Hash, data: &[u8]) -> Result<(), VctrlError> {
-        self.objects.insert(*hash, data.to_vec());
-        Ok(())
-    }
-
-    fn get(&self, hash: &Hash) -> Result<Box<dyn Read + Send + '_>, VctrlError> {
-        match self.objects.get(hash) {
-            Some(data) => Ok(Box::new(io::Cursor::new(data.clone()))),
-            None => Err(VctrlError::ObjectNotFound(*hash)),
-        }
-    }
-
-    fn delete(&mut self, hash: &Hash) -> Result<(), VctrlError> {
-        self.objects.remove(hash).map(|_| ()).ok_or(VctrlError::ObjectNotFound(*hash))
-    }
-
-    fn exists(&self, hash: &Hash) -> Result<bool, VctrlError> {
-        Ok(self.objects.contains_key(hash))
-    }
-}
+// Git object modes are accessible via the strongly-typed EntryKind enum.
+let blob_mode = EntryKind::Blob.mode();
+assert_eq!(blob_mode, 0o100_644);
 ```
 
-### Constructing a validated data type
-
-Data types enforce validation in their constructors. For example, creating a `Commit` with metadata:
+### Convert between EntryKind and raw mode bits
 
 ```rust
-use libvctrl_handler::{Commit, CommitMeta, UserID, Hash};
+use libvctrl_handler::enums::EntryKind;
+
+// Enum -> raw mode (const fn, usable in const contexts).
+assert_eq!(EntryKind::Executable.mode(), 0o100_755);
+
+// Raw mode -> Enum (graceful on invalid input).
+assert_eq!(EntryKind::from_mode(0o120_000), Some(EntryKind::Symlink));
+assert_eq!(EntryKind::from_mode(0o000_000), None);
+```
+
+### Construct ad-hoc errors with the macro
+
+```rust
+use libvctrl_handler::{VctrlError, vctrl_error_other};
+
+let err = vctrl_error_other!("missing configuration file: {} (code {})", "config.toml", 404);
+assert_eq!(
+    err.to_string(),
+    "missing configuration file: config.toml (code 404)"
+);
+```
+
+### Wrap an I/O error
+
+```rust
 use libvctrl_handler::VctrlError;
+use std::io::{self, ErrorKind};
 
-fn create_commit(tree_hash: Hash, parent: Hash, author: UserID, committer: UserID) -> Result<Commit, VctrlError> {
-    let meta = CommitMeta::new(
-        1_700_000_000,      // timestamp
-        0,                  // timezone offset (UTC)
-        Some("UTF-8".into()),
-    )?;
+let io_err = io::Error::new(ErrorKind::NotFound, "file missing");
+let vctrl_err = VctrlError::from_io(io_err);
 
-    Commit::with_meta(
-        tree_hash,
-        vec![parent],
-        author,
-        committer,
-        "Initial commit".to_string(),
-        meta,
-    )
-}
+// The error is cloneable despite wrapping std::io::Error.
+let cloned = vctrl_err.clone();
+assert_eq!(vctrl_err, cloned);
 ```
 
-### Encoder/Decoder roundtrip
+### Implement a trait for a custom backend
 
-The `Encoder` and `Decoder` traits define how objects are serialized and deserialized. Implementations must adhere to the binary format contract:
+The traits are designed to be implemented by backend authors. The `Blame` trait
+illustrates the idiom: `Send + Sync` bounds for thread safety, `&self` for read
+operations, and `VctrlError` as the unified failure type.
 
 ```rust
-use libvctrl_handler::{Encoder, Decoder, Commit, VctrlError};
-use std::io::{Cursor, Read, Write};
+use libvctrl_handler::traits::core::blame::{Blame, BlameEntry};
+use libvctrl_handler::{Hash, VctrlError};
 
-fn roundtrip_commit<D: Decoder, E: Encoder>(
-    decoder: &D,
-    encoder: &E,
-    commit: &Commit,
-) -> Result<Commit, VctrlError> {
-    let mut buffer = Vec::new();
-    encoder.encode_commit(commit, &mut buffer)?;
+struct MockRepo;
 
-    let mut reader = Cursor::new(buffer);
-    decoder.decode_commit(reader)
+impl Blame for MockRepo {
+    fn blame_file(&self, path: &str) -> Result<Vec<BlameEntry>, VctrlError> {
+        let hash = Hash::from_bytes(&[0_u8; 64])?;
+        let entry = BlameEntry::new(hash, 1, 10, path.to_string(), None)?;
+        Ok(vec![entry])
+    }
 }
+
+let repo = MockRepo;
+let entries = repo.blame_file("src/main.rs").unwrap();
+assert_eq!(entries.len(), 1);
 ```
 
 ---
 
 ## API Reference / Core Modules
 
-This section documents the public API of the handler crate.
-
-### `constants`
-
-Defines size and count limits and Git entry mode bits.
-
-| Constant             | Value               | Description                                         |
-| -------------------- | ------------------- | --------------------------------------------------- |
-| `HASH_LENGTH`        | `64`                | Length of a hash in bytes (SHA-512).                |
-| `MAX_NAME_LENGTH`    | `255`               | Maximum length for names, in bytes.                 |
-| `MAX_BLOB_SIZE`      | `100 * 1024 * 1024` | Maximum blob size in bytes (100 MiB).               |
-| `MAX_TREE_ENTRIES`   | `100_000`           | Maximum number of entries in a tree.                |
-| `MAX_MESSAGE_LENGTH` | `1024 * 1024`       | Maximum commit/tag message length in bytes (1 MiB). |
-| `MAX_PARENT_COUNT`   | `65535`             | Maximum number of parent commits.                   |
-
-`constants::entry_mode` provides Git mode bits:
-
-| Mode         | Value (octal) | Description       |
-| ------------ | ------------- | ----------------- |
-| `BLOB`       | `0o100_644`   | Regular file.     |
-| `EXECUTABLE` | `0o100_755`   | Executable file.  |
-| `SYMLINK`    | `0o120_000`   | Symbolic link.    |
-| `TREE`       | `0o40_000`    | Directory (tree). |
-| `SUBMODULE`  | `0o160_000`   | Submodule commit. |
-
-### `enums::EntryKind`
-
-Represents the kind of an entry in a Git tree.
-
-| Variant      | Mode         | Description       |
-| ------------ | ------------ | ----------------- |
-| `Blob`       | `BLOB`       | Regular file.     |
-| `Executable` | `EXECUTABLE` | Executable file.  |
-| `Symlink`    | `SYMLINK`    | Symbolic link.    |
-| `Tree`       | `TREE`       | Directory.        |
-| `Submodule`  | `SUBMODULE`  | Submodule commit. |
-
-Methods: `mode()` returns the mode bits; `from_mode(mode: u32) -> Option<Self>` converts raw mode bits.
-
-### `errors::VctrlError`
-
-The unified error type for all operations.
-
-| Variant                        | Description                                                     |
-| ------------------------------ | --------------------------------------------------------------- |
-| `InvalidHashLength(usize)`     | Hash length did not match expected 64 bytes.                    |
-| `InvalidName(String)`          | Name invalid (empty, too long, or contains control characters). |
-| `InvalidEmail(String)`         | Email invalid.                                                  |
-| `ObjectNotFound(Hash)`         | Object not found.                                               |
-| `RefNotFound(String)`          | Reference not found.                                            |
-| `CorruptedData(String)`        | Data corrupted or malformed.                                    |
-| `IoError(Arc<std::io::Error>)` | I/O error.                                                      |
-| `SerializationError(String)`   | Serialization/deserialization error.                            |
-| `Other(String)`                | Any other error.                                                |
-| `InvalidTreeStructure(String)` | Tree structure invalid (unsorted entries, duplicates).          |
-| `InvalidTimezoneOffset(i16)`   | Timezone offset out of range (-1440 to 1440).                   |
-| `DuplicateParent`              | Commit contains duplicate parent hashes.                        |
-| `ExceededMaxSize(String)`      | Size or count limit exceeded.                                   |
-| `InvalidBlameRange`            | Invalid blame range (zero line count).                          |
-
-`VctrlError` implements `Display`, `Error`, `PartialEq`, and `Eq`. It also provides `from_io(e: std::io::Error) -> Self` for canonical I/O error conversion.
-
-### `macros`
-
-- **`vctrl_error_other!`** — Constructs a `VctrlError::Other` from a format string and arguments.
-
-```rust
-let err = vctrl_error_other!("Failed to parse {}", "object");
-```
-
-### `traits::core`
-
-The following traits are defined. All are `Send + Sync`.
-
-#### `Blame`
-
-Computes blame information for files.
-
-```rust
-fn blame_file(&self, path: &str) -> Result<Vec<BlameEntry>, VctrlError>;
-```
-
-`BlameEntry` represents a line range attributed to a commit.
-
-#### `ConfigStore`
-
-Reads and writes configuration values.
-
-```rust
-fn get_string(&self, section: &str, key: &str) -> Result<Option<String>, VctrlError>;
-fn set_string(&mut self, section: &str, key: &str, value: &str) -> Result<(), VctrlError>;
-fn get_bool(&self, section: &str, key: &str) -> Result<Option<bool>, VctrlError>;
-fn set_bool(&mut self, section: &str, key: &str, value: bool) -> Result<(), VctrlError>;
-fn remove(&mut self, section: &str, key: &str) -> Result<(), VctrlError>;
-fn exists(&self, section: &str, key: &str) -> Result<bool, VctrlError>;
-```
-
-#### `Decoder`
-
-Decodes raw Git object bytes into structured types.
-
-```rust
-fn decode_blob<R: Read + Send>(&self, reader: R) -> Result<Blob, VctrlError>;
-fn decode_tree<R: Read + Send>(&self, reader: R) -> Result<Tree, VctrlError>;
-fn decode_commit<R: Read + Send>(&self, reader: R) -> Result<Commit, VctrlError>;
-fn decode_tag<R: Read + Send>(&self, reader: R) -> Result<Tag, VctrlError>;
-```
-
-#### `TreeDiffer`
-
-Computes differences between two trees.
-
-```rust
-type TreeId: Send + Sync;
-fn diff_trees(&self, old: &Self::TreeId, new: &Self::TreeId) -> Result<TreeDelta, VctrlError>;
-```
-
-#### `Encoder`
-
-Encodes structured Git objects into raw bytes.
-
-```rust
-fn encode_blob<W: Write + Send>(&self, blob: &Blob, writer: &mut W) -> Result<(), VctrlError>;
-fn encode_tree<W: Write + Send>(&self, tree: &Tree, writer: &mut W) -> Result<(), VctrlError>;
-fn encode_commit<W: Write + Send>(&self, commit: &Commit, writer: &mut W) -> Result<(), VctrlError>;
-fn encode_tag<W: Write + Send>(&self, tag: &Tag, writer: &mut W) -> Result<(), VctrlError>;
-```
-
-#### `Hasher`
-
-Computes hash values.
-
-```rust
-fn hash<R: Read + Send>(&self, reader: R) -> Result<Hash, VctrlError>;
-```
-
-#### `Index`
-
-Manages a Git index (staging area).
-
-```rust
-type Entry: Send + Sync;
-type Path: Send + Sync;
-type TreeId: Send + Sync;
-
-fn add(&mut self, entry: Self::Entry) -> Result<(), VctrlError>;
-fn remove(&mut self, path: &Self::Path) -> Result<(), VctrlError>;
-fn clear(&mut self) -> Result<(), VctrlError>;
-fn get(&self, path: &Self::Path) -> Result<Option<Self::Entry>, VctrlError>;
-fn contains(&self, path: &Self::Path) -> Result<bool, VctrlError>;
-fn len(&self) -> Result<usize, VctrlError>;
-fn is_empty(&self) -> Result<bool, VctrlError>;
-fn entries(&self) -> Result<Vec<Self::Entry>, VctrlError>;
-fn write_tree(&self) -> Result<Self::TreeId, VctrlError>;
-fn read_tree(&mut self, tree: &Self::TreeId) -> Result<(), VctrlError>;
-```
-
-#### `ObjectStore`
-
-Stores and retrieves Git objects.
-
-```rust
-fn put(&mut self, hash: &Hash, data: &[u8]) -> Result<(), VctrlError>;
-fn get(&self, hash: &Hash) -> Result<Box<dyn Read + Send + '_>, VctrlError>;
-fn delete(&mut self, hash: &Hash) -> Result<(), VctrlError>;
-fn exists(&self, hash: &Hash) -> Result<bool, VctrlError>;
-```
-
-#### `PackWriter` / `PackReader`
-
-Write and read Git pack files.
-
-```rust
-// PackWriter
-type ObjectId: Send + Sync;
-fn write_object(&mut self, id: &Self::ObjectId, data: &[u8]) -> Result<(), VctrlError>;
-fn finish(&mut self) -> Result<(), VctrlError>;
-
-// PackReader
-type ObjectId: Send + Sync;
-fn read_object(&self, id: &Self::ObjectId) -> Result<Box<dyn Read + Send + '_>, VctrlError>;
-```
-
-#### `RefStore`
-
-Manages Git references (branches, tags, etc.).
-
-```rust
-type RefsIterator: Iterator<Item = Result<String, VctrlError>> + Send;
-
-fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError>;
-fn get_ref(&self, name: &str) -> Result<Hash, VctrlError>;
-fn delete_ref(&mut self, name: &str) -> Result<(), VctrlError>;
-fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError>;
-```
-
-#### `ReflogStore`
-
-Manages reflogs.
-
-```rust
-type RefName: Send + Sync;
-
-fn append(
-    &mut self,
-    reference: &Self::RefName,
-    old_hash: Option<Hash>,
-    new_hash: Option<Hash>,
-    reason: &str,
-    timestamp: i64,
-    timezone_offset: i16,
-) -> Result<(), VctrlError>;
-
-fn entries(&self, reference: &Self::RefName) -> Result<Vec<ReflogEntry>, VctrlError>;
-```
-
-#### `Remote`
-
-Interacts with remote repositories.
-
-```rust
-type RefSpec: Send + Sync;
-type RemoteRef: Send + Sync;
-
-fn list_refs(&self) -> Result<Vec<Self::RemoteRef>, VctrlError>;
-fn fetch(&mut self, refspecs: &[Self::RefSpec]) -> Result<(), VctrlError>;
-fn push(&mut self, refspecs: &[Self::RefSpec]) -> Result<(), VctrlError>;
-```
-
-#### `RevWalk`
-
-Walks commit history.
-
-```rust
-type CommitId: Send + Sync;
-fn walk(&self, start: &Self::CommitId) -> Result<RevWalkIterator<'_, Self::CommitId>, VctrlError>;
-```
-
-#### `Signer`
-
-Signs data.
-
-```rust
-fn sign(&mut self, key_id: &str, data: &[u8]) -> Result<Vec<u8>, VctrlError>;
-```
-
-#### `Transport`
-
-Transports Git objects.
-
-```rust
-fn fetch_object(&self, hash: &Hash) -> Result<Box<dyn Read + Send + '_>, VctrlError>;
-fn push_object(&mut self, hash: &Hash, data: &[u8]) -> Result<(), VctrlError>;
-```
-
-#### `Verifier`
-
-Verifies signatures.
-
-```rust
-fn verify(&self, key_id: &str, data: &[u8], signature: &[u8]) -> Result<bool, VctrlError>;
-```
-
-### `types::core`
-
-The following data types are defined:
-
-#### `Hash`
-
-Fixed-size hash of 64 bytes (SHA-512 length).
-
-- `from_bytes(bytes: &[u8]) -> Result<Self, VctrlError>` — validates length.
-- `as_bytes() -> &[u8; 64]` — raw bytes.
-- Implements `From<[u8; 64]>`, `TryFrom<&[u8]>`, `AsRef<[u8]>`, `FromStr` (hex string), `Display` (hex), `Debug` (truncated), `PartialOrd`, `Ord`.
-
-#### `Blob`
-
-Represents a Git blob (file content).
-
-- `new(data: Vec<u8>) -> Result<Self, VctrlError>` — enforces `MAX_BLOB_SIZE`.
-- `data() -> &[u8]`, `size() -> usize`, `is_empty() -> bool`.
-
-#### `TreeEntry`
-
-Represents a single entry in a tree.
-
-- `new(name: String, kind: EntryKind, hash: Hash) -> Result<Self, VctrlError>` — validates tree entry name.
-- Accessors: `name()`, `kind()`, `hash()`.
-
-#### `Tree`
-
-Represents a Git tree (directory listing). Entries are always sorted according to Git ordering rules (tree entries are compared as if their name has a trailing `/`). Duplicate names are rejected.
-
-- `new(entries: Vec<TreeEntry>) -> Result<Self, VctrlError>` — sorts and validates.
-- Accessors: `entries() -> &[TreeEntry]`, `len()`, `is_empty()`, `get(name: &str) -> Option<&TreeEntry>`.
-
-#### `UserID`
-
-Represents a user identity (author or committer).
-
-- `new(name: String, email: String) -> Result<Self, VctrlError>` — validates name and email.
-- Accessors: `name()`, `email()`.
-
-#### `CommitMeta`
-
-Metadata associated with a commit or tag.
-
-- `new(timestamp: i64, timezone_offset: i16, encoding: Option<String>) -> Result<Self, VctrlError>` — validates timezone offset.
-- Accessors: `timestamp()`, `timezone_offset()`, `encoding()`.
-
-#### `Commit`
-
-Represents a Git commit object.
-
-- `new(tree, parents, author, committer, message)` or `with_meta(...)` — validates parent count, message length, and duplicate parents.
-- Accessors: `tree()`, `parents()`, `author()`, `committer()`, `message()`, `meta()`.
-
-#### `Tag`
-
-Represents a Git tag object.
-
-- `new(name, target, tagger, message)` or `with_meta(...)` — validates reference name and message length.
-- Accessors: `name()`, `target()`, `tagger()`, `message()`, `meta()`.
-
-#### `ChangeKind`
-
-Enum describing the kind of change: `Added`, `Deleted`, `Modified`, `TypeChange`, `Renamed`, `Copied`.
-
-#### `FileDelta`
-
-Represents a single file delta between two trees. Provides constructor methods: `added`, `deleted`, `modified`, `type_change`, `renamed`, `copied`. Accessors for path, old path, old hash, new hash, kind, and convenience `is_*` methods.
-
-#### `TreeDelta`
-
-A collection of `FileDelta`. Supports `len`, `is_empty`, `iter`, `changes`, `IntoIterator`.
-
-#### `Conflict`
-
-Represents a merge conflict: path, ancestor blob hash, our blob hash, their blob hash.
-
-#### `MergeResult`
-
-Enum: `Success(Hash)` or `Conflicts(Vec<Conflict>)`. Provides `is_success`, `is_conflicts`, `conflicts`.
-
-#### `ReflogEntry`
-
-A single reflog entry: old id, new id, reason, timestamp, timezone offset. Constructor validates timezone offset.
-
-### `validation`
-
-Validation functions that define the security boundary.
-
-- `validate_hash_bytes(bytes: &[u8]) -> Result<(), VctrlError>` — ensures exactly 64 bytes.
-- `validate_name(name: &str) -> Result<(), VctrlError>` — basic name validation.
-- `validate_ref_name(name: &str) -> Result<(), VctrlError>` — strict Git reference name validation.
-- `validate_tree_entry_name(name: &str) -> Result<(), VctrlError>` — strict tree entry name validation.
-
----
-
-## Validation Contract
-
-Validation is the single source of truth for security-critical rules. It is encapsulated in `libvctrl_handler::validation` and must be used by all implementation crates. Duplicating validation logic in `libvctrl_core` or elsewhere is forbidden.
-
-### Reference Names (`validate_ref_name`)
-
-Enforces Git-strict rules with additional security hardening.
-
-**Forbidden substrings:**
-
-- `..` (path traversal)
-- `~`, `^`, `:`, `?`, `*`, `[`, `\`, space, `@{`, `//`
-- `<`, `>`, `|`, `"`
-
-**Forbidden patterns:**
-
-- Leading `.` (hidden paths)
-- Leading `/` (absolute paths)
-- Trailing `/`
-- Trailing `.`
-- Extension `.lock` (case-insensitive)
-
-**Additional constraints:**
-
-- Length must be between 1 and 255 bytes.
-- No ASCII control characters.
-
-### Tree Entry Names (`validate_tree_entry_name`)
-
-Stricter than reference names because tree entries map directly to filesystem entries.
-
-**Forbidden:**
-
-- `/` and `\` (path separators)
-- Exact names `.` and `..`
-- Length 0 or > 255 bytes
-- ASCII control characters
-
-### Hash Length (`validate_hash_bytes`)
-
-- Exactly 64 bytes, corresponding to SHA-512 output length.
-
-### Architectural Rule
-
-> `libvctrl_core` and all implementation crates MUST call
-> `libvctrl_handler::validate_*` — never duplicate validation logic.
-
-This rule prevents divergent validation implementations, which could lead to security vulnerabilities or interoperability issues. All type constructors in `libvctrl_handler::types` already call the appropriate validation functions, so any object created through the public API is guaranteed to be valid.
+Full API documentation is published at <https://docs.rs/libvctrl_handler>. The summary
+below describes each module and its public surface.
+
+### `constants` — Limits and protocol values
+
+Centralises all magic numbers so that limits are uniformly enforced at the type
+construction level. Two categories: resource-exhaustion circuit breakers and Git protocol
+constants.
+
+| Constant             | Value          | Purpose                                                  |
+| -------------------- | -------------- | -------------------------------------------------------- |
+| `HASH_LENGTH`        | `64`           | SHA-512 hash length in bytes; enables fixed-size arrays. |
+| `MAX_NAME_LENGTH`    | `255`          | Upper bound on file/directory/reference names (bytes).   |
+| `MAX_BLOB_SIZE`      | `100 * 1024^2` | Maximum blob size (100 MiB); DoS circuit breaker.        |
+| `MAX_TREE_ENTRIES`   | `100_000`      | Maximum entries per tree; bounds parse/diff cost.        |
+| `MAX_MESSAGE_LENGTH` | `1024 * 1024`  | Maximum commit/tag message length (1 MiB).               |
+| `MAX_PARENT_COUNT`   | `0xFFFF`       | Maximum parent commits (u16 range).                      |
+
+The `entry_mode` submodule exposes the Git protocol mode bits:
+
+| Constant     | Value       | Meaning          |
+| ------------ | ----------- | ---------------- |
+| `BLOB`       | `0o100_644` | Regular file     |
+| `EXECUTABLE` | `0o100_755` | Executable file  |
+| `SYMLINK`    | `0o120_000` | Symbolic link    |
+| `TREE`       | `0o40_000`  | Directory (tree) |
+| `SUBMODULE`  | `0o160_000` | Submodule commit |
+
+### `enums` — Strongly-typed protocol kinds
+
+- **`EntryKind`** — a `#[non_exhaustive]` enum (`Blob`, `Executable`, `Symlink`, `Tree`,
+  `Submodule`) classifying tree entries. Provides `const fn mode() -> u32` and
+  `const fn from_mode(u32) -> Option<Self>` for lossless conversion to and from raw Git
+  mode bits. Consumers must include a `_` catch-all when matching.
+
+### `errors` — Unified error type
+
+- **`VctrlError`** — a `#[non_exhaustive]`, `Clone + Debug + PartialEq + Eq` enum that all
+  fallible operations across the ecosystem return. Implements `Display` and `std::error::Error`.
+  I/O errors are stored as `Arc<std::io::Error>` to make the error `Clone`. A manual
+  `PartialEq` compares `io::Error::kind()` and string representation.
+
+| Variant                        | Meaning                                                      |
+| ------------------------------ | ------------------------------------------------------------ |
+| `CorruptedData(String)`        | Data was corrupted or malformed.                             |
+| `DuplicateParent`              | A commit contains duplicate parent hashes.                   |
+| `ExceededMaxSize(String)`      | A size or count limit was exceeded.                          |
+| `InvalidBlameRange`            | An invalid blame range was specified (zero start or count).  |
+| `InvalidEmail(String)`         | An email address was invalid.                                |
+| `InvalidHashLength(usize)`     | Hash length did not match `HASH_LENGTH`.                     |
+| `InvalidName(String)`          | A name was empty, too long, or contained control characters. |
+| `InvalidTimezoneOffset(i16)`   | Timezone offset outside `-1440..=1440`.                      |
+| `InvalidTreeStructure(String)` | Tree entries unsorted or duplicated.                         |
+| `IoError(Arc<io::Error>)`      | An I/O error occurred.                                       |
+| `ObjectNotFound(Hash)`         | An object with the given hash was not found.                 |
+| `Other(String)`                | Any error not covered by the above.                          |
+| `RefNotFound(String)`          | A reference with the given name was not found.               |
+| `SerializationError(String)`   | A serialization/deserialization error occurred.              |
+
+`VctrlError::from_io(io::Error)` is the canonical constructor for I/O failures.
+
+### `macros` — Error-construction helpers
+
+- **`vctrl_error_other!`** — an exported declarative macro that wraps `format!` into
+  `VctrlError::Other`. Uses `$crate` for absolute path resolution so the macro remains
+  correct even when imported via glob from another crate.
+
+### `traits` — The 17 backend contracts
+
+All traits live under `traits::core` and are re-exported at the crate root. They are
+grouped by domain:
+
+**Serialization and content addressing**
+
+| Trait     | Purpose                                                       |
+| --------- | ------------------------------------------------------------- |
+| `Encoder` | Serialise objects (`Blob`, `Tree`, `Commit`, `Tag`) to bytes. |
+| `Decoder` | Parse bytes back into validated objects; the trust boundary.  |
+| `Hasher`  | Compute a content-address `Hash` from a byte stream.          |
+
+**Object and reference storage**
+
+| Trait         | Purpose                                                      |
+| ------------- | ------------------------------------------------------------ |
+| `ObjectStore` | Store and retrieve encoded object bytes keyed by `Hash`.     |
+| `RefStore`    | Manage named references (branches, tags) pointing at hashes. |
+| `ReflogStore` | Append and read reflog entries for a reference.              |
+| `Index`       | Manage the staged index of path-to-hash mappings.            |
+
+**History traversal and analysis**
+
+| Trait        | Purpose                                                             |
+| ------------ | ------------------------------------------------------------------- |
+| `RevWalk`    | Traverse the commit graph from a set of heads.                      |
+| `Blame`      | Attribute file line ranges to commits (`BlameEntry`).               |
+| `TreeDiffer` | Compute tree-level deltas (`TreeDelta`, `FileDelta`, `ChangeKind`). |
+
+**Remote and packfile**
+
+| Trait        | Purpose                                               |
+| ------------ | ----------------------------------------------------- |
+| `Transport`  | Abstract network transport for remote operations.     |
+| `Remote`     | Manage remote configuration and endpoint interaction. |
+| `PackReader` | Decode Git packfile streams into objects.             |
+| `PackWriter` | Encode objects into Git packfile streams.             |
+
+**Cryptographic integrity**
+
+| Trait      | Purpose                                        |
+| ---------- | ---------------------------------------------- |
+| `Signer`   | Produce cryptographic signatures over objects. |
+| `Verifier` | Verify cryptographic signatures over objects.  |
+
+**Configuration**
+
+| Trait         | Purpose                                                                                                           |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ConfigStore` | Read and write sectioned configuration values (`Option`-returning reads for sparse keys; `&mut self` for writes). |
+
+All traits require `Send + Sync`. Write operations take `&mut self`; read operations take
+`&self`. `BlameEntry` is the companion struct for `Blame`, constructed via a fallible
+`new()` that rejects zero start lines or counts.
+
+### `types` — The 14 immutable data types
+
+All types live under `types/core` and are re-exported at the crate root. Each is immutable
+after construction and built through a fallible constructor.
+
+| Type          | Purpose                                                                    |
+| ------------- | -------------------------------------------------------------------------- |
+| `Blob`        | A file's raw content, bounded by `MAX_BLOB_SIZE`.                          |
+| `Tree`        | A sorted collection of `TreeEntry` objects, bounded by `MAX_TREE_ENTRIES`. |
+| `TreeEntry`   | A single directory entry: name, `EntryKind`, and target `Hash`.            |
+| `Commit`      | A commit object: tree hash, parents, author/committer, message, metadata.  |
+| `CommitMeta`  | Timestamp, timezone offset, and optional encoding for a commit.            |
+| `Tag`         | An annotated tag: name, target hash, optional tagger, message, metadata.   |
+| `Hash`        | A fixed 64-byte SHA-512 content address (`Copy`, `Send`, `Sync`).          |
+| `UserID`      | A name and email pair with validation.                                     |
+| `ReflogEntry` | A single reflog record (old/new hash, committer, message).                 |
+| `ChangeKind`  | The kind of change in a diff (added, modified, deleted, etc.).             |
+| `FileDelta`   | A per-file change between two trees.                                       |
+| `TreeDelta`   | An aggregate tree-level diff.                                              |
+| `Conflict`    | A merge conflict representation.                                           |
+| `MergeResult` | The outcome of a merge operation.                                          |
+
+### `validation` — Input checks
+
+Pure functions that define the security boundary for raw inputs, intended to be applied
+_before_ attempting object construction so that malformed data fails fast.
+
+| Function                   | Validates                                                                           |
+| -------------------------- | ----------------------------------------------------------------------------------- |
+| `validate_hash_bytes`      | That a byte slice is exactly `HASH_LENGTH` bytes.                                   |
+| `validate_name`            | That a name is non-empty, within `MAX_NAME_LENGTH`, and free of control characters. |
+| `validate_ref_name`        | That a reference name is structurally valid (e.g. `refs/heads/main`).               |
+| `validate_tree_entry_name` | That a tree entry name is a valid path component.                                   |
 
 ---
 
 ## Testing
 
-The handler crate includes a small set of unit tests, primarily for tree ordering and duplicate rejection, located in `src/types/core/tree.rs`.
-
-To run the tests:
+Run the crate's test suite with Cargo:
 
 ```bash
 cargo test
 ```
 
-When developing an implementation crate, you should write additional tests that exercise your concrete implementations against the trait contracts. The handler's validation functions can be used as property-based test oracles.
+Property-based tests use `proptest` (a dev-dependency). Because the crate defines only
+contracts and immutable types, its tests focus on construction invariants, validation
+rejection of malformed input, and round-trip properties of `EntryKind` mode conversion.
+To run the entire workspace test suite from the repository root:
+
+```bash
+cargo test --workspace
+```
+
+To verify the strict lint policy is satisfied:
+
+```bash
+cargo clippy --workspace --all-targets -- -D warnings
+cargo doc --workspace --no-deps
+```
 
 ---
 
 ## Contributing
 
-Contributions to `libvctrl` are welcome. Before submitting a pull request, please ensure:
+Contributions are welcome. The crate enforces `#![forbid(unsafe_code)]` and inherits a
+strict, denied Clippy and documentation-lint policy from the workspace; all public items
+must be documented.
 
-1. **Contract stability** — Any change to traits or types must be backward-compatible or clearly justified. The handler crate is a foundation; breaking changes propagate to all downstream crates.
-2. **Validation rules** — If you modify validation functions, update the Validation Contract section of this README and the test suite accordingly.
-3. **No unsafe code** — The crate uses `#![forbid(unsafe_code)]`. Do not introduce unsafe blocks.
-4. **Documentation** — All public items must have doc comments due to `#![deny(missing_docs)]`. Ensure new code is documented at the same standard.
-5. **Lint compliance** — Run `cargo clippy` with the project's lint configuration and fix all warnings.
-6. **Tests** — Add unit tests for new logic and run `cargo test` to verify no regressions.
+For contribution guidelines, code style, and the full lint configuration, see the
+repository's `CONTRIBUTING.md` and the workspace root `README.md`:
 
-For significant architectural changes, open an issue first to discuss the design with the maintainers.
+- Repository: https://github.com/mroczect/libvctrl
+
+When contributing to `libvctrl_handler`, preserve the contracts-only invariant: no
+concrete implementations belong here. New behaviours belong in `libvctrl_core`; new
+contracts and types belong here; new user-facing commands belong in `libvctrl_plumbing`
+or `libvctrl_porcelain`.
+
+---
+
+## Ecosystem
+
+`libvctrl_handler` is the foundation of a larger workspace. The related crates are listed
+below; each has its own documentation.
+
+| Crate                | Role                                                     | Documentation                      |
+| -------------------- | -------------------------------------------------------- | ---------------------------------- |
+| `libvctrl`           | Facade: re-exports contracts, reference impl, and crypto | https://docs.rs/libvctrl           |
+| `libvctrl_core`      | Reference implementations of these contracts             | https://docs.rs/libvctrl_core      |
+| `libvctrl_sha512`    | Zero-dependency SHA-512 / HMAC / HKDF primitives         | https://docs.rs/libvctrl_sha512    |
+| `libvctrl_plumbing`  | Command-level VCS operations built on `libvctrl_core`    | https://docs.rs/libvctrl_plumbing  |
+| `libvctrl_porcelain` | High-level, user-facing VCS operations                   | https://docs.rs/libvctrl_porcelain |
+
+The dependency flow is strictly one-way: `libvctrl_handler` is the foundation,
+`libvctrl_core` implements its contracts, the facade re-exports both, and
+`libvctrl_plumbing` / `libvctrl_porcelain` build on `libvctrl_core`.
+
+```mermaid
+flowchart LR
+    H[libvctrl_handler<br/>contracts] --> C[libvctrl_core<br/>reference impl]
+    C --> PL[libvctrl_plumbing]
+    C --> PO[libvctrl_porcelain]
+    H --> F[libvctrl<br/>facade]
+    C --> F
+```
+
+---
+
+## License
+
+Licensed under the MIT License. See the repository for the full license text.
