@@ -1,3 +1,6 @@
+#![allow(missing_docs)]
+#![allow(unused_crate_dependencies)]
+
 use libvctrl_sha512::{HKDF, HMAC, Hash};
 
 // ============================================================================
