@@ -8,3 +8,4 @@ pull_request_body.md
 issue*
 /dist
 release*
+!release.json
