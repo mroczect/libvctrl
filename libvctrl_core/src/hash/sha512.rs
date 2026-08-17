@@ -101,7 +101,13 @@ impl Hasher for Sha512Hasher {
             if n == 0 {
                 break;
             }
-            hasher.update(&buffer[..n]);
+            let chunk = buffer.get(..n).ok_or_else(|| {
+                VctrlError::IoError(std::sync::Arc::new(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "read returned invalid length",
+                )))
+            })?;
+            hasher.update(chunk);
         }
         let digest = hasher.finalize();
         Hash::from_bytes(&digest)
