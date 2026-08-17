@@ -44,6 +44,7 @@
 //! # use libvctrl::{
 //! #     Blob, Encoder, Hasher, ObjectStore, BinaryEncoder, Sha512Hasher, MemoryStore,
 //! # };
+//! # use libvctrl_core::codec::BinaryDecoder;
 //! # use libvctrl_plumbing::{cat_file, CatFileMode};
 //! # use std::io::Cursor;
 //! # fn main() -> Result<(), libvctrl::VctrlError> {
@@ -51,7 +52,7 @@
 //! let blob = Blob::new(b"hello".to_vec())?;
 //! let mut encoded = Vec::new();
 //! BinaryEncoder.encode_blob(&blob, &mut encoded)?;
-//! let hash = Sha512Hasher.hash(&mut encoded.as_slice())?;
+//! let hash = Sha512Hasher.hash(encoded.as_slice())?;
 //! let mut store = MemoryStore::new();
 //! store.put(&hash, &encoded)?;
 //!
@@ -173,6 +174,7 @@ pub enum ObjectType {
 /// #     Commit, Encoder, Hasher, ObjectStore, BinaryEncoder, Sha512Hasher, MemoryStore,
 /// #     Hash, UserID,
 /// # };
+/// # use libvctrl_core::codec::BinaryDecoder;
 /// # use libvctrl_plumbing::{cat_file, CatFileMode};
 /// # use std::io::Cursor;
 /// # fn main() -> Result<(), libvctrl::VctrlError> {
@@ -185,7 +187,7 @@ pub enum ObjectType {
 /// // Encode, hash, and store.
 /// let mut encoded = Vec::new();
 /// BinaryEncoder.encode_commit(&commit, &mut encoded)?;
-/// let hash = Sha512Hasher.hash(&mut encoded.as_slice())?;
+/// let hash = Sha512Hasher.hash(encoded.as_slice())?;
 /// let mut store = MemoryStore::new();
 /// store.put(&hash, &encoded)?;
 ///
@@ -323,6 +325,7 @@ pub struct BatchOptions {
 /// # use libvctrl::{
 /// #     Blob, Encoder, Hasher, ObjectStore, BinaryEncoder, Sha512Hasher, MemoryStore,
 /// # };
+/// # use libvctrl_core::codec::BinaryDecoder;
 /// # use libvctrl_plumbing::{cat_file_batch, BatchOptions};
 /// # use std::io::{BufReader, Cursor};
 /// # fn main() -> Result<(), libvctrl::VctrlError> {
@@ -333,7 +336,7 @@ pub struct BatchOptions {
 ///     let blob = Blob::new(content)?;
 ///     let mut encoded = Vec::new();
 ///     BinaryEncoder.encode_blob(&blob, &mut encoded)?;
-///     let hash = Sha512Hasher.hash(&mut encoded.as_slice())?;
+///     let hash = Sha512Hasher.hash(encoded.as_slice())?;
 ///     store.put(&hash, &encoded)?;
 ///     hashes.push(hash.to_string());
 /// }
@@ -484,7 +487,7 @@ fn parse_hash(s: &str) -> Result<Hash, VctrlError> {
     for (i, byte) in bytes.iter_mut().enumerate() {
         let hex_byte = &s[i * 2..i * 2 + 2];
         *byte = u8::from_str_radix(hex_byte, 16)
-            .map_err(|_| VctrlError::Other("invalid hex character in hash".into()))?;
+            .map_err(|e| VctrlError::Other(format!("invalid hex character in hash: {e}")))?;
     }
     Hash::from_bytes(&bytes)
 }
@@ -534,52 +537,49 @@ fn pretty_print<D: Decoder>(decoder: &D, encoded: &[u8]) -> Result<String, Vctrl
     if let Ok(tree) = decoder.decode_tree(encoded) {
         let mut out = String::new();
         for entry in tree.entries() {
-            writeln!(
+            let _ = writeln!(
                 &mut out,
                 "{:06o} {:?} {} {}",
                 entry_mode(entry.kind()),
                 entry.kind(),
                 entry.hash(),
                 entry.name()
-            )
-            .expect("write to String never fails");
+            );
         }
         return Ok(out);
     }
     if let Ok(commit) = decoder.decode_commit(encoded) {
         let mut out = String::new();
-        writeln!(&mut out, "tree {}", commit.tree()).unwrap();
+        let _ = writeln!(&mut out, "tree {}", commit.tree());
         for parent in commit.parents() {
-            writeln!(&mut out, "parent {parent}").unwrap();
+            let _ = writeln!(&mut out, "parent {parent}");
         }
-        writeln!(
+        let _ = writeln!(
             &mut out,
             "author {} <{}>",
             commit.author().name(),
             commit.author().email()
-        )
-        .unwrap();
-        writeln!(
+        );
+        let _ = writeln!(
             &mut out,
             "committer {} <{}>",
             commit.committer().name(),
             commit.committer().email()
-        )
-        .unwrap();
-        writeln!(&mut out).unwrap();
-        writeln!(&mut out, "{}", commit.message()).unwrap();
+        );
+        let _ = writeln!(&mut out);
+        let _ = writeln!(&mut out, "{}", commit.message());
         return Ok(out);
     }
     if let Ok(tag) = decoder.decode_tag(encoded) {
         let mut out = String::new();
-        writeln!(&mut out, "object {}", tag.target()).unwrap();
-        writeln!(&mut out, "type commit").unwrap();
-        writeln!(&mut out, "tag {}", tag.name()).unwrap();
+        let _ = writeln!(&mut out, "object {}", tag.target());
+        let _ = writeln!(&mut out, "type commit");
+        let _ = writeln!(&mut out, "tag {}", tag.name());
         if let Some(tagger) = tag.tagger() {
-            writeln!(&mut out, "tagger {} <{}>", tagger.name(), tagger.email()).unwrap();
+            let _ = writeln!(&mut out, "tagger {} <{}>", tagger.name(), tagger.email());
         }
-        writeln!(&mut out).unwrap();
-        writeln!(&mut out, "{}", tag.message()).unwrap();
+        let _ = writeln!(&mut out);
+        let _ = writeln!(&mut out, "{}", tag.message());
         return Ok(out);
     }
     Err(VctrlError::CorruptedData("unknown object type".into()))
