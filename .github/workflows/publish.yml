@@ -4,7 +4,7 @@ on:
   push:
     branches: ["master"]
     paths:
-      - 'release.json'
+      - "release.json"
   workflow_dispatch:
 
 permissions:
