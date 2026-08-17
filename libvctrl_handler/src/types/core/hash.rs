@@ -14,8 +14,8 @@
 
 use crate::constants::HASH_LENGTH;
 use crate::errors::VctrlError;
-use std::fmt;
-use std::str::FromStr;
+use core::fmt;
+use core::str::FromStr;
 
 /// A fixed-size hash (64 bytes, e.g., SHA-512).
 ///
@@ -73,6 +73,7 @@ impl Hash {
     /// assert!(invalid_hash.is_err());
     /// # Ok::<(), VctrlError>(())
     /// ```
+    #[allow(clippy::indexing_slicing)]
     pub const fn from_bytes(bytes: &[u8]) -> Result<Self, VctrlError> {
         if bytes.len() != HASH_LENGTH {
             return Err(VctrlError::InvalidHashLength(bytes.len()));
@@ -175,10 +176,13 @@ impl FromStr for Hash {
             return Err(VctrlError::InvalidHashLength(s.len()));
         }
         let mut bytes = [0_u8; HASH_LENGTH];
-        for i in 0..HASH_LENGTH {
-            let byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16)
-                .map_err(|_| VctrlError::CorruptedData(format!("invalid hex char in hash: {s}")))?;
-            bytes[i] = byte;
+        for (out, chunk) in bytes.iter_mut().zip(s.as_bytes().chunks_exact(2)) {
+            let hex_str = core::str::from_utf8(chunk).map_err(|e| {
+                VctrlError::CorruptedData(format!("invalid hex char in hash: {s}: {e}"))
+            })?;
+            *out = u8::from_str_radix(hex_str, 16).map_err(|e| {
+                VctrlError::CorruptedData(format!("invalid hex char in hash: {s}: {e}"))
+            })?;
         }
         Ok(Self(bytes))
     }
