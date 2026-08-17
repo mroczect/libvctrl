@@ -130,6 +130,9 @@
 //! [`crypto`](crate::crypto) if you need direct access to the underlying
 //! crates.
 
+#[cfg(test)]
+use proptest as _;
+
 /// Re-export of the `libvctrl_core` reference implementation crate.
 ///
 /// This namespace contains production-ready implementations of the handler
