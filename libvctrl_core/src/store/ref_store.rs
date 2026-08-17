@@ -68,7 +68,7 @@ impl MemoryRefStore {
     /// # Examples
     ///
     /// ```
-    /// # use libvctrl_core::store::MemoryRefStore;
+    /// use libvctrl_handler::traits::core::ref_store::RefStore;
     /// let store = MemoryRefStore::new();
     /// assert!(store.list_refs().unwrap().next().is_none());
     /// ```
