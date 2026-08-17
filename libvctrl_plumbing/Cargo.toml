@@ -16,6 +16,7 @@ categories = ["development-tools"]
 libvctrl = { path = "../libvctrl", version = "2.1.2" }
 
 [dev-dependencies]
+libvctrl_core = { path = "../libvctrl_core", version = "3.0.0" }
 
 [lints]
 workspace = true
