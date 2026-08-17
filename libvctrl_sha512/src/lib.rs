@@ -47,7 +47,8 @@
 //! assert_eq!(tag.len(), 64);
 //! ```
 
-#![allow(clippy::indexing_slicing, clippy::unwrap_used)]
+#![allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::expect_used)]
+#![allow(unused_crate_dependencies)]
 
 /// Defines an HMAC (Hash-based Message Authentication Code) type based on the
 /// provided hash struct.
