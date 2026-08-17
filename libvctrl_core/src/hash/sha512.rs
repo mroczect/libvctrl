@@ -28,7 +28,7 @@
 //! use libvctrl_handler::Hasher;
 //!
 //! let hasher = Sha512Hasher;
-//! let hash = hasher.hash(b"hello world").unwrap();
+//! let hash = hasher.hash(b"hello world".as_ref()).unwrap();
 //! assert_eq!(hash.as_bytes().len(), 64);
 //! ```
 
