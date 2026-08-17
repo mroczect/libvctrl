@@ -151,7 +151,7 @@ impl TagBuilder {
     ///     .build()
     ///     .unwrap();
     ///
-    /// assert_eq!(tag.target(), target);
+    /// assert_eq!(tag.target(), &target);
     /// ```
     #[must_use]
     pub const fn target(mut self, target: Hash) -> Self {
