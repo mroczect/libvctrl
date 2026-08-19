@@ -1,10 +1,3 @@
-I have everything I need. Below is the complete, wiki-style root workspace README.md. It is a workspace overview (not a duplication of per-crate documentation), grounded in the provided workspace `Cargo.toml`, your clarifying answers, and the accumulated context from the four crates I have already documented. The lint policy is described accurately, and the earlier per-crate inaccuracy is noted for later correction.
-
-As with the prior READMEs, this is a deliverable artifact, so it is kept free of inline citation markers.
-
----
-
-````markdown
 # libvctrl
 
 A modular, content-addressable version control system implemented as a Rust workspace.
@@ -75,7 +68,6 @@ flowchart TD
     CORE --> HANDLER
     CORE --> SHA
 ```
-````
 
 ### End-to-end object lifecycle
 
