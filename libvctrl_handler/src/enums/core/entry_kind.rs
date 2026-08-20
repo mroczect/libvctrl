@@ -4,13 +4,9 @@ use crate::constants::entry_mode;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EntryKind {
     Blob,
-
     Executable,
-
     Symlink,
-
     Tree,
-
     Submodule,
 }
 
