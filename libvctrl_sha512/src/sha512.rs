@@ -1,5 +1,6 @@
 #![allow(clippy::inline_always)]
 #![allow(clippy::indexing_slicing)]
+#![allow(clippy::arithmetic_side_effects)]
 
 use crate::utils::{load_be, store_be, verify};
 
@@ -10,9 +11,9 @@ pub(crate) struct State(pub(crate) [u64; 8]);
 
 impl W {
     fn new(input: &[u8]) -> Self {
-        let mut words = [0u64; 16];
-        for (i, e) in words.iter_mut().enumerate() {
-            *e = load_be(input, i * 8);
+        let mut words = [0_u64; 16];
+        for (index, word) in words.iter_mut().enumerate() {
+            *word = load_be(input, index * 8);
         }
         Self(words)
     }
@@ -215,50 +216,50 @@ impl State {
             0x68, 0x8c, 0x2b, 0x3e, 0x6c, 0x1f, 0x1f, 0x83, 0xd9, 0xab, 0xfb, 0x41, 0xbd, 0x6b,
             0x5b, 0xe0, 0xcd, 0x19, 0x13, 0x7e, 0x21, 0x79,
         ];
-        let mut t = [0u64; 8];
-        for (i, e) in t.iter_mut().enumerate() {
-            *e = load_be(&IV, i * 8);
+        let mut state = [0_u64; 8];
+        for (index, word) in state.iter_mut().enumerate() {
+            *word = load_be(&IV, index * 8);
         }
-        Self(t)
+        Self(state)
     }
 
     #[inline(always)]
     #[allow(clippy::missing_const_for_fn)]
-    pub(crate) fn add(&mut self, x: &Self) {
-        let sx = &mut self.0;
-        let ex = &x.0;
-        sx[0] = sx[0].wrapping_add(ex[0]);
-        sx[1] = sx[1].wrapping_add(ex[1]);
-        sx[2] = sx[2].wrapping_add(ex[2]);
-        sx[3] = sx[3].wrapping_add(ex[3]);
-        sx[4] = sx[4].wrapping_add(ex[4]);
-        sx[5] = sx[5].wrapping_add(ex[5]);
-        sx[6] = sx[6].wrapping_add(ex[6]);
-        sx[7] = sx[7].wrapping_add(ex[7]);
+    pub(crate) fn add(&mut self, other: &Self) {
+        let self_state = &mut self.0;
+        let other_state = &other.0;
+        self_state[0] = self_state[0].wrapping_add(other_state[0]);
+        self_state[1] = self_state[1].wrapping_add(other_state[1]);
+        self_state[2] = self_state[2].wrapping_add(other_state[2]);
+        self_state[3] = self_state[3].wrapping_add(other_state[3]);
+        self_state[4] = self_state[4].wrapping_add(other_state[4]);
+        self_state[5] = self_state[5].wrapping_add(other_state[5]);
+        self_state[6] = self_state[6].wrapping_add(other_state[6]);
+        self_state[7] = self_state[7].wrapping_add(other_state[7]);
     }
 
     pub(crate) fn store(&self, out: &mut [u8]) {
-        for (i, &e) in self.0.iter().enumerate() {
-            store_be(out, i * 8, e);
+        for (index, &word) in self.0.iter().enumerate() {
+            store_be(out, index * 8, word);
         }
     }
 
     pub(crate) fn blocks(&mut self, mut input: &[u8]) -> usize {
-        let mut t = *self;
+        let mut temp = *self;
         let mut inlen = input.len();
         while inlen >= 128 {
             let mut w = W::new(input);
-            w.g(&mut t, 0);
+            w.g(&mut temp, 0);
             w.expand();
-            w.g(&mut t, 1);
+            w.g(&mut temp, 1);
             w.expand();
-            w.g(&mut t, 2);
+            w.g(&mut temp, 2);
             w.expand();
-            w.g(&mut t, 3);
+            w.g(&mut temp, 3);
             w.expand();
-            w.g(&mut t, 4);
-            t.add(self);
-            self.0 = t.0;
+            w.g(&mut temp, 4);
+            temp.add(self);
+            self.0 = temp.0;
             input = &input[128..];
             inlen -= 128;
         }
@@ -272,6 +273,12 @@ pub struct Hash {
     pub(crate) w: [u8; 128],
     pub(crate) r: usize,
     pub(crate) len: u128,
+}
+
+impl core::fmt::Debug for Hash {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("Hash")
+    }
 }
 
 impl zeroize::Zeroize for Hash {
@@ -295,30 +302,30 @@ impl Hash {
         Self {
             state: State::new(),
             r: 0,
-            w: [0u8; 128],
+            w: [0_u8; 128],
             len: 0,
         }
     }
 
     pub(crate) fn update_inner<T: AsRef<[u8]>>(&mut self, input: T) {
         let input = input.as_ref();
-        let mut n = input.len();
-        self.len += n as u128;
-        let av = 128 - self.r;
-        let tc = core::cmp::min(n, av);
-        self.w[self.r..self.r + tc].copy_from_slice(&input[0..tc]);
-        self.r += tc;
-        n -= tc;
-        let pos = tc;
+        let mut remaining = input.len();
+        self.len += remaining as u128;
+        let available = 128 - self.r;
+        let take = core::cmp::min(remaining, available);
+        self.w[self.r..self.r + take].copy_from_slice(&input[0..take]);
+        self.r += take;
+        remaining -= take;
+        let pos = take;
         if self.r == 128 {
-            self.state.blocks(&self.w);
+            let _ = self.state.blocks(&self.w);
             self.r = 0;
         }
-        if self.r == 0 && n > 0 {
-            let rb = self.state.blocks(&input[pos..]);
-            if rb > 0 {
-                self.w[..rb].copy_from_slice(&input[pos + n - rb..]);
-                self.r = rb;
+        if self.r == 0 && remaining > 0 {
+            let leftover = self.state.blocks(&input[pos..]);
+            if leftover > 0 {
+                self.w[..leftover].copy_from_slice(&input[pos + remaining - leftover..]);
+                self.r = leftover;
             }
         }
     }
@@ -330,7 +337,7 @@ impl Hash {
     #[must_use]
     #[allow(clippy::cast_possible_truncation)]
     pub fn finalize(mut self) -> [u8; 64] {
-        let mut padded = zeroize::Zeroizing::new([0u8; 256]);
+        let mut padded = zeroize::Zeroizing::new([0_u8; 256]);
         padded[..self.r].copy_from_slice(&self.w[..self.r]);
         padded[self.r] = 0x80;
         let r = if self.r < 112 { 128 } else { 256 };
@@ -340,16 +347,16 @@ impl Hash {
         store_be(&mut *padded, r - 16, high);
         store_be(&mut *padded, r - 8, low);
 
-        self.state.blocks(&padded[..r]);
-        let mut out = [0u8; 64];
+        let _ = self.state.blocks(&padded[..r]);
+        let mut out = [0_u8; 64];
         self.state.store(&mut out);
         out
     }
 
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 64] {
-        let mut h = Self::new();
-        h.update(input);
-        h.finalize()
+        let mut hasher = Self::new();
+        hasher.update(input);
+        hasher.finalize()
     }
 
     #[must_use]
