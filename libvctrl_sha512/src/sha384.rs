@@ -1,4 +1,5 @@
 #![allow(clippy::indexing_slicing)]
+#![allow(clippy::arithmetic_side_effects)]
 
 use crate::sha512::{Hash as Sha512Hash, State};
 use crate::utils::load_be;
@@ -12,15 +13,21 @@ fn new_state() -> State {
         0x58, 0x15, 0x11, 0xdb, 0x0c, 0x2e, 0x0d, 0x64, 0xf9, 0x8f, 0xa7, 0x47, 0xb5, 0x48, 0x1d,
         0xbe, 0xfa, 0x4f, 0xa4,
     ];
-    let mut t = [0u64; 8];
-    for (i, e) in t.iter_mut().enumerate() {
-        *e = load_be(&IV, i * 8);
+    let mut state = [0_u64; 8];
+    for (index, word) in state.iter_mut().enumerate() {
+        *word = load_be(&IV, index * 8);
     }
-    State(t)
+    State(state)
 }
 
 #[derive(Clone)]
 pub struct Hash(Sha512Hash);
+
+impl core::fmt::Debug for Hash {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("Hash")
+    }
+}
 
 impl Hash {
     #[must_use]
@@ -28,7 +35,7 @@ impl Hash {
         Self(Sha512Hash {
             state: new_state(),
             r: 0,
-            w: [0u8; 128],
+            w: [0_u8; 128],
             len: 0,
         })
     }
@@ -43,7 +50,7 @@ impl Hash {
 
     #[must_use]
     pub fn finalize(self) -> [u8; 48] {
-        let mut out = [0u8; 48];
+        let mut out = [0_u8; 48];
         let full = zeroize::Zeroizing::new(self.0.finalize());
         out.copy_from_slice(&full[..48]);
         out
@@ -51,9 +58,9 @@ impl Hash {
 
     #[must_use]
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 48] {
-        let mut h = Self::new();
-        h.update(input);
-        h.finalize()
+        let mut hasher = Self::new();
+        hasher.update(input);
+        hasher.finalize()
     }
 
     pub fn zeroize(&mut self) {
