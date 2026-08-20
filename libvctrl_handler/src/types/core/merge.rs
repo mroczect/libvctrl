@@ -45,7 +45,6 @@ impl Conflict {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MergeResult {
     Success(Hash),
-
     Conflicts(Vec<Conflict>),
 }
 

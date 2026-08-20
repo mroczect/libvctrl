@@ -1,9 +1,11 @@
+use core::cmp::Ordering;
+use std::collections::HashSet;
+
 use super::hash::Hash;
 use crate::constants::MAX_TREE_ENTRIES;
 use crate::enums::EntryKind;
 use crate::errors::VctrlError;
 use crate::validation::validate_tree_entry_name;
-use std::cmp::Ordering;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TreeEntry {
@@ -49,19 +51,18 @@ impl Tree {
             )));
         }
 
-        let mut sorted = entries;
-        sorted.sort_by(compare_tree_entries);
-
-        for window in sorted.windows(2) {
-            if let (Some(first), Some(second)) = (window.first(), window.get(1))
-                && first.name == second.name
-            {
+        let mut seen = HashSet::with_capacity(entries.len());
+        for entry in &entries {
+            if !seen.insert(entry.name.clone()) {
                 return Err(VctrlError::InvalidTreeStructure(format!(
                     "duplicate entry name: '{}'",
-                    first.name
+                    entry.name
                 )));
             }
         }
+
+        let mut sorted = entries;
+        sorted.sort_by(compare_tree_entries);
 
         Ok(Self { entries: sorted })
     }
@@ -83,7 +84,7 @@ impl Tree {
 
     #[must_use]
     pub fn get(&self, name: &str) -> Option<&TreeEntry> {
-        self.entries.iter().find(|e| e.name == name)
+        self.entries.iter().find(|entry| entry.name == name)
     }
 }
 
@@ -94,8 +95,8 @@ fn compare_tree_entries(a: &TreeEntry, b: &TreeEntry) -> Ordering {
     let a_is_tree = a.kind == EntryKind::Tree;
     let b_is_tree = b.kind == EntryKind::Tree;
 
-    let a_len = a_bytes.len() + usize::from(a_is_tree);
-    let b_len = b_bytes.len() + usize::from(b_is_tree);
+    let a_len = a_bytes.len().wrapping_add(usize::from(a_is_tree));
+    let b_len = b_bytes.len().wrapping_add(usize::from(b_is_tree));
     let min_len = a_len.min(b_len);
 
     for i in 0..min_len {
@@ -140,12 +141,17 @@ mod tests {
         let e2 = TreeEntry::new("a".into(), EntryKind::Blob, h)?;
 
         let tree = Tree::new(vec![e1, e2])?;
-        assert_eq!(tree.entries().first().map(|e| e.name()), Some("a"));
-        assert_eq!(tree.entries().get(1).map(|e| e.name()), Some("b"));
+        assert_eq!(tree.entries().first().map(TreeEntry::name), Some("a"));
+        assert_eq!(tree.entries().get(1).map(TreeEntry::name), Some("b"));
 
         let dup1 = TreeEntry::new("x".into(), EntryKind::Blob, h)?;
         let dup2 = TreeEntry::new("x".into(), EntryKind::Tree, h)?;
         assert!(Tree::new(vec![dup1, dup2]).is_err());
+
+        let tricky_dup1 = TreeEntry::new("x".into(), EntryKind::Blob, h)?;
+        let tricky_mid = TreeEntry::new("x.".into(), EntryKind::Blob, h)?;
+        let tricky_dup2 = TreeEntry::new("x".into(), EntryKind::Tree, h)?;
+        assert!(Tree::new(vec![tricky_dup1, tricky_mid, tricky_dup2]).is_err());
 
         Ok(())
     }

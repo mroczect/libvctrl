@@ -1,7 +1,8 @@
-use crate::constants::HASH_LENGTH;
-use crate::errors::VctrlError;
 use core::fmt;
 use core::str::FromStr;
+
+use crate::constants::HASH_LENGTH;
+use crate::errors::VctrlError;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Hash([u8; HASH_LENGTH]);
@@ -16,7 +17,7 @@ impl Hash {
         let mut i = 0;
         while i < HASH_LENGTH {
             arr[i] = bytes[i];
-            i += 1;
+            i = i.wrapping_add(1);
         }
         Ok(Self(arr))
     }

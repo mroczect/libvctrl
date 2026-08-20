@@ -1,9 +1,9 @@
+use std::io::Read;
+
 use crate::errors::VctrlError;
 use crate::types::Hash;
-use std::io::Read;
 
 pub trait Transport: Send + Sync {
     fn fetch_object(&self, hash: &Hash) -> Result<Box<dyn Read + Send + '_>, VctrlError>;
-
     fn push_object(&mut self, hash: &Hash, data: &[u8]) -> Result<(), VctrlError>;
 }

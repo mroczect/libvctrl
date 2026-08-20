@@ -283,6 +283,9 @@ dependencies = [
 [[package]]
 name = "libvctrl_handler"
 version = "5.0.1"
+dependencies = [
+ "criterion",
+]
 
 [[package]]
 name = "libvctrl_plumbing"
