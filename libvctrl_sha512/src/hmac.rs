@@ -1,3 +1,4 @@
+#![allow(clippy::indexing_slicing)]
 use crate::sha512::Hash;
 
 impl_hmac!(Hash, 64, 128);
