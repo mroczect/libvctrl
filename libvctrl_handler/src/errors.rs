@@ -1,39 +1,27 @@
+use alloc::sync::Arc;
+use core::error::Error;
+use core::fmt;
+use std::io;
+
 use crate::constants::HASH_LENGTH;
 use crate::types::Hash;
-use std::error::Error;
-use std::fmt;
-use std::io;
-use std::sync::Arc;
 
 #[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum VctrlError {
     CorruptedData(String),
-
     DuplicateParent,
-
     ExceededMaxSize(String),
-
     InvalidBlameRange,
-
     InvalidEmail(String),
-
     InvalidHashLength(usize),
-
     InvalidName(String),
-
     InvalidTimezoneOffset(i16),
-
     InvalidTreeStructure(String),
-
     IoError(Arc<io::Error>),
-
     ObjectNotFound(Hash),
-
     Other(String),
-
     RefNotFound(String),
-
     SerializationError(String),
 }
 
