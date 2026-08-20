@@ -241,7 +241,8 @@ impl Encoder for BinaryEncoder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libvctrl_handler::{CommitMeta, HASH_LENGTH, Hash, UserID};
+    use crate::codec::BinaryDecoder;
+    use libvctrl_handler::{CommitMeta, Decoder, HASH_LENGTH, Hash, TreeEntry, UserID};
     use std::io::Cursor;
 
     fn make_hash(fill: u8) -> Hash {
@@ -299,9 +300,9 @@ mod tests {
         let mut expected = Vec::new();
         expected.push(VERSION);
         expected.extend_from_slice(&1u32.to_le_bytes());
-        expected.push(6); // "README" length
+        expected.push(6);
         expected.extend_from_slice(b"README");
-        expected.push(0); // Blob
+        expected.push(0);
         expected.extend_from_slice(&hash_bytes(0xAB));
         assert_eq!(encoded, expected);
     }
@@ -333,11 +334,11 @@ mod tests {
         expected.extend_from_slice(&2u32.to_le_bytes());
         expected.push(3);
         expected.extend_from_slice(b"src");
-        expected.push(3); // Tree
+        expected.push(3);
         expected.extend_from_slice(&hash_bytes(0x01));
         expected.push(3);
         expected.extend_from_slice(b"run");
-        expected.push(1); // Executable
+        expected.push(1);
         expected.extend_from_slice(&hash_bytes(0x02));
         assert_eq!(encoded, expected);
     }
@@ -350,7 +351,7 @@ mod tests {
             make_user_id("Alice", "a@b.c"),
             make_user_id("Bob", "b@c.d"),
             "init".into(),
-            make_meta(1700000000, 0, None),
+            make_meta(1_700_000_000, 0, None),
         )
         .unwrap();
         let mut buf = Cursor::new(Vec::new());
@@ -371,7 +372,7 @@ mod tests {
         expected.extend_from_slice(b"b@c.d");
         expected.extend_from_slice(&4u32.to_le_bytes());
         expected.extend_from_slice(b"init");
-        expected.extend_from_slice(&1700000000i64.to_le_bytes());
+        expected.extend_from_slice(&1_700_000_000_i64.to_le_bytes());
         expected.extend_from_slice(&0i16.to_le_bytes());
         expected.push(0);
         assert_eq!(encoded, expected);
@@ -385,7 +386,7 @@ mod tests {
             make_user_id("A", "a@b.c"),
             make_user_id("B", "b@c.d"),
             "msg".into(),
-            make_meta(1700000000, 3600, Some("UTF-8")),
+            make_meta(1_700_000_000, 3600, Some("UTF-8")),
         )
         .unwrap();
         let mut buf = Cursor::new(Vec::new());
@@ -406,7 +407,7 @@ mod tests {
         expected.extend_from_slice(b"b@c.d");
         expected.extend_from_slice(&3u32.to_le_bytes());
         expected.extend_from_slice(b"msg");
-        expected.extend_from_slice(&1700000000i64.to_le_bytes());
+        expected.extend_from_slice(&1_700_000_000_i64.to_le_bytes());
         expected.extend_from_slice(&3600i16.to_le_bytes());
         expected.push(5);
         expected.extend_from_slice(b"UTF-8");
@@ -457,7 +458,7 @@ mod tests {
             make_hash(0x10),
             Some(make_user_id("Alice", "alice@ex.com")),
             "release".into(),
-            make_meta(1700000000, 0, None),
+            make_meta(1_700_000_000, 0, None),
         )
         .unwrap();
         let mut buf = Cursor::new(Vec::new());
@@ -466,17 +467,17 @@ mod tests {
 
         let mut expected = Vec::new();
         expected.push(VERSION);
-        expected.push(4); // "v1.0" length
+        expected.push(4);
         expected.extend_from_slice(b"v1.0");
         expected.extend_from_slice(&hash_bytes(0x10));
-        expected.push(1); // has tagger
+        expected.push(1);
         expected.push(5);
         expected.extend_from_slice(b"Alice");
         expected.push(11);
         expected.extend_from_slice(b"alice@ex.com");
         expected.extend_from_slice(&7u32.to_le_bytes());
         expected.extend_from_slice(b"release");
-        expected.extend_from_slice(&1700000000i64.to_le_bytes());
+        expected.extend_from_slice(&1_700_000_000_i64.to_le_bytes());
         expected.extend_from_slice(&0i16.to_le_bytes());
         expected.push(0);
         assert_eq!(encoded, expected);
@@ -489,7 +490,7 @@ mod tests {
             make_hash(0x20),
             None,
             "".into(),
-            make_meta(1700000000, 0, None),
+            make_meta(1_700_000_000, 0, None),
         )
         .unwrap();
         let mut buf = Cursor::new(Vec::new());
@@ -501,9 +502,9 @@ mod tests {
         expected.push(4);
         expected.extend_from_slice(b"v2.0");
         expected.extend_from_slice(&hash_bytes(0x20));
-        expected.push(0); // no tagger
+        expected.push(0);
         expected.extend_from_slice(&0u32.to_le_bytes());
-        expected.extend_from_slice(&1700000000i64.to_le_bytes());
+        expected.extend_from_slice(&1_700_000_000_i64.to_le_bytes());
         expected.extend_from_slice(&0i16.to_le_bytes());
         expected.push(0);
         assert_eq!(encoded, expected);
@@ -516,7 +517,7 @@ mod tests {
             make_hash(0x30),
             Some(make_user_id("B", "b@c.d")),
             "tag".into(),
-            make_meta(1700000000, -3600, Some("UTF-8")),
+            make_meta(1_700_000_000, -3600, Some("UTF-8")),
         )
         .unwrap();
         let mut buf = Cursor::new(Vec::new());
@@ -525,7 +526,7 @@ mod tests {
 
         let mut expected = Vec::new();
         expected.push(VERSION);
-        expected.push(2); // "v3" length
+        expected.push(2);
         expected.extend_from_slice(b"v3");
         expected.extend_from_slice(&hash_bytes(0x30));
         expected.push(1);
@@ -535,10 +536,156 @@ mod tests {
         expected.extend_from_slice(b"b@c.d");
         expected.extend_from_slice(&3u32.to_le_bytes());
         expected.extend_from_slice(b"tag");
-        expected.extend_from_slice(&1700000000i64.to_le_bytes());
+        expected.extend_from_slice(&1_700_000_000_i64.to_le_bytes());
         expected.extend_from_slice(&(-3600i16).to_le_bytes());
         expected.push(5);
         expected.extend_from_slice(b"UTF-8");
         assert_eq!(encoded, expected);
+    }
+
+    #[test]
+    fn test_blob_roundtrip() {
+        let original_data = vec![0x01, 0x02, 0x03, 0x04, 0x05];
+        let blob = Blob::new(original_data.clone()).unwrap();
+        let mut buf = Cursor::new(Vec::new());
+        BinaryEncoder.encode_blob(&blob, &mut buf).unwrap();
+        let encoded = buf.into_inner();
+
+        assert_eq!(encoded[0], VERSION, "first byte should be version");
+
+        let decoded = BinaryDecoder
+            .decode_blob(Cursor::new(encoded))
+            .expect("decode should succeed");
+        assert_eq!(
+            decoded.data(),
+            original_data.as_slice(),
+            "roundtrip blob data should match original"
+        );
+    }
+
+    #[test]
+    fn test_blob_empty_roundtrip() {
+        let blob = Blob::new(vec![]).unwrap();
+        let mut buf = Cursor::new(Vec::new());
+        BinaryEncoder.encode_blob(&blob, &mut buf).unwrap();
+        let encoded = buf.into_inner();
+
+        let decoded = BinaryDecoder
+            .decode_blob(Cursor::new(encoded))
+            .expect("decode empty blob should succeed");
+        assert!(
+            decoded.data().is_empty(),
+            "roundtrip empty blob should have empty data"
+        );
+    }
+
+    #[test]
+    fn test_blob_large_roundtrip() {
+        let original_data = vec![0x42u8; 8192];
+        let blob = Blob::new(original_data.clone()).unwrap();
+        let mut buf = Cursor::new(Vec::new());
+        BinaryEncoder.encode_blob(&blob, &mut buf).unwrap();
+        let encoded = buf.into_inner();
+
+        let decoded = BinaryDecoder
+            .decode_blob(Cursor::new(encoded))
+            .expect("decode large blob should succeed");
+        assert_eq!(decoded.data(), original_data.as_slice());
+    }
+
+    #[test]
+    fn test_tree_roundtrip() {
+        let e1 = TreeEntry::new("file.txt".into(), EntryKind::Blob, make_hash(0x01)).unwrap();
+        let e2 = TreeEntry::new("src".into(), EntryKind::Tree, make_hash(0x02)).unwrap();
+        let tree = Tree::new(vec![e1, e2]).unwrap();
+
+        let mut buf = Cursor::new(Vec::new());
+        BinaryEncoder.encode_tree(&tree, &mut buf).unwrap();
+        let encoded = buf.into_inner();
+
+        let decoded = BinaryDecoder
+            .decode_tree(Cursor::new(encoded))
+            .expect("decode tree should succeed");
+        assert_eq!(decoded.entries().len(), 2);
+        assert_eq!(decoded.entries()[0].name(), "file.txt");
+        assert_eq!(decoded.entries()[0].kind(), EntryKind::Blob);
+        assert_eq!(decoded.entries()[1].name(), "src");
+        assert_eq!(decoded.entries()[1].kind(), EntryKind::Tree);
+    }
+
+    #[test]
+    fn test_commit_roundtrip() {
+        let commit = Commit::with_meta(
+            make_hash(0x01),
+            vec![make_hash(0x02)],
+            make_user_id("Alice", "alice@ex.com"),
+            make_user_id("Bob", "bob@ex.com"),
+            "roundtrip test".into(),
+            make_meta(1_700_000_000, 3600, Some("UTF-8")),
+        )
+        .unwrap();
+
+        let mut buf = Cursor::new(Vec::new());
+        BinaryEncoder.encode_commit(&commit, &mut buf).unwrap();
+        let encoded = buf.into_inner();
+
+        let decoded = BinaryDecoder
+            .decode_commit(Cursor::new(encoded))
+            .expect("decode commit should succeed");
+        assert_eq!(decoded.parents().len(), 1);
+        assert_eq!(decoded.author().name(), "Alice");
+        assert_eq!(decoded.committer().name(), "Bob");
+        assert_eq!(decoded.message(), "roundtrip test");
+        assert_eq!(decoded.meta().timestamp(), 1_700_000_000);
+        assert_eq!(decoded.meta().timezone_offset(), 3600);
+        assert_eq!(decoded.meta().encoding(), Some("UTF-8"));
+    }
+
+    #[test]
+    fn test_tag_roundtrip() {
+        let tag = Tag::with_meta(
+            "v1.0".into(),
+            make_hash(0x10),
+            Some(make_user_id("Alice", "alice@ex.com")),
+            "release tag".into(),
+            make_meta(1_700_000_000, 0, None),
+        )
+        .unwrap();
+
+        let mut buf = Cursor::new(Vec::new());
+        BinaryEncoder.encode_tag(&tag, &mut buf).unwrap();
+        let encoded = buf.into_inner();
+
+        let decoded = BinaryDecoder
+            .decode_tag(Cursor::new(encoded))
+            .expect("decode tag should succeed");
+        assert_eq!(decoded.name(), "v1.0");
+        assert!(decoded.tagger().is_some());
+        assert_eq!(decoded.tagger().unwrap().name(), "Alice");
+        assert_eq!(decoded.message(), "release tag");
+        assert!(decoded.meta().encoding().is_none());
+    }
+
+    #[test]
+    fn test_tag_roundtrip_no_tagger() {
+        let tag = Tag::with_meta(
+            "v2.0".into(),
+            make_hash(0x20),
+            None,
+            "".into(),
+            make_meta(1_700_000_000, 0, None),
+        )
+        .unwrap();
+
+        let mut buf = Cursor::new(Vec::new());
+        BinaryEncoder.encode_tag(&tag, &mut buf).unwrap();
+        let encoded = buf.into_inner();
+
+        let decoded = BinaryDecoder
+            .decode_tag(Cursor::new(encoded))
+            .expect("decode lightweight tag should succeed");
+        assert_eq!(decoded.name(), "v2.0");
+        assert!(decoded.tagger().is_none());
+        assert_eq!(decoded.message(), "");
     }
 }
