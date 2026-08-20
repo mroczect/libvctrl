@@ -1,4 +1,5 @@
 #![cfg_attr(not(test), no_std)]
+#![allow(clippy::arithmetic_side_effects)]
 
 #[macro_export]
 macro_rules! impl_hmac {
@@ -7,6 +8,12 @@ macro_rules! impl_hmac {
         pub struct HMAC {
             ih: Option<$hash_struct>,
             padded: [u8; $block_size],
+        }
+
+        impl core::fmt::Debug for HMAC {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("HMAC")
+            }
         }
 
         impl zeroize::Zeroize for HMAC {
@@ -24,35 +31,36 @@ macro_rules! impl_hmac {
             }
         }
 
+        #[allow(clippy::indexing_slicing)]
         impl HMAC {
-            fn prepare_key(k: &[u8]) -> [u8; $block_size] {
-                let mut block_key = [0u8; $block_size];
-                if k.len() > $block_size {
-                    let hash = zeroize::Zeroizing::new(<$hash_struct>::hash(k));
+            fn prepare_key(key: &[u8]) -> [u8; $block_size] {
+                let mut block_key = [0_u8; $block_size];
+                if key.len() > $block_size {
+                    let hash = zeroize::Zeroizing::new(<$hash_struct>::hash(key));
                     let hash_bytes = &*hash;
                     block_key[..$output_size].copy_from_slice(&hash_bytes[..$output_size]);
                 } else {
-                    block_key[..k.len()].copy_from_slice(k);
+                    block_key[..key.len()].copy_from_slice(key);
                 }
                 block_key
             }
 
             #[doc = "One-shot HMAC computation."]
             #[must_use]
-            pub fn mac<T: AsRef<[u8]>, U: AsRef<[u8]>>(input: T, k: U) -> [u8; $output_size] {
-                let mut hmac = Self::new(k);
+            pub fn mac<T: AsRef<[u8]>, U: AsRef<[u8]>>(input: T, key: U) -> [u8; $output_size] {
+                let mut hmac = Self::new(key);
                 hmac.update(input);
                 hmac.finalize()
             }
 
             #[doc = "Creates a new HMAC context from a secret key."]
             #[must_use]
-            pub fn new(k: impl AsRef<[u8]>) -> Self {
-                let k = k.as_ref();
-                let mut block_key = Self::prepare_key(k);
-                let mut padded = [0x36u8; $block_size];
-                for i in 0..$block_size {
-                    padded[i] ^= block_key[i];
+            pub fn new(key: impl AsRef<[u8]>) -> Self {
+                let key = key.as_ref();
+                let mut block_key = Self::prepare_key(key);
+                let mut padded = [0x36_u8; $block_size];
+                for (padded_byte, block_byte) in padded.iter_mut().zip(block_key.iter()) {
+                    *padded_byte ^= *block_byte;
                 }
                 let mut ih = <$hash_struct>::new();
                 ih.update(&padded);
@@ -73,8 +81,8 @@ macro_rules! impl_hmac {
             #[doc = "Finalizes the HMAC and returns the authentication tag."]
             #[must_use]
             pub fn finalize(mut self) -> [u8; $output_size] {
-                for p in self.padded.iter_mut() {
-                    *p ^= 0x6a;
+                for padded_byte in self.padded.iter_mut() {
+                    *padded_byte ^= 0x6a;
                 }
                 let mut oh = <$hash_struct>::new();
                 oh.update(&self.padded);
@@ -101,10 +109,10 @@ macro_rules! impl_hmac {
             #[must_use]
             pub fn verify<T: AsRef<[u8]>, U: AsRef<[u8]>>(
                 input: T,
-                k: U,
+                key: U,
                 expected: &[u8; $output_size],
             ) -> bool {
-                let mac = Self::mac(input, k);
+                let mac = Self::mac(input, key);
                 $crate::utils::verify(&mac, expected)
             }
         }
@@ -115,8 +123,10 @@ macro_rules! impl_hmac {
 macro_rules! impl_hkdf {
     ($hash_struct:ty, $output_size:expr, $block_size:expr) => {
         #[doc = concat!("HKDF key derivation using `", stringify!($hash_struct), "`.")]
+        #[derive(Debug, Copy, Clone)]
         pub struct HKDF;
 
+        #[allow(clippy::indexing_slicing)]
         impl HKDF {
             #[doc = "HKDF-Extract step. Returns a pseudorandom key (PRK)."]
             #[inline]
@@ -127,33 +137,40 @@ macro_rules! impl_hkdf {
 
             #[doc = "HKDF-Expand step. Fills `out` with output keying material."]
             #[inline]
-            #[allow(clippy::arithmetic_side_effects, clippy::cast_possible_truncation)]
             pub fn expand(out: &mut [u8], prk: impl AsRef<[u8]>, info: impl AsRef<[u8]>) {
+                let prk = prk.as_ref();
                 assert_eq!(
-                    prk.as_ref().len(),
+                    prk.len(),
                     $output_size,
                     "HKDF expects a {}-byte PRK",
                     $output_size
                 );
                 let info = info.as_ref();
-                let max_blocks: u32 = 255;
+                let max_len = 255_usize.saturating_mul($output_size);
                 assert!(
-                    (out.len() as u32) <= max_blocks * ($output_size as u32),
+                    out.len() <= max_len,
                     "Requested output exceeds RFC 5869 limit"
                 );
-                let mut offset = 0;
+                let mut offset = 0_usize;
                 let mut counter: u32 = 1;
                 while offset < out.len() {
-                    let mut hmac = HMAC::new(&prk);
+                    let mut hmac = HMAC::new(prk);
                     if offset != 0 {
-                        hmac.update(&out[offset - $output_size..][..$output_size]);
+                        if let Some(prev) = out.get(offset.saturating_sub($output_size)..offset) {
+                            hmac.update(prev);
+                        }
                     }
                     hmac.update(info);
-                    hmac.update([counter as u8]);
+                    let counter_byte = u8::try_from(counter).unwrap_or(0);
+                    hmac.update([counter_byte]);
                     let block = zeroize::Zeroizing::new(hmac.finalize());
-                    let left = core::cmp::min($output_size, out.len() - offset);
-                    out[offset..][..left].copy_from_slice(&block[..left]);
-                    offset += $output_size;
+                    let left = core::cmp::min($output_size, out.len().saturating_sub(offset));
+                    if let Some(dst) = out.get_mut(offset..offset.saturating_add(left)) {
+                        if let Some(src) = block.get(..left) {
+                            dst.copy_from_slice(src);
+                        }
+                    }
+                    offset = offset.saturating_add($output_size);
                     counter = counter.wrapping_add(1);
                 }
             }
@@ -177,10 +194,11 @@ pub use utils::{BLOCKBYTES, BYTES};
 #[cfg(test)]
 mod tests {
     use super::*;
+    use criterion as _;
 
     #[test]
     fn hmac_vectors() {
-        let h = HMAC::mac([], [0u8; 32]);
+        let h = HMAC::mac([], [0_u8; 32]);
         let expected: [u8; 64] = [
             185, 54, 206, 232, 108, 159, 135, 170, 93, 60, 111, 46, 132, 203, 90, 66, 57, 165, 254,
             80, 72, 10, 110, 198, 107, 112, 171, 91, 31, 74, 198, 115, 12, 108, 81, 84, 33, 179,
@@ -188,9 +206,9 @@ mod tests {
             12, 178, 34, 71, 34, 93, 71,
         ];
         assert_eq!(h, expected);
-        assert!(HMAC::verify([], [0u8; 32], &expected));
+        assert!(HMAC::verify([], [0_u8; 32], &expected));
 
-        let h = HMAC::mac([42u8; 69], []);
+        let h = HMAC::mac([42_u8; 69], []);
         let expected: [u8; 64] = [
             56, 224, 189, 205, 65, 104, 107, 85, 241, 188, 253, 35, 238, 174, 69, 191, 206, 183,
             205, 71, 196, 180, 56, 122, 106, 55, 136, 7, 208, 183, 99, 67, 229, 213, 255, 154, 107,
@@ -198,12 +216,12 @@ mod tests {
             115, 59, 54, 91, 143, 143, 254, 220,
         ];
         assert_eq!(h, expected);
-        assert!(HMAC::verify([42u8; 69], [], &expected));
+        assert!(HMAC::verify([42_u8; 69], [], &expected));
     }
 
     #[test]
     fn hkdf_vector() {
-        let ikm = [0x0bu8; 22];
+        let ikm = [0x0b_u8; 22];
         let salt: [u8; 13] = [
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
         ];
@@ -214,7 +232,7 @@ mod tests {
             0x14, 0x81, 0x57, 0x93, 0x38, 0xda, 0x36, 0x2c, 0xb8, 0xd9, 0xf9, 0x25, 0xd7, 0xcb,
         ];
         let prk = HKDF::extract(salt, ikm);
-        let mut okm = [0u8; 42];
+        let mut okm = [0_u8; 42];
         HKDF::expand(&mut okm, prk, info);
         assert_eq!(okm, expected);
     }
