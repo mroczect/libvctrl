@@ -1,4 +1,5 @@
 #![allow(clippy::inline_always)]
+#![allow(clippy::indexing_slicing)]
 
 use crate::utils::{load_be, store_be, verify};
 
@@ -268,12 +269,24 @@ impl State {
 #[derive(Clone)]
 pub struct Hash {
     pub(crate) state: State,
-
     pub(crate) w: [u8; 128],
-
     pub(crate) r: usize,
-
     pub(crate) len: u128,
+}
+
+impl zeroize::Zeroize for Hash {
+    fn zeroize(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.state.0);
+        zeroize::Zeroize::zeroize(&mut self.w);
+        zeroize::Zeroize::zeroize(&mut self.r);
+        zeroize::Zeroize::zeroize(&mut self.len);
+    }
+}
+
+impl Drop for Hash {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(self);
+    }
 }
 
 impl Hash {
@@ -315,17 +328,17 @@ impl Hash {
     }
 
     #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn finalize(mut self) -> [u8; 64] {
-        let mut padded = [0u8; 256];
+        let mut padded = zeroize::Zeroizing::new([0u8; 256]);
         padded[..self.r].copy_from_slice(&self.w[..self.r]);
         padded[self.r] = 0x80;
         let r = if self.r < 112 { 128 } else { 256 };
         let total_bits: u128 = self.len * 8;
         let high = (total_bits >> 64) as u64;
-        #[allow(clippy::cast_possible_truncation)]
         let low = total_bits as u64;
-        store_be(&mut padded, r - 16, high);
-        store_be(&mut padded, r - 8, low);
+        store_be(&mut *padded, r - 16, high);
+        store_be(&mut *padded, r - 8, low);
 
         self.state.blocks(&padded[..r]);
         let mut out = [0u8; 64];
@@ -346,11 +359,7 @@ impl Hash {
     }
 
     pub fn zeroize(&mut self) {
-        self.state.0.fill(0);
-        self.w.fill(0);
-        self.r = 0;
-        self.len = 0;
-        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+        zeroize::Zeroize::zeroize(self);
     }
 }
 
