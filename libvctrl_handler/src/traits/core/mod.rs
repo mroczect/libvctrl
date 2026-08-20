@@ -1,31 +1,16 @@
 pub mod blame;
-
 pub mod config;
-
 pub mod decoder;
-
 pub mod diff;
-
 pub mod encoder;
-
 pub mod hasher;
-
 pub mod index;
-
 pub mod object_store;
-
 pub mod pack;
-
 pub mod ref_store;
-
 pub mod reflog;
-
 pub mod remote;
-
 pub mod revwalk;
-
 pub mod signer;
-
 pub mod transport;
-
 pub mod verifier;
