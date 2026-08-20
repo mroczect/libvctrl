@@ -1,3 +1,5 @@
+use alloc::vec::IntoIter as VecIntoIter;
+use core::slice::Iter as SliceIter;
 use std::path::{Path, PathBuf};
 
 use crate::Hash;
@@ -5,15 +7,10 @@ use crate::Hash;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChangeKind {
     Added,
-
     Deleted,
-
     Modified,
-
     TypeChange,
-
     Renamed,
-
     Copied,
 }
 
@@ -187,7 +184,7 @@ impl TreeDelta {
         self.changes.is_empty()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, FileDelta> {
+    pub fn iter(&self) -> SliceIter<'_, FileDelta> {
         self.changes.iter()
     }
 
@@ -199,7 +196,7 @@ impl TreeDelta {
 
 impl IntoIterator for TreeDelta {
     type Item = FileDelta;
-    type IntoIter = std::vec::IntoIter<FileDelta>;
+    type IntoIter = VecIntoIter<FileDelta>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.changes.into_iter()
@@ -208,7 +205,7 @@ impl IntoIterator for TreeDelta {
 
 impl<'a> IntoIterator for &'a TreeDelta {
     type Item = &'a FileDelta;
-    type IntoIter = std::slice::Iter<'a, FileDelta>;
+    type IntoIter = SliceIter<'a, FileDelta>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
