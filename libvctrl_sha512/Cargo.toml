@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.96"
 description = "Zero-dependency SHA512, HMAC-SHA512, HKDF-SHA512, and optional SHA384"
 license = "ISC"
-authors = ["mroczect <mroczect@proton.me"]
+authors = ["mroczect <mroczect@proton.me>"]
 repository = "https://github.com/mroczect/libvctrl"
 homepage = "https://github.com/mroczect/libvctrl"
 documentation = "https://docs.rs/libvctrl_sha512"
@@ -20,7 +20,7 @@ sha384 = []
 opt_size = []
 
 [dependencies]
-zeroize = { version = "1.9.0", default-features = false }
+zeroize = { version = "1.8", default-features = false }
 
 [dev-dependencies]
 criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
