@@ -1,3 +1,5 @@
+#![allow(clippy::indexing_slicing)]
+
 use crate::sha512::{Hash as Sha512Hash, State};
 use crate::utils::load_be;
 
@@ -42,10 +44,12 @@ impl Hash {
     #[must_use]
     pub fn finalize(self) -> [u8; 48] {
         let mut out = [0u8; 48];
-        out.copy_from_slice(&self.0.finalize()[..48]);
+        let full = zeroize::Zeroizing::new(self.0.finalize());
+        out.copy_from_slice(&full[..48]);
         out
     }
 
+    #[must_use]
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 48] {
         let mut h = Self::new();
         h.update(input);
@@ -53,7 +57,13 @@ impl Hash {
     }
 
     pub fn zeroize(&mut self) {
-        self.0.zeroize();
+        zeroize::Zeroize::zeroize(self);
+    }
+}
+
+impl zeroize::Zeroize for Hash {
+    fn zeroize(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.0);
     }
 }
 
