@@ -11,8 +11,8 @@ keywords = ["version-control", "vcs", "core"]
 categories = ["development-tools"]
 
 [dependencies]
-libvctrl_handler = {path = "../libvctrl_handler", version = "5.0.0" }
-libvctrl_sha512 = { path = "../libvctrl_sha512", version = "3.0.0" }
+libvctrl_handler = {path = "../libvctrl_handler", version = "5.0.1" }
+libvctrl_sha512 = { path = "../libvctrl_sha512", version = "3.1.0" }
 
 [dev-dependencies]
 proptest = "1.11.0"
