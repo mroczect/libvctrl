@@ -402,8 +402,6 @@ mod tests {
         vec![fill; HASH_LENGTH]
     }
 
-    // --- Private helper tests ---
-
     #[test]
     fn test_check_version_missing_byte() {
         let result = BinaryDecoder::check_version(&[]);
@@ -509,8 +507,6 @@ mod tests {
         );
     }
 
-    // --- decode_blob tests ---
-
     #[test]
     fn test_decode_blob_valid() {
         let payload = b"hello world";
@@ -574,8 +570,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // --- decode_tree tests ---
-
     #[test]
     fn test_decode_tree_valid_single_entry() {
         let hb = hash_bytes(0xAB);
@@ -584,7 +578,7 @@ mod tests {
         data.extend_from_slice(&1u32.to_le_bytes());
         data.push(4);
         data.extend_from_slice(b"file");
-        data.push(0); // Blob
+        data.push(0);
         data.extend_from_slice(&hb);
 
         let result = BinaryDecoder.decode_tree(Cursor::new(data));
@@ -613,15 +607,13 @@ mod tests {
         let mut data = Vec::new();
         data.push(EXPECTED_VERSION);
         data.extend_from_slice(&2u32.to_le_bytes());
-        // Entry 1
         data.push(3);
         data.extend_from_slice(b"src");
-        data.push(3); // Tree
+        data.push(3);
         data.extend_from_slice(&hb1);
-        // Entry 2
         data.push(9);
         data.extend_from_slice(b"Cargo.toml");
-        data.push(0); // Blob
+        data.push(0);
         data.extend_from_slice(&hb2);
 
         let result = BinaryDecoder.decode_tree(Cursor::new(data));
@@ -642,7 +634,7 @@ mod tests {
         data.extend_from_slice(&1u32.to_le_bytes());
         data.push(1);
         data.push(b'x');
-        data.push(99); // unknown kind
+        data.push(99);
         data.extend_from_slice(&hb);
 
         let result = BinaryDecoder.decode_tree(Cursor::new(data));
@@ -659,7 +651,7 @@ mod tests {
         data.push(b'x');
         data.push(0);
         data.extend_from_slice(&hb);
-        data.push(0xFF); // trailing
+        data.push(0xFF);
 
         let result = BinaryDecoder.decode_tree(Cursor::new(data));
         assert!(result.is_err());
@@ -667,7 +659,7 @@ mod tests {
 
     #[test]
     fn test_decode_tree_all_known_kinds() {
-        let kinds = [0u8, 1, 2, 3, 4]; // Blob, Executable, Symlink, Tree, Submodule
+        let kinds = [0u8, 1, 2, 3, 4];
         let mut data = Vec::new();
         data.push(EXPECTED_VERSION);
         data.extend_from_slice(&(kinds.len() as u32).to_le_bytes());
@@ -682,8 +674,6 @@ mod tests {
         let result = BinaryDecoder.decode_tree(Cursor::new(data));
         assert!(result.is_ok(), "should decode all known entry kinds");
     }
-
-    // --- decode_commit tests ---
 
     fn build_valid_commit_bytes(
         tree_fill: u8,
@@ -736,7 +726,7 @@ mod tests {
             "Bob",
             "b@c.d",
             "init",
-            1700000000,
+            1_700_000_000,
             0,
             None,
         );
@@ -749,7 +739,7 @@ mod tests {
         assert_eq!(commit.committer().name(), "Bob");
         assert_eq!(commit.committer().email(), "b@c.d");
         assert_eq!(commit.message(), "init");
-        assert_eq!(commit.meta().timestamp(), 1700000000);
+        assert_eq!(commit.meta().timestamp(), 1_700_000_000);
         assert_eq!(commit.meta().timezone_offset(), 0);
         assert!(commit.meta().encoding().is_none());
     }
@@ -764,7 +754,7 @@ mod tests {
             "Bob",
             "bob@ex.com",
             "merge",
-            1700000000,
+            1_700_000_000,
             3600,
             Some("UTF-8"),
         );
@@ -803,8 +793,6 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap().message(), "");
     }
-
-    // --- decode_tag tests ---
 
     fn build_valid_tag_bytes(
         name: &str,
@@ -851,7 +839,7 @@ mod tests {
             0x10,
             Some(("Alice", "alice@ex.com")),
             "release",
-            1700000000,
+            1_700_000_000,
             0,
             None,
         );
@@ -867,7 +855,7 @@ mod tests {
 
     #[test]
     fn test_decode_tag_no_tagger() {
-        let data = build_valid_tag_bytes("v2.0", 0x20, None, "", 1700000000, 0, None);
+        let data = build_valid_tag_bytes("v2.0", 0x20, None, "", 1_700_000_000, 0, None);
         let result = BinaryDecoder.decode_tag(Cursor::new(data));
         assert!(result.is_ok());
         let tag = result.unwrap();
@@ -883,7 +871,7 @@ mod tests {
             0x30,
             Some(("Bob", "bob@ex.com")),
             "annotated",
-            1700000000,
+            1_700_000_000,
             -3600,
             Some("UTF-8"),
         );
@@ -897,9 +885,9 @@ mod tests {
     #[test]
     fn test_decode_tag_invalid_tagger_presence() {
         let data = build_valid_tag_bytes("v4.0", 0x40, None, "", 0, 0, None);
-        let pos = 1 + 4 + HASH_LENGTH; // after name + target
+        let pos = 1 + 4 + HASH_LENGTH;
         let mut mutable_data = data;
-        mutable_data[pos] = 5; // invalid tagger presence byte
+        mutable_data[pos] = 5;
         let result = BinaryDecoder.decode_tag(Cursor::new(mutable_data));
         assert!(result.is_err());
     }
