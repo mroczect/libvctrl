@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn test_build_missing_target() {
-        let result = TagBuilder::new().name("v1.0".into()).build();
+        let result = TagBuilder::new().name("v1.0").build();
         assert!(result.is_err(), "should fail without target");
     }
 
@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn test_build_success_without_meta() {
         let result = TagBuilder::new()
-            .name("v1.0".into())
+            .name("v1.0")
             .target(make_hash(0xAA))
             .build();
         assert!(result.is_ok(), "should succeed with name and target");
@@ -115,12 +115,12 @@ mod tests {
 
     #[test]
     fn test_build_success_with_tagger_and_meta() {
-        let meta = CommitMeta::new(1700000000, 0, None).unwrap();
+        let meta = CommitMeta::new(1_700_000_000, 0, None).unwrap();
         let result = TagBuilder::new()
-            .name("release".into())
+            .name("release")
             .target(make_hash(0xBB))
             .tagger(make_user_id("Alice", "alice@example.com"))
-            .message("v1.0 release".into())
+            .message("v1.0 release")
             .meta(meta)
             .build();
         assert!(result.is_ok(), "should succeed with all fields");
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_build_default_message_when_none() {
         let result = TagBuilder::new()
-            .name("v2.0".into())
+            .name("v2.0")
             .target(make_hash(0xCC))
             .build();
         assert!(result.is_ok());
@@ -144,9 +144,9 @@ mod tests {
 
     #[test]
     fn test_build_without_tagger() {
-        let meta = CommitMeta::new(1700000000, 0, Some("UTF-8".into())).unwrap();
+        let meta = CommitMeta::new(1_700_000_000, 0, Some("UTF-8".into())).unwrap();
         let result = TagBuilder::new()
-            .name("lightweight".into())
+            .name("lightweight")
             .target(make_hash(0xDD))
             .meta(meta)
             .build();
