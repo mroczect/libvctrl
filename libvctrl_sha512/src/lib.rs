@@ -1,5 +1,4 @@
-#![allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::expect_used)]
-#![allow(unused_crate_dependencies)]
+#![no_std]
 
 #[macro_export]
 macro_rules! impl_hmac {
