@@ -20,6 +20,7 @@ sha384 = []
 opt_size = []
 
 [dependencies]
+zeroize = { version = "1.9.0", default-features = false }
 
 [dev-dependencies]
 criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
