@@ -1,6 +1,7 @@
+use std::path::Path;
+
 use crate::constants::MAX_NAME_LENGTH;
 use crate::errors::VctrlError;
-use std::path::Path;
 
 pub fn validate_name(name: &str) -> Result<(), VctrlError> {
     if name.is_empty() {
@@ -22,33 +23,44 @@ pub fn validate_name(name: &str) -> Result<(), VctrlError> {
 
 pub fn validate_ref_name(name: &str) -> Result<(), VctrlError> {
     validate_name(name)?;
-    if name.contains("..")
-        || name.contains('~')
-        || name.contains('^')
-        || name.contains(':')
-        || name.contains('?')
-        || name.contains('*')
-        || name.contains('[')
-        || name.contains('\\')
-        || name.contains(' ')
-        || name.contains("@{")
-        || name.contains("//")
-        || name.starts_with('.')
-        || name.starts_with('/')
-        || name.ends_with('/')
-        || name.ends_with('.')
-        || name.contains('<')
-        || name.contains('>')
-        || name.contains('|')
-        || name.contains('"')
-        || Path::new(name)
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("lock"))
-    {
+
+    if name == "@" {
+        return Err(VctrlError::InvalidName("ref name cannot be '@'".into()));
+    }
+
+    if name.starts_with('/') || name.ends_with('/') || name.contains("//") {
         return Err(VctrlError::InvalidName(format!(
             "invalid ref name: '{name}'"
         )));
     }
+
+    for component in name.split('/') {
+        if component.is_empty()
+            || component.starts_with('.')
+            || Path::new(component)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("lock"))
+            || component.contains("..")
+            || component.contains('~')
+            || component.contains('^')
+            || component.contains(':')
+            || component.contains('?')
+            || component.contains('*')
+            || component.contains('[')
+            || component.contains('\\')
+            || component.contains(' ')
+            || component.contains("@{")
+            || component.contains('<')
+            || component.contains('>')
+            || component.contains('|')
+            || component.contains('"')
+        {
+            return Err(VctrlError::InvalidName(format!(
+                "invalid ref name: '{name}'"
+            )));
+        }
+    }
+
     Ok(())
 }
 
