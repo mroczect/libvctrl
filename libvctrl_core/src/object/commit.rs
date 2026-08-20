@@ -99,7 +99,7 @@ mod tests {
         let result = CommitBuilder::new()
             .author(make_user_id("A", "a@b.c"))
             .committer(make_user_id("B", "b@c.d"))
-            .message("msg".into())
+            .message("msg")
             .build();
         assert!(result.is_err(), "should fail without tree");
     }
@@ -109,7 +109,7 @@ mod tests {
         let result = CommitBuilder::new()
             .tree(make_hash(0))
             .committer(make_user_id("B", "b@c.d"))
-            .message("msg".into())
+            .message("msg")
             .build();
         assert!(result.is_err(), "should fail without author");
     }
@@ -119,7 +119,7 @@ mod tests {
         let result = CommitBuilder::new()
             .tree(make_hash(0))
             .author(make_user_id("A", "a@b.c"))
-            .message("msg".into())
+            .message("msg")
             .build();
         assert!(result.is_err(), "should fail without committer");
     }
@@ -146,19 +146,19 @@ mod tests {
             .tree(make_hash(1))
             .author(make_user_id("Alice", "alice@example.com"))
             .committer(make_user_id("Bob", "bob@example.com"))
-            .message("initial commit".into())
+            .message("initial commit")
             .build();
         assert!(result.is_ok(), "should succeed with all required fields");
     }
 
     #[test]
     fn test_build_success_with_meta() {
-        let meta = CommitMeta::new(1700000000, 3600, Some("UTF-8".into())).unwrap();
+        let meta = CommitMeta::new(1_700_000_000, 3600, Some("UTF-8".into())).unwrap();
         let result = CommitBuilder::new()
             .tree(make_hash(1))
             .author(make_user_id("Alice", "alice@example.com"))
             .committer(make_user_id("Bob", "bob@example.com"))
-            .message("initial commit".into())
+            .message("initial commit")
             .meta(meta)
             .build();
         assert!(result.is_ok(), "should succeed with meta");
@@ -173,7 +173,7 @@ mod tests {
             .parent(make_hash(4))
             .author(make_user_id("Alice", "alice@example.com"))
             .committer(make_user_id("Bob", "bob@example.com"))
-            .message("merge commit".into())
+            .message("merge commit")
             .build();
         assert!(result.is_ok(), "should succeed with multiple parents");
         let commit = result.unwrap();
@@ -182,16 +182,16 @@ mod tests {
 
     #[test]
     fn test_build_with_meta_preserves_timestamp() {
-        let meta = CommitMeta::new(9999999999, -7200, None).unwrap();
+        let meta = CommitMeta::new(9_999_999_999, -7200, None).unwrap();
         let commit = CommitBuilder::new()
             .tree(make_hash(1))
             .author(make_user_id("A", "a@b.c"))
             .committer(make_user_id("B", "b@c.d"))
-            .message("ts test".into())
+            .message("ts test")
             .meta(meta)
             .build()
             .unwrap();
-        assert_eq!(commit.meta().timestamp(), 9999999999);
+        assert_eq!(commit.meta().timestamp(), 9_999_999_999);
         assert_eq!(commit.meta().timezone_offset(), -7200);
     }
 }
