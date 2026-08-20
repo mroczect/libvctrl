@@ -72,3 +72,86 @@ impl TagBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libvctrl_handler::HASH_LENGTH;
+
+    fn make_hash(fill: u8) -> Hash {
+        Hash::from_bytes(&vec![fill; HASH_LENGTH]).unwrap()
+    }
+
+    fn make_user_id(name: &str, email: &str) -> UserID {
+        UserID::new(name.into(), email.into()).unwrap()
+    }
+
+    #[test]
+    fn test_build_missing_name() {
+        let result = TagBuilder::new().target(make_hash(0)).build();
+        assert!(result.is_err(), "should fail without name");
+    }
+
+    #[test]
+    fn test_build_missing_target() {
+        let result = TagBuilder::new().name("v1.0".into()).build();
+        assert!(result.is_err(), "should fail without target");
+    }
+
+    #[test]
+    fn test_build_missing_both() {
+        let result = TagBuilder::new().build();
+        assert!(result.is_err(), "should fail without name and target");
+    }
+
+    #[test]
+    fn test_build_success_without_meta() {
+        let result = TagBuilder::new()
+            .name("v1.0".into())
+            .target(make_hash(0xAA))
+            .build();
+        assert!(result.is_ok(), "should succeed with name and target");
+    }
+
+    #[test]
+    fn test_build_success_with_tagger_and_meta() {
+        let meta = CommitMeta::new(1700000000, 0, None).unwrap();
+        let result = TagBuilder::new()
+            .name("release".into())
+            .target(make_hash(0xBB))
+            .tagger(make_user_id("Alice", "alice@example.com"))
+            .message("v1.0 release".into())
+            .meta(meta)
+            .build();
+        assert!(result.is_ok(), "should succeed with all fields");
+        let tag = result.unwrap();
+        assert_eq!(tag.name(), "release");
+        assert!(tag.tagger().is_some());
+        assert_eq!(tag.tagger().unwrap().name(), "Alice");
+        assert_eq!(tag.message(), "v1.0 release");
+    }
+
+    #[test]
+    fn test_build_default_message_when_none() {
+        let result = TagBuilder::new()
+            .name("v2.0".into())
+            .target(make_hash(0xCC))
+            .build();
+        assert!(result.is_ok());
+        let tag = result.unwrap();
+        assert_eq!(tag.message(), "", "message should default to empty string");
+    }
+
+    #[test]
+    fn test_build_without_tagger() {
+        let meta = CommitMeta::new(1700000000, 0, Some("UTF-8".into())).unwrap();
+        let result = TagBuilder::new()
+            .name("lightweight".into())
+            .target(make_hash(0xDD))
+            .meta(meta)
+            .build();
+        assert!(result.is_ok());
+        let tag = result.unwrap();
+        assert!(tag.tagger().is_none(), "tagger should be None when not set");
+    }
+}
