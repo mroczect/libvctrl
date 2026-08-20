@@ -1,5 +1,10 @@
+use libvctrl_handler as _;
+use libvctrl_sha512 as _;
+use proptest as _;
+
 use libvctrl_core::object::{BlobBuilder, CommitBuilder, TagBuilder, TreeBuilder};
 
+#[allow(dead_code)]
 mod common;
 
 #[test]
