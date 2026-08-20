@@ -46,3 +46,59 @@ pub fn verify(x: &[u8], y: &[u8]) -> bool {
     let diff = core::hint::black_box(diff);
     diff == 0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_be_valid() {
+        let bytes = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        assert_eq!(load_be(&bytes, 0), 0x0102_0304_0506_0708);
+    }
+
+    #[test]
+    fn test_load_be_out_of_bounds_returns_zero() {
+        let bytes = [0x01, 0x02, 0x03];
+        assert_eq!(load_be(&bytes, 0), 0);
+        assert_eq!(load_be(&bytes, 4), 0);
+    }
+
+    #[test]
+    fn test_store_be_writes_big_endian() {
+        let mut bytes = [0_u8; 10];
+        store_be(&mut bytes, 1, 0x0102_0304_0506_0708);
+        assert_eq!(&bytes[0..1], &[0]);
+        assert_eq!(&bytes[1..9], &[1, 2, 3, 4, 5, 6, 7, 8][..]);
+        assert_eq!(&bytes[9..10], &[0]);
+    }
+
+    #[test]
+    fn test_store_be_out_of_bounds_does_nothing() {
+        let mut bytes = [0xAA; 8];
+        store_be(&mut bytes, 1, 0x1122_3344_5566_7788);
+        assert_eq!(bytes, [0xAA; 8]);
+    }
+
+    #[test]
+    fn test_verify_equal_empty_slices() {
+        assert!(verify(&[], &[]));
+    }
+
+    #[test]
+    fn test_verify_equal_same_length() {
+        let a = [1, 2, 3];
+        let b = [1, 2, 3];
+        assert!(verify(&a, &b));
+    }
+
+    #[test]
+    fn test_verify_different_same_length() {
+        assert!(!verify(&[1, 2, 3], &[1, 2, 4]));
+    }
+
+    #[test]
+    fn test_verify_different_length() {
+        assert!(!verify(&[1, 2, 3], &[1, 2]));
+    }
+}
