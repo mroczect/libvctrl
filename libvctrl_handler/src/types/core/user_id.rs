@@ -1,46 +1,5 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use crate::constants::MAX_NAME_LENGTH;
 use crate::errors::VctrlError;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UserID {
@@ -49,32 +8,6 @@ pub struct UserID {
 }
 
 impl UserID {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn new(name: String, email: String) -> Result<Self, VctrlError> {
         let max_len = usize::try_from(MAX_NAME_LENGTH).unwrap_or(usize::MAX);
         if name.is_empty() {
@@ -111,21 +44,11 @@ impl UserID {
         Ok(Self { name, email })
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub fn email(&self) -> &str {
         &self.email

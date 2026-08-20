@@ -1,33 +1,5 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use crate::sha512::{Hash as Sha512Hash, State};
 use crate::utils::load_be;
-
-
-
-
-
 
 #[inline]
 fn new_state() -> State {
@@ -45,62 +17,10 @@ fn new_state() -> State {
     State(t)
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[derive(Clone)]
 pub struct Hash(Sha512Hash);
 
 impl Hash {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn new() -> Self {
         Self(Sha512Hash {
@@ -111,46 +31,14 @@ impl Hash {
         })
     }
 
-    
-    
-    
-    
     pub(crate) fn update_inner<T: AsRef<[u8]>>(&mut self, input: T) {
         self.0.update_inner(input);
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T) {
         self.update_inner(input);
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn finalize(self) -> [u8; 48] {
         let mut out = [0u8; 48];
@@ -158,55 +46,18 @@ impl Hash {
         out
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 48] {
         let mut h = Self::new();
         h.update(input);
         h.finalize()
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn zeroize(&mut self) {
         self.0.zeroize();
     }
 }
 
 impl Default for Hash {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn default() -> Self {
         Self::new()
     }

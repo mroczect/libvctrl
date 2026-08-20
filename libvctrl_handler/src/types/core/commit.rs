@@ -1,38 +1,8 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use super::hash::Hash;
 use super::user_id::UserID;
 use crate::constants::{MAX_MESSAGE_LENGTH, MAX_PARENT_COUNT};
 use crate::errors::VctrlError;
 use std::collections::HashSet;
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct CommitMeta {
@@ -42,30 +12,6 @@ pub struct CommitMeta {
 }
 
 impl CommitMeta {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn new(
         timestamp: i64,
         timezone_offset: i16,
@@ -81,53 +27,21 @@ impl CommitMeta {
         })
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn timestamp(&self) -> i64 {
         self.timestamp
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn timezone_offset(&self) -> i16 {
         self.timezone_offset
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub fn encoding(&self) -> Option<&str> {
         self.encoding.as_deref()
     }
 }
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Commit {
@@ -140,31 +54,6 @@ pub struct Commit {
 }
 
 impl Commit {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn new(
         tree: Hash,
         parents: Vec<Hash>,
@@ -182,37 +71,6 @@ impl Commit {
         )
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn with_meta(
         tree: Hash,
         parents: Vec<Hash>,
@@ -253,60 +111,31 @@ impl Commit {
         })
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn tree(&self) -> &Hash {
         &self.tree
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub fn parents(&self) -> &[Hash] {
         &self.parents
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn author(&self) -> &UserID {
         &self.author
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn committer(&self) -> &UserID {
         &self.committer
     }
 
-    
-    
-    
-    
     #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn meta(&self) -> &CommitMeta {
         &self.meta

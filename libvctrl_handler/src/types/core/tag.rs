@@ -1,53 +1,9 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use super::commit::CommitMeta;
 use super::hash::Hash;
 use super::user_id::UserID;
 use crate::constants::MAX_MESSAGE_LENGTH;
 use crate::errors::VctrlError;
 use crate::validation::validate_ref_name;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tag {
@@ -59,28 +15,6 @@ pub struct Tag {
 }
 
 impl Tag {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn new(
         name: String,
         target: Hash,
@@ -90,37 +24,6 @@ impl Tag {
         Self::with_meta(name, target, tagger, message, CommitMeta::default())
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn with_meta(
         name: String,
         target: Hash,
@@ -144,50 +47,26 @@ impl Tag {
         })
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn target(&self) -> &Hash {
         &self.target
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn tagger(&self) -> Option<&UserID> {
         self.tagger.as_ref()
     }
 
-    
-    
-    
-    
     #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn meta(&self) -> &CommitMeta {
         &self.meta

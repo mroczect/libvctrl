@@ -1,39 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use crate::constants::HASH_LENGTH;
 use crate::types::Hash;
 use std::error::Error;
@@ -41,49 +5,35 @@ use std::fmt;
 use std::io;
 use std::sync::Arc;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum VctrlError {
-    
     CorruptedData(String),
-    
+
     DuplicateParent,
-    
+
     ExceededMaxSize(String),
-    
+
     InvalidBlameRange,
-    
+
     InvalidEmail(String),
-    
+
     InvalidHashLength(usize),
-    
+
     InvalidName(String),
-    
+
     InvalidTimezoneOffset(i16),
-    
+
     InvalidTreeStructure(String),
-    
+
     IoError(Arc<io::Error>),
-    
+
     ObjectNotFound(Hash),
-    
+
     Other(String),
-    
+
     RefNotFound(String),
-    
+
     SerializationError(String),
 }
 
@@ -184,28 +134,6 @@ impl From<io::Error> for VctrlError {
 }
 
 impl VctrlError {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     #[inline]
     pub fn from_io(err: io::Error) -> Self {

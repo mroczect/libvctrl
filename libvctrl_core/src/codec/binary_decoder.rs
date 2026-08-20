@@ -1,75 +1,14 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use libvctrl_handler::{
     Blob, Commit, CommitMeta, Decoder, EntryKind, HASH_LENGTH, Hash, MAX_BLOB_SIZE,
     MAX_MESSAGE_LENGTH, MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID, VctrlError,
 };
 use std::str;
 
-
 const EXPECTED_VERSION: u8 = 3;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub struct BinaryDecoder;
 
 impl BinaryDecoder {
-    
-    
-    
-    
-    
     fn check_version(data: &[u8]) -> Result<&[u8], VctrlError> {
         let version = data
             .first()
@@ -85,12 +24,6 @@ impl BinaryDecoder {
             .ok_or_else(|| VctrlError::CorruptedData("missing payload after version".into()))
     }
 
-    
-    
-    
-    
-    
-    
     fn read_bounded<R: std::io::Read>(
         reader: &mut R,
         max_size: usize,
@@ -114,14 +47,12 @@ impl BinaryDecoder {
         Ok(buf)
     }
 
-    
     fn require_byte(data: &[u8], pos: usize, what: &str) -> Result<u8, VctrlError> {
         data.get(pos)
             .copied()
             .ok_or_else(|| VctrlError::CorruptedData(format!("missing {what}")))
     }
 
-    
     fn require_slice<'a>(
         data: &'a [u8],
         start: usize,
@@ -137,35 +68,6 @@ impl BinaryDecoder {
 }
 
 impl Decoder for BinaryDecoder {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn decode_blob<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Blob, VctrlError> {
         let max_size = usize::try_from(MAX_BLOB_SIZE).unwrap_or(usize::MAX) + 16;
         let data = Self::read_bounded(&mut reader, max_size)?;
@@ -193,38 +95,6 @@ impl Decoder for BinaryDecoder {
         Blob::new(payload.to_vec())
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn decode_tree<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Tree, VctrlError> {
         let max_size = usize::try_from(MAX_TREE_ENTRIES).unwrap_or(usize::MAX) * 321 + 5;
         let data = Self::read_bounded(&mut reader, max_size)?;
@@ -284,57 +154,15 @@ impl Decoder for BinaryDecoder {
         Tree::new(entries)
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[allow(clippy::too_many_lines)]
     fn decode_commit<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Commit, VctrlError> {
         let max_size = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) + 1024;
         let data = Self::read_bounded(&mut reader, max_size)?;
         let data = Self::check_version(&data)?;
 
-        
         let tree_hash = Self::require_slice(data, 0, HASH_LENGTH, "commit tree hash")?;
         let tree = Hash::from_bytes(tree_hash)?;
 
-        
         let parent_count_bytes = Self::require_slice(data, HASH_LENGTH, 2, "commit parent count")?;
         let parent_count = u16::from_le_bytes(
             parent_count_bytes
@@ -350,7 +178,6 @@ impl Decoder for BinaryDecoder {
             pos += HASH_LENGTH;
         }
 
-        
         let author_name_len = Self::require_byte(data, pos, "author name length")? as usize;
         pos += 1;
         let author_name_bytes = Self::require_slice(data, pos, author_name_len, "author name")?;
@@ -359,7 +186,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += author_name_len;
 
-        
         let author_email_len = Self::require_byte(data, pos, "author email length")? as usize;
         pos += 1;
         let author_email_bytes = Self::require_slice(data, pos, author_email_len, "author email")?;
@@ -370,7 +196,6 @@ impl Decoder for BinaryDecoder {
 
         let author = UserID::new(author_name, author_email)?;
 
-        
         let committer_name_len = Self::require_byte(data, pos, "committer name length")? as usize;
         pos += 1;
         let committer_name_bytes =
@@ -382,7 +207,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += committer_name_len;
 
-        
         let committer_email_len = Self::require_byte(data, pos, "committer email length")? as usize;
         pos += 1;
         let committer_email_bytes =
@@ -396,7 +220,6 @@ impl Decoder for BinaryDecoder {
 
         let committer = UserID::new(committer_name, committer_email)?;
 
-        
         let msg_len_bytes = Self::require_slice(data, pos, 4, "commit message length")?;
         let msg_len = u32::from_le_bytes(
             msg_len_bytes
@@ -417,7 +240,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += msg_len;
 
-        
         let timestamp_bytes = Self::require_slice(data, pos, 8, "commit timestamp")?;
         let timestamp = i64::from_le_bytes(
             timestamp_bytes
@@ -434,7 +256,6 @@ impl Decoder for BinaryDecoder {
         );
         pos += 2;
 
-        
         let encoding_len = Self::require_byte(data, pos, "commit encoding length")? as usize;
         pos += 1;
         let encoding = if encoding_len > 0 {
@@ -456,50 +277,12 @@ impl Decoder for BinaryDecoder {
         Commit::with_meta(tree, parents, author, committer, message, meta)
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[allow(clippy::too_many_lines)]
     fn decode_tag<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Tag, VctrlError> {
         let max_size = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) + 1024;
         let data = Self::read_bounded(&mut reader, max_size)?;
         let data = Self::check_version(&data)?;
 
-        
         let name_len = Self::require_byte(data, 0, "tag name length")? as usize;
         let name_bytes = Self::require_slice(data, 1, name_len, "tag name")?;
         let name = str::from_utf8(name_bytes)
@@ -507,12 +290,10 @@ impl Decoder for BinaryDecoder {
             .to_string();
         let mut pos = 1 + name_len;
 
-        
         let target_bytes = Self::require_slice(data, pos, HASH_LENGTH, "tag target hash")?;
         let target = Hash::from_bytes(target_bytes)?;
         pos += HASH_LENGTH;
 
-        
         let has_tagger = match Self::require_byte(data, pos, "tagger presence byte")? {
             0 => false,
             1 => true,
@@ -524,7 +305,6 @@ impl Decoder for BinaryDecoder {
         };
         pos += 1;
 
-        
         let tagger = if has_tagger {
             let tagger_name_len = Self::require_byte(data, pos, "tagger name length")? as usize;
             pos += 1;
@@ -552,7 +332,6 @@ impl Decoder for BinaryDecoder {
             None
         };
 
-        
         let msg_len_bytes = Self::require_slice(data, pos, 4, "tag message length")?;
         let msg_len = u32::from_le_bytes(
             msg_len_bytes
@@ -573,7 +352,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += msg_len;
 
-        
         let timestamp_bytes = Self::require_slice(data, pos, 8, "tag timestamp")?;
         let timestamp = i64::from_le_bytes(
             timestamp_bytes
@@ -590,7 +368,6 @@ impl Decoder for BinaryDecoder {
         );
         pos += 2;
 
-        
         let encoding_len = Self::require_byte(data, pos, "tag encoding length")? as usize;
         pos += 1;
         let encoding = if encoding_len > 0 {

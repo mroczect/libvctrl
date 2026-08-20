@@ -1,78 +1,12 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use crate::constants::HASH_LENGTH;
 use crate::errors::VctrlError;
 use core::fmt;
 use core::str::FromStr;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Hash([u8; HASH_LENGTH]);
 
 impl Hash {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[allow(clippy::indexing_slicing)]
     pub const fn from_bytes(bytes: &[u8]) -> Result<Self, VctrlError> {
         if bytes.len() != HASH_LENGTH {
@@ -87,21 +21,6 @@ impl Hash {
         Ok(Self(arr))
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn as_bytes(&self) -> &[u8; HASH_LENGTH] {
         &self.0
@@ -109,11 +28,6 @@ impl Hash {
 }
 
 impl From<[u8; HASH_LENGTH]> for Hash {
-    
-    
-    
-    
-    
     fn from(arr: [u8; HASH_LENGTH]) -> Self {
         Self(arr)
     }
@@ -122,23 +36,12 @@ impl From<[u8; HASH_LENGTH]> for Hash {
 impl TryFrom<&[u8]> for Hash {
     type Error = VctrlError;
 
-    
-    
-    
-    
-    
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Self::from_bytes(value)
     }
 }
 
 impl AsRef<[u8]> for Hash {
-    
-    
-    
-    
-    
-    
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
@@ -147,30 +50,6 @@ impl AsRef<[u8]> for Hash {
 impl FromStr for Hash {
     type Err = VctrlError;
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != HASH_LENGTH * 2 {
             return Err(VctrlError::InvalidHashLength(s.len()));
@@ -189,12 +68,6 @@ impl FromStr for Hash {
 }
 
 impl fmt::Debug for Hash {
-    
-    
-    
-    
-    
-    
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Hash(")?;
         for &byte in self.0.iter().take(16) {
@@ -205,23 +78,6 @@ impl fmt::Debug for Hash {
 }
 
 impl fmt::Display for Hash {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for &byte in &self.0 {
             write!(f, "{byte:02x}")?;

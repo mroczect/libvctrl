@@ -1,81 +1,4 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use libvctrl_handler::{Commit, CommitMeta, Hash, UserID, VctrlError};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Debug, Default)]
 pub struct CommitBuilder {
@@ -88,25 +11,6 @@ pub struct CommitBuilder {
 }
 
 impl CommitBuilder {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -119,184 +23,42 @@ impl CommitBuilder {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn tree(mut self, tree: Hash) -> Self {
         self.tree = Some(tree);
         self
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn parent(mut self, parent: Hash) -> Self {
         self.parents.push(parent);
         self
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn author(mut self, author: UserID) -> Self {
         self.author = Some(author);
         self
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn committer(mut self, committer: UserID) -> Self {
         self.committer = Some(committer);
         self
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn message(mut self, msg: impl Into<String>) -> Self {
         self.message = Some(msg.into());
         self
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn meta(mut self, meta: CommitMeta) -> Self {
         self.meta = Some(meta);
         self
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn build(self) -> Result<Commit, VctrlError> {
         let tree = self
             .tree

@@ -1,73 +1,20 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 use crate::constants::entry_mode;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EntryKind {
-    
     Blob,
-    
+
     Executable,
-    
+
     Symlink,
-    
+
     Tree,
-    
+
     Submodule,
 }
 
 impl EntryKind {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn mode(self) -> u32 {
         match self {
@@ -79,37 +26,6 @@ impl EntryKind {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn from_mode(mode: u32) -> Option<Self> {
         match mode {

@@ -1,45 +1,9 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use super::hash::Hash;
 use crate::constants::MAX_TREE_ENTRIES;
 use crate::enums::EntryKind;
 use crate::errors::VctrlError;
 use crate::validation::validate_tree_entry_name;
 use std::cmp::Ordering;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TreeEntry {
@@ -49,61 +13,26 @@ pub struct TreeEntry {
 }
 
 impl TreeEntry {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn new(name: String, kind: EntryKind, hash: Hash) -> Result<Self, VctrlError> {
         validate_tree_entry_name(&name)?;
         Ok(Self { name, kind, hash })
     }
 
-    
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    
     #[must_use]
     pub const fn kind(&self) -> EntryKind {
         self.kind
     }
 
-    
     #[must_use]
     pub const fn hash(&self) -> &Hash {
         &self.hash
     }
 }
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tree {
@@ -111,37 +40,6 @@ pub struct Tree {
 }
 
 impl Tree {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn new(entries: Vec<TreeEntry>) -> Result<Self, VctrlError> {
         let max_entries = usize::try_from(MAX_TREE_ENTRIES).unwrap_or(usize::MAX);
         if entries.len() > max_entries {
@@ -168,44 +66,26 @@ impl Tree {
         Ok(Self { entries: sorted })
     }
 
-    
     #[must_use]
     pub fn entries(&self) -> &[TreeEntry] {
         &self.entries
     }
 
-    
     #[must_use]
     pub const fn len(&self) -> usize {
         self.entries.len()
     }
 
-    
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub fn get(&self, name: &str) -> Option<&TreeEntry> {
         self.entries.iter().find(|e| e.name == name)
     }
 }
-
-
-
-
-
-
-
-
-
 
 #[inline]
 fn compare_tree_entries(a: &TreeEntry, b: &TreeEntry) -> Ordering {

@@ -1,51 +1,5 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use crate::Hash;
 use crate::errors::VctrlError;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReflogEntry {
@@ -57,30 +11,6 @@ pub struct ReflogEntry {
 }
 
 impl ReflogEntry {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn new(
         old_id: Option<Hash>,
         new_id: Option<Hash>,
@@ -100,52 +30,26 @@ impl ReflogEntry {
         })
     }
 
-    
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn old_id(&self) -> Option<Hash> {
         self.old_id
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn new_id(&self) -> Option<Hash> {
         self.new_id
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub fn reason(&self) -> &str {
         &self.reason
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn timestamp(&self) -> i64 {
         self.timestamp
     }
 
-    
-    
-    
-    
-    
     #[must_use]
     pub const fn timezone_offset(&self) -> i16 {
         self.timezone_offset

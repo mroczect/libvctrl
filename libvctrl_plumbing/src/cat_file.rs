@@ -1,208 +1,30 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use libvctrl::{Decoder, EntryKind, Hash, ObjectStore, VctrlError};
 use std::fmt::Write;
 use std::io::{BufRead, Write as IoWrite};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[derive(Clone, Copy)]
 pub enum CatFileMode {
-    
     PrettyPrint,
-    
+
     ObjectType,
-    
+
     ObjectSize,
-    
-    
+
     Exists,
-    
-    
+
     Raw(ObjectType),
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectType {
-    
     Blob,
-    
+
     Tree,
-    
+
     Commit,
-    
+
     Tag,
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub fn cat_file<D: Decoder>(
     store: &dyn ObjectStore,
@@ -258,103 +80,19 @@ pub fn cat_file<D: Decoder>(
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Default)]
 pub struct BatchOptions {
-    
-    
     pub format: Option<String>,
-    
-    
+
     pub nul_terminated: bool,
-    
-    
+
     pub follow_symlinks: bool,
-    
-    
+
     pub buffer: bool,
-    
+
     pub print_contents: bool,
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub fn cat_file_batch<D: Decoder>(
     store: &dyn ObjectStore,
@@ -423,16 +161,6 @@ pub fn cat_file_batch<D: Decoder>(
     Ok(())
 }
 
-
-
-
-
-
-
-
-
-
-
 fn handle_one_object<D: Decoder>(
     store: &dyn ObjectStore,
     decoder: &D,
@@ -467,15 +195,6 @@ fn handle_one_object<D: Decoder>(
     Ok((info, content))
 }
 
-
-
-
-
-
-
-
-
-
 fn parse_hash(s: &str) -> Result<Hash, VctrlError> {
     if s.len() != 128 {
         let actual_len = s.len();
@@ -492,16 +211,6 @@ fn parse_hash(s: &str) -> Result<Hash, VctrlError> {
     Hash::from_bytes(&bytes)
 }
 
-
-
-
-
-
-
-
-
-
-
 fn decode_type<D: Decoder>(decoder: &D, encoded: &[u8]) -> Result<ObjectType, VctrlError> {
     if decoder.decode_blob(encoded).is_ok() {
         return Ok(ObjectType::Blob);
@@ -517,18 +226,6 @@ fn decode_type<D: Decoder>(decoder: &D, encoded: &[u8]) -> Result<ObjectType, Vc
     }
     Err(VctrlError::CorruptedData("unknown object type".into()))
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 fn pretty_print<D: Decoder>(decoder: &D, encoded: &[u8]) -> Result<String, VctrlError> {
     if let Ok(blob) = decoder.decode_blob(encoded) {
@@ -585,7 +282,6 @@ fn pretty_print<D: Decoder>(decoder: &D, encoded: &[u8]) -> Result<String, Vctrl
     Err(VctrlError::CorruptedData("unknown object type".into()))
 }
 
-
 const fn obj_type_to_str(t: ObjectType) -> &'static str {
     match t {
         ObjectType::Blob => "blob",
@@ -594,9 +290,6 @@ const fn obj_type_to_str(t: ObjectType) -> &'static str {
         ObjectType::Tag => "tag",
     }
 }
-
-
-
 
 const fn entry_mode(kind: EntryKind) -> u32 {
     match kind {
@@ -608,11 +301,6 @@ const fn entry_mode(kind: EntryKind) -> u32 {
         _ => 0,
     }
 }
-
-
-
-
-
 
 fn format_batch_info(
     format: &str,
