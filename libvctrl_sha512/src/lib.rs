@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 #[macro_export]
 macro_rules! impl_hmac {
@@ -9,12 +9,18 @@ macro_rules! impl_hmac {
             padded: [u8; $block_size],
         }
 
+        impl zeroize::Zeroize for HMAC {
+            fn zeroize(&mut self) {
+                if let Some(ref mut ih) = self.ih {
+                    zeroize::Zeroize::zeroize(ih);
+                }
+                zeroize::Zeroize::zeroize(&mut self.padded);
+            }
+        }
+
         impl Drop for HMAC {
             fn drop(&mut self) {
-                if let Some(ref mut ih) = self.ih {
-                    ih.zeroize();
-                }
-                self.padded.fill(0);
+                zeroize::Zeroize::zeroize(self);
             }
         }
 
@@ -22,8 +28,9 @@ macro_rules! impl_hmac {
             fn prepare_key(k: &[u8]) -> [u8; $block_size] {
                 let mut block_key = [0u8; $block_size];
                 if k.len() > $block_size {
-                    let hash = <$hash_struct>::hash(k);
-                    block_key[..$output_size].copy_from_slice(&hash[..$output_size]);
+                    let hash = zeroize::Zeroizing::new(<$hash_struct>::hash(k));
+                    let hash_bytes = &*hash;
+                    block_key[..$output_size].copy_from_slice(&hash_bytes[..$output_size]);
                 } else {
                     block_key[..k.len()].copy_from_slice(k);
                 }
@@ -49,7 +56,7 @@ macro_rules! impl_hmac {
                 }
                 let mut ih = <$hash_struct>::new();
                 ih.update(&padded);
-                block_key.fill(0);
+                zeroize::Zeroize::zeroize(&mut block_key);
                 HMAC {
                     ih: Some(ih),
                     padded,
@@ -71,8 +78,13 @@ macro_rules! impl_hmac {
                 }
                 let mut oh = <$hash_struct>::new();
                 oh.update(&self.padded);
-                let inner = self.ih.take().unwrap().finalize();
-                oh.update(&inner);
+                let inner = zeroize::Zeroizing::new(
+                    self.ih
+                        .take()
+                        .unwrap_or_else(|| <$hash_struct>::new())
+                        .finalize(),
+                );
+                oh.update(&*inner);
                 oh.finalize()
             }
 
@@ -115,6 +127,7 @@ macro_rules! impl_hkdf {
 
             #[doc = "HKDF-Expand step. Fills `out` with output keying material."]
             #[inline]
+            #[allow(clippy::arithmetic_side_effects, clippy::cast_possible_truncation)]
             pub fn expand(out: &mut [u8], prk: impl AsRef<[u8]>, info: impl AsRef<[u8]>) {
                 assert_eq!(
                     prk.as_ref().len(),
@@ -123,46 +136,42 @@ macro_rules! impl_hkdf {
                     $output_size
                 );
                 let info = info.as_ref();
-                let mut counter: u8 = 1;
+                let max_blocks: u32 = 255;
                 assert!(
-                    out.len() < 0xff * $output_size,
+                    (out.len() as u32) <= max_blocks * ($output_size as u32),
                     "Requested output exceeds RFC 5869 limit"
                 );
-                let mut i = 0;
-                while i < out.len() {
+                let mut offset = 0;
+                let mut counter: u32 = 1;
+                while offset < out.len() {
                     let mut hmac = HMAC::new(&prk);
-                    if i != 0 {
-                        hmac.update(&out[i - $output_size..][..$output_size]);
+                    if offset != 0 {
+                        hmac.update(&out[offset - $output_size..][..$output_size]);
                     }
                     hmac.update(info);
-                    hmac.update([counter]);
-                    let left = core::cmp::min($output_size, out.len() - i);
-                    out[i..][..left].copy_from_slice(&hmac.finalize()[..left]);
-                    counter += 1;
-                    i += $output_size;
+                    hmac.update([counter as u8]);
+                    let block = zeroize::Zeroizing::new(hmac.finalize());
+                    let left = core::cmp::min($output_size, out.len() - offset);
+                    out[offset..][..left].copy_from_slice(&block[..left]);
+                    offset += $output_size;
+                    counter = counter.wrapping_add(1);
                 }
             }
         }
     };
 }
 
-pub mod hmac;
-
 pub mod hkdf;
-
+pub mod hmac;
 pub mod sha512;
-
 pub mod utils;
 
 #[cfg(feature = "sha384")]
 pub mod sha384;
 
-pub use sha512::Hash;
-
-pub use hmac::HMAC;
-
 pub use hkdf::HKDF;
-
+pub use hmac::HMAC;
+pub use sha512::Hash;
 pub use utils::{BLOCKBYTES, BYTES};
 
 #[cfg(test)]
