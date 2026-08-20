@@ -1,8 +1,9 @@
+use std::collections::HashSet;
+
 use super::hash::Hash;
 use super::user_id::UserID;
 use crate::constants::{MAX_MESSAGE_LENGTH, MAX_PARENT_COUNT};
 use crate::errors::VctrlError;
-use std::collections::HashSet;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct CommitMeta {
@@ -95,8 +96,8 @@ impl Commit {
         }
 
         let mut seen = HashSet::new();
-        for p in &parents {
-            if !seen.insert(*p) {
+        for parent in &parents {
+            if !seen.insert(*parent) {
                 return Err(VctrlError::DuplicateParent);
             }
         }
