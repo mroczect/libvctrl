@@ -44,7 +44,7 @@ fn test_tree_new_sorts_entries() {
     let tree = common::ok(Tree::new(vec![e1, e2]));
 
     assert_eq!(tree.len(), 2);
-    assert_eq!(tree.entries().get(0).map(TreeEntry::name), Some("a"));
+    assert_eq!(tree.entries().first().map(TreeEntry::name), Some("a"));
     assert_eq!(tree.entries().get(1).map(TreeEntry::name), Some("b"));
 }
 

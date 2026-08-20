@@ -5,9 +5,10 @@ mod common;
 #[test]
 fn test_blob_valid_empty() {
     let blob = common::ok(Blob::new(Vec::new()));
+    let empty: &[u8] = &[];
     assert!(blob.is_empty());
     assert_eq!(blob.size(), 0);
-    assert_eq!(blob.data(), &[] as &[u8]);
+    assert_eq!(blob.data(), empty);
 }
 
 #[test]
