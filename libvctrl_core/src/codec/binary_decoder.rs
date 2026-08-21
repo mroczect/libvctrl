@@ -392,3 +392,274 @@ impl Decoder for BinaryDecoder {
         Tag::with_meta(name, target, tagger, message, meta)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec::BinaryEncoder;
+    use libvctrl_handler::{Encoder, TreeEntry};
+    use std::io::Cursor;
+
+    fn hash_byte(byte: u8) -> Result<Hash, VctrlError> {
+        Hash::from_bytes(&[byte; 64])
+    }
+
+    fn user(name: &str, email: &str) -> Result<UserID, VctrlError> {
+        UserID::new(name.to_string(), email.to_string())
+    }
+
+    fn meta(ts: i64, tz: i16) -> Result<CommitMeta, VctrlError> {
+        CommitMeta::new(ts, tz, None)
+    }
+
+    #[test]
+    fn check_version_valid() -> Result<(), VctrlError> {
+        let data = [3_u8, 42];
+        let rest = BinaryDecoder::check_version(&data)?;
+        assert_eq!(rest, &[42]);
+        Ok(())
+    }
+
+    #[test]
+    fn check_version_missing_byte() {
+        assert!(BinaryDecoder::check_version(&[]).is_err());
+    }
+
+    #[test]
+    fn check_version_unsupported() -> Result<(), VctrlError> {
+        let result = BinaryDecoder::check_version(&[4_u8]);
+        assert!(result.is_err());
+        match result {
+            Err(VctrlError::CorruptedData(msg)) => {
+                assert!(msg.contains("unsupported version"));
+            }
+            _ => return Err(VctrlError::Other("expected CorruptedData".into())),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn read_bounded_within_limit() -> Result<(), VctrlError> {
+        let mut reader = Cursor::new(vec![1_u8, 2, 3]);
+        let data = BinaryDecoder::read_bounded(&mut reader, 10)?;
+        assert_eq!(data, vec![1, 2, 3]);
+        Ok(())
+    }
+
+    #[test]
+    fn read_bounded_exceeds_limit() {
+        let mut reader = Cursor::new(vec![1_u8, 2, 3, 4]);
+        assert!(BinaryDecoder::read_bounded(&mut reader, 2).is_err());
+    }
+
+    #[test]
+    fn require_byte_valid() -> Result<(), VctrlError> {
+        let value = BinaryDecoder::require_byte(&[10, 20], 1, "second byte")?;
+        assert_eq!(value, 20);
+        Ok(())
+    }
+
+    #[test]
+    fn require_byte_missing() {
+        assert!(BinaryDecoder::require_byte(&[10], 1, "second byte").is_err());
+    }
+
+    #[test]
+    fn require_slice_valid() -> Result<(), VctrlError> {
+        let data = [1, 2, 3, 4];
+        let slice = BinaryDecoder::require_slice(&data, 1, 2, "middle")?;
+        assert_eq!(slice, &[2, 3]);
+        Ok(())
+    }
+
+    #[test]
+    fn require_slice_overflow() {
+        let data = [1, 2, 3];
+        assert!(BinaryDecoder::require_slice(&data, usize::MAX, 2, "overflow").is_err());
+    }
+
+    #[test]
+    fn decode_blob_valid_roundtrip() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+        let payload = vec![1_u8, 2, 3, 4];
+
+        let blob = Blob::new(payload.clone())?;
+        let mut buf = Vec::new();
+        encoder.encode_blob(&blob, &mut buf)?;
+        let decoded = codec.decode_blob(Cursor::new(buf))?;
+        assert_eq!(decoded.data(), payload.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn decode_blob_invalid_version() {
+        let codec = BinaryDecoder;
+        let data = [4_u8, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert!(codec.decode_blob(Cursor::new(data)).is_err());
+    }
+
+    #[test]
+    fn decode_blob_length_mismatch() {
+        let codec = BinaryDecoder;
+        let mut data = Vec::new();
+        data.push(3_u8);
+        data.extend_from_slice(&5_u64.to_le_bytes());
+        data.push(1_u8);
+        assert!(codec.decode_blob(Cursor::new(data)).is_err());
+    }
+
+    #[test]
+    fn decode_tree_valid_roundtrip() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+
+        let hash = hash_byte(0x22)?;
+        let entry = TreeEntry::new("a.txt".to_string(), EntryKind::Blob, hash)?;
+        let tree = Tree::new(vec![entry])?;
+
+        let mut buf = Vec::new();
+        encoder.encode_tree(&tree, &mut buf)?;
+        let decoded = codec.decode_tree(Cursor::new(buf))?;
+
+        let entries = decoded.entries();
+        assert_eq!(entries.len(), 1);
+        let first = entries
+            .first()
+            .ok_or_else(|| VctrlError::Other("expected one entry".into()))?;
+        assert_eq!(first.name(), "a.txt");
+        assert_eq!(first.kind(), EntryKind::Blob);
+        assert_eq!(*first.hash(), hash);
+        Ok(())
+    }
+
+    #[test]
+    fn decode_tree_unknown_kind() -> Result<(), VctrlError> {
+        let codec = BinaryDecoder;
+        let mut data = Vec::new();
+        data.push(3_u8);
+        data.extend_from_slice(&1_u32.to_le_bytes());
+        data.push(1_u8);
+        data.push(b'a');
+        data.push(9_u8);
+        data.extend_from_slice(hash_byte(0x33)?.as_bytes());
+
+        let result = codec.decode_tree(Cursor::new(data));
+        assert!(result.is_err());
+        match result {
+            Err(VctrlError::CorruptedData(msg)) => {
+                assert!(msg.contains("unknown entry kind"));
+            }
+            _ => return Err(VctrlError::Other("expected CorruptedData".into())),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn decode_commit_valid_roundtrip() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+
+        let tree = hash_byte(0x01)?;
+        let parent = hash_byte(0x02)?;
+        let author = user("Alice", "alice@example.com")?;
+        let committer = user("Bob", "bob@example.com")?;
+        let message = "initial commit".to_string();
+        let meta = meta(1_600_000_000, 0)?;
+
+        let commit =
+            Commit::with_meta(tree, vec![parent], author, committer, message.clone(), meta)?;
+
+        let mut buf = Vec::new();
+        encoder.encode_commit(&commit, &mut buf)?;
+        let decoded = codec.decode_commit(Cursor::new(buf))?;
+
+        assert_eq!(decoded.tree(), &tree);
+        let parents = decoded.parents();
+        assert_eq!(parents.len(), 1);
+        assert_eq!(parents.first(), Some(&parent));
+        assert_eq!(decoded.author().name(), "Alice");
+        assert_eq!(decoded.committer().email(), "bob@example.com");
+        assert_eq!(decoded.message(), message);
+        assert_eq!(decoded.meta().timestamp(), 1_600_000_000);
+        assert_eq!(decoded.meta().timezone_offset(), 0);
+        assert!(decoded.meta().encoding().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn decode_commit_trailing_bytes() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+
+        let tree = hash_byte(0x01)?;
+        let author = user("Alice", "alice@example.com")?;
+        let committer = user("Bob", "bob@example.com")?;
+        let message = "initial commit".to_string();
+        let meta = meta(1_600_000_000, 0)?;
+
+        let commit = Commit::with_meta(tree, vec![], author, committer, message, meta)?;
+        let mut buf = Vec::new();
+        encoder.encode_commit(&commit, &mut buf)?;
+        buf.push(0_u8);
+
+        assert!(codec.decode_commit(Cursor::new(buf)).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn decode_tag_valid_roundtrip() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+
+        let target = hash_byte(0x33)?;
+        let tagger = user("Tagger", "tagger@example.com")?;
+        let message = "v1.0".to_string();
+        let meta = meta(1_600_000_000, 0)?;
+
+        let tag = Tag::with_meta(
+            "v1.0".to_string(),
+            target,
+            Some(tagger),
+            message.clone(),
+            meta,
+        )?;
+
+        let mut buf = Vec::new();
+        encoder.encode_tag(&tag, &mut buf)?;
+        let decoded = codec.decode_tag(Cursor::new(buf))?;
+
+        assert_eq!(decoded.name(), "v1.0");
+        assert_eq!(decoded.target(), &target);
+        let decoded_tagger = decoded
+            .tagger()
+            .ok_or_else(|| VctrlError::Other("expected tagger".into()))?;
+        assert_eq!(decoded_tagger.name(), "Tagger");
+        assert_eq!(decoded.message(), message);
+        assert_eq!(decoded.meta().timestamp(), 1_600_000_000);
+        assert_eq!(decoded.meta().timezone_offset(), 0);
+        assert!(decoded.meta().encoding().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn decode_tag_invalid_tagger_presence() -> Result<(), VctrlError> {
+        let codec = BinaryDecoder;
+        let mut data = Vec::new();
+        data.push(3_u8);
+        data.push(1_u8);
+        data.push(b'v');
+        data.extend_from_slice(hash_byte(0x33)?.as_bytes());
+        data.push(2_u8);
+
+        let result = codec.decode_tag(Cursor::new(data));
+        assert!(result.is_err());
+        match result {
+            Err(VctrlError::CorruptedData(msg)) => {
+                assert!(msg.contains("invalid tagger presence"));
+            }
+            _ => return Err(VctrlError::Other("expected CorruptedData".into())),
+        }
+        Ok(())
+    }
+}
