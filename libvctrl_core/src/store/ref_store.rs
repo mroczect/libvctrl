@@ -44,3 +44,64 @@ impl RefStore for MemoryRefStore {
         Ok(names.into_iter().map(Ok).collect::<Vec<_>>().into_iter())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hash_byte(byte: u8) -> Result<Hash, VctrlError> {
+        Hash::from_bytes(&[byte; 64])
+    }
+
+    #[test]
+    fn set_and_get_ref_roundtrip() -> Result<(), VctrlError> {
+        let mut store = MemoryRefStore::new();
+        let hash = hash_byte(0xAB)?;
+
+        store.set_ref("refs/heads/main", &hash)?;
+        let got = store.get_ref("refs/heads/main")?;
+        assert_eq!(got, hash);
+        Ok(())
+    }
+
+    #[test]
+    fn set_ref_invalid_name_errors() -> Result<(), VctrlError> {
+        let mut store = MemoryRefStore::new();
+        let hash = hash_byte(0xCD)?;
+        assert!(store.set_ref("bad name", &hash).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn get_ref_missing_errors() {
+        let store = MemoryRefStore::new();
+        let result = store.get_ref("refs/heads/nope");
+        assert!(matches!(result, Err(VctrlError::RefNotFound(_))));
+    }
+
+    #[test]
+    fn delete_ref_removes_ref() -> Result<(), VctrlError> {
+        let mut store = MemoryRefStore::new();
+        let hash = hash_byte(0xEF)?;
+        store.set_ref("refs/tags/v1", &hash)?;
+        store.delete_ref("refs/tags/v1")?;
+        assert!(store.get_ref("refs/tags/v1").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn list_refs_sorted() -> Result<(), VctrlError> {
+        let mut store = MemoryRefStore::new();
+        let h1 = hash_byte(0x01)?;
+        let h2 = hash_byte(0x02)?;
+        store.set_ref("refs/heads/b", &h1)?;
+        store.set_ref("refs/heads/a", &h2)?;
+
+        let names: Vec<String> = store.list_refs()?.collect::<Result<_, _>>()?;
+        assert_eq!(
+            names,
+            vec!["refs/heads/a".to_string(), "refs/heads/b".to_string()]
+        );
+        Ok(())
+    }
+}
