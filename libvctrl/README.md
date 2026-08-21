@@ -5,7 +5,7 @@ all-in-one facade crate of the `libvctrl` workspace: it re-exports the contract 
 the reference implementation, and the cryptographic primitives of a content-addressable
 VCS into a single, ergonomic namespace.
 
-- **Crate:** `libvctrl` 2.1.3 (library-only, `std`-only)
+- **Crate:** `libvctrl` 2.2.0 (library-only, `std`-only)
 - **Language:** Rust, edition 2024 — MSRV **1.96.0**
 - **License:** MIT
 - **Repository:** https://github.com/mroczect/libvctrl
@@ -14,7 +14,7 @@ VCS into a single, ergonomic namespace.
 > `libvctrl` is a **library facade**. It contains no logic of its own; every public
 > item is a compile-time re-export of one of three underlying workspace crates. A
 > future binary crate (for example, a `vctrl` CLI) may be built on top of this facade,
-> but no such binary exists at the 2.1.2 release.
+> but no such binary exists at the 2.2.0 release.
 
 ---
 
@@ -146,9 +146,9 @@ sequenceDiagram
 
 - **Language:** Rust (edition 2024, MSRV 1.96.0)
 - **Dependencies:**
-  - `libvctrl_handler` 5.0.0 — contracts and types (path dependency)
-  - `libvctrl_core` 3.0.0 — reference implementations (path dependency)
-  - `libvctrl_sha512` 3.0.0 — cryptography, `default-features = false` (path dependency)
+  - `libvctrl_handler` 5.2.0 — contracts and types (path dependency)
+  - `libvctrl_core` 3.2.0 — reference implementations (path dependency)
+  - `libvctrl_sha512` 3.2.0 — cryptography, `default-features = false` (path dependency)
 - **Dev-dependencies:** `proptest` 1.11.0
 - **Lint policy:** workspace-inherited, `#![forbid(unsafe_code)]`, denied missing-docs,
   rust-2018-idioms, and a broad set of Clippy lints (including pedantic and nursery
@@ -185,7 +185,7 @@ Add `libvctrl` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-libvctrl = "2.1.2"
+libvctrl = "2.2.0"
 ```
 
 Or use Cargo directly:
@@ -211,16 +211,16 @@ controlled through Cargo features.
 
 ```toml
 # Default (SHA-512 + SHA-384)
-libvctrl = "2.1.2"
+libvctrl = "2.2.0"
 
 # Minimal: SHA-512 only
-libvctrl = { version = "2.1.2", default-features = false }
+libvctrl = { version = "2.2.0", default-features = false }
 
 # Size-optimised, full crypto
-libvctrl = { version = "2.1.2", features = ["opt_size"] }
+libvctrl = { version = "2.2.0", features = ["opt_size"] }
 
 # Size-optimised, SHA-512 only
-libvctrl = { version = "2.1.2", default-features = false, features = ["opt_size"] }
+libvctrl = { version = "2.2.0", default-features = false, features = ["opt_size"] }
 ```
 
 - **`sha384`** (default): enables SHA-384, HMAC-SHA-384, and HKDF-SHA-384 in the `crypto`
@@ -284,22 +284,23 @@ fn main() -> Result<(), VctrlError> {
 
     // 2. Encode the Tree into binary format.
     let encoder = BinaryEncoder;
-    let encoded_bytes = encoder.encode_tree(&tree)?;
+    let mut encoded = Vec::new();
+    encoder.encode_tree(&tree, &mut encoded)?;
 
     // 3. Hash the encoded bytes to get an address.
     let hasher = Sha512Hasher;
-    let tree_hash = hasher.hash(&encoded_bytes)?;
+    let tree_hash = hasher.hash(&mut encoded.as_slice())?;
 
     // 4. Store the encoded object in memory.
     let mut store = MemoryStore::new();
-    store.put(&tree_hash, &encoded_bytes)?;
+    store.put(&tree_hash, &encoded)?;
 
     // 5. Retrieve and verify the object.
     assert!(store.exists(&tree_hash)?);
     let mut reader = store.get(&tree_hash)?;
     let mut buf = Vec::new();
-    reader.read_to_end(&mut buf).map_err(VctrlError::IoError)?;
-    assert_eq!(buf, encoded_bytes);
+    reader.read_to_end(&mut buf).map_err(VctrlError::from_io)?;
+    assert_eq!(buf, encoded);
     Ok(())
 }
 ```

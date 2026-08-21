@@ -1,388 +1,235 @@
 # libvctrl
 
-A modular, content-addressable version control system implemented as a Rust workspace.
-`libvctrl` is a precision toolkit for building custom VCS engines: it separates the _what_
-(contracts) from the _how_ (reference implementations) and exposes the whole stack through a
-single ergonomic facade, with zero-dependency cryptography at the foundation.
+A precision toolkit for building custom version control systems in Rust.
 
-- **Repository:** https://github.com/mroczect/libvctrl
-- **Workspace documentation:** https://docs.rs/libvctrl
-- **Language:** Rust, edition 2024 — MSRV **1.96.0** (`rust-version = "1.96"`)
-- **Licence:** MIT for the workspace; `libvctrl_sha512` is ISC
-- **Status:** library-only (no CLI/binary member)
+`libvctrl` is a workspace of six crates that together provide:
 
-> This is the **workspace root README**. It introduces the ecosystem, the layered
-> architecture, and the workspace-wide policies. Each crate has its own README and
-> docs.rs page with full API detail; links are in the [Crates](#crates) section.
+- **contracts** for VCS objects, storage, transport, signing, and traversal
+- **reference implementations** of those contracts
+- **cryptographic primitives** for content addressing and authentication
+- **plumbing and porcelain** command-level building blocks
+- a **facade crate** that re-exports the entire SDK under one namespace
+
+The workspace is designed to be layered, auditable, and usable either as a complete
+batteries-included VCS SDK or as a set of focused, standalone libraries.
 
 ---
 
-## Overview
+## Workspace at a glance
 
-The `libvctrl` workspace is built around a strict separation of concerns. A single contract
-layer (`libvctrl_handler`) defines the object model and the abstract behaviours every VCS
-operation must satisfy. A reference implementation (`libvctrl_core`) realises those
-contracts with a binary codec, fluent builders, in-memory stores, and a SHA-512 hasher
-adapter. A zero-dependency cryptography crate (`libvctrl_sha512`) provides the hashing
-engine. A facade (`libvctrl`) re-exports all three under one namespace. Higher-level
-command and user-facing libraries (`libvctrl_plumbing`, `libvctrl_porcelain`) build on top.
+| Crate                | Version | Role                                                       | MSRV   | License |
+| -------------------- | ------- | ---------------------------------------------------------- | ------ | ------- |
+| `libvctrl`           | 2.2.0   | Facade: re-exports the full SDK                            | 1.96.0 | MIT     |
+| `libvctrl_handler`   | 5.2.0   | Contracts: traits, immutable types, limits, validation     | 1.96.0 | MIT     |
+| `libvctrl_core`      | 3.2.0   | Reference implementations: codec, builders, stores, hasher | 1.96.0 | MIT     |
+| `libvctrl_sha512`    | 3.2.0   | SHA-512, HMAC-SHA512, HKDF-SHA512, optional SHA-384        | 1.96.0 | ISC     |
+| `libvctrl_plumbing`  | 0.2.0   | Command-level VCS operations built on `libvctrl_core`      | 1.96.0 | MIT     |
+| `libvctrl_porcelain` | 0.1.0   | High-level, user-facing VCS operations                     | 1.96.0 | MIT     |
 
-The workspace is **library-only** at present: there is no dedicated binary/CLI member.
-`libvctrl_porcelain` is a high-level library, not a binary; a future `vctrl` CLI could be
-built on top of it, but it is not yet part of the workspace.
+All crates share Rust edition 2024 and are tested against Rust **1.96.0**.
 
 ---
 
 ## Architecture
 
-The workspace enforces a one-way dependency flow. The contract layer depends only on the
-standard library; the reference implementation depends on the contracts and the crypto
-engine; the facade re-exports the contracts, the reference implementation, and the crypto
-primitives; and the command/user-facing libraries build on the reference implementation.
+The dependency flow is strictly one-way:
 
 ```mermaid
-flowchart TD
-    subgraph Apps["Application layer"]
-        FACADE["libvctrl<br/>facade (re-exports)"]
-        PL["libvctrl_plumbing<br/>command-level library"]
-        PO["libvctrl_porcelain<br/>high-level library"]
-    end
-
-    subgraph Ref["Reference implementation"]
-        CORE["libvctrl_core<br/>codec / builders / stores / hasher adapter"]
-    end
-
-    subgraph Contracts["Contract layer"]
-        HANDLER["libvctrl_handler<br/>traits / types / limits / validation"]
-    end
-
-    subgraph Crypto["Cryptography"]
-        SHA["libvctrl_sha512<br/>SHA-512 / HMAC / HKDF (+ SHA-384)"]
-    end
-
-    FACADE --> HANDLER
-    FACADE --> CORE
-    FACADE --> SHA
-    PL --> CORE
-    PO --> CORE
-    CORE --> HANDLER
-    CORE --> SHA
+flowchart LR
+    H[libvctrl_handler<br/>contracts] --> C[libvctrl_core<br/>reference impl]
+    S[libvctrl_sha512<br/>crypto] --> C
+    C --> PL[libvctrl_plumbing]
+    C --> PO[libvctrl_porcelain]
+    H --> F[libvctrl<br/>facade]
+    C --> F
+    S --> F
 ```
 
-### End-to-end object lifecycle
-
-The layers collaborate to build, serialise, content-address, store, and later decode an
-object. The decoder is the trust boundary: it treats every byte stream as untrusted and
-re-validates structure, UTF-8, and system limits before constructing a handler type.
-
-```mermaid
-sequenceDiagram
-    participant App as Application
-    participant B as Builder (core)
-    participant E as BinaryEncoder (core)
-    participant H as Sha512Hasher (core, via sha512)
-    participant S as MemoryStore (core)
-    participant D as BinaryDecoder (core)
-
-    App->>B: Build object (Blob/Tree/Commit/Tag)
-    B->>B: Enforce handler limits and invariants
-    B-->>App: Validated immutable object
-    App->>E: encode_*(&object, &mut writer)
-    E-->>App: Deterministic, versioned bytes
-    App->>H: hash(&mut bytes.as_slice())
-    H->>H: SHA-512 over the encoded payload
-    H-->>App: 64-byte Hash (content address)
-    App->>S: put(&hash, &bytes)
-    App->>S: get(&hash)
-    S-->>App: Stored bytes
-    App->>D: decode_*(reader)
-    D->>D: Defense-in-depth validation
-    D-->>App: Validated immutable object
-```
+- `libvctrl_handler` is the foundation. It contains only traits, types, constants, and
+  validation; no concrete implementations.
+- `libvctrl_core` implements those contracts, using `libvctrl_sha512` for hashing.
+- `libvctrl_plumbing` and `libvctrl_porcelain` build command-level behaviour on top of
+  `libvctrl_core`.
+- `libvctrl` is a facade that re-exports all three foundational crates into a single
+  ergonomic namespace.
 
 ---
 
-## Core Features
+## Features
 
-- **Layered and modular.** Contracts, reference implementations, and crypto primitives are
-  isolated in separate crates with a one-way dependency flow.
-- **Content-addressed.** Objects are serialised deterministically and addressed by SHA-512
-  digests, so identical content always produces identical addresses.
-- **Invalid states unrepresentable.** All domain types use fallible constructors that reject
-  malformed input at construction time; objects are immutable thereafter.
-- **Defense-in-depth decoding.** The binary decoder bounds input, checks every offset,
-  validates UTF-8, and re-checks system limits — no slice indexing without a prior bounds
-  check.
-- **Resource-exhaustion prevention.** Hard `MAX_*` limits act as fail-fast circuit breakers
-  during construction and decoding, bounding memory allocation against malicious input.
-- **Zero-dependency cryptography.** SHA-512, HMAC-SHA512, HKDF-SHA512, and optional SHA-384
-  are implemented in pure Rust over `core`, with constant-time verification and zeroization.
-- **Single-dependency entry point.** The `libvctrl` facade re-exports the entire stack under
-  one ergonomic namespace.
-- **Strict memory safety.** `#![forbid(unsafe_code)]` is enforced workspace-wide.
-
----
-
-## Technology Stack
-
-- **Language:** Rust (edition 2024, MSRV 1.96.0)
-- **Workspace licence:** MIT (`libvctrl_sha512` is ISC)
-- **Authors:** `mroczect`
-- **Resolver:** Cargo resolver v2
-- **Lint policy:** workspace-inherited (see [Contributing](#contributing))
-- **`no_std` status:** the workspace as a whole is **`std`-only**. The `no-std` keyword in
-  the workspace metadata applies only to `libvctrl_sha512` as a future-compatible goal; even
-  that crate is currently `std`-by-default (it uses only `core` APIs internally but does not
-  yet set `#![no_std]`).
+- **Invalid states are unrepresentable.** Fallible constructors enforce invariants at
+  construction time; objects are immutable thereafter.
+- **Resource-exhaustion prevention.** Hard limits on blob size, tree entries, message
+  length, parent count, and name length.
+- **Strong typing over raw mode bits.** Tree entry kinds are represented by the
+  `EntryKind` enum, not raw integers.
+- **Deterministic serialization.** The binary codec produces a versioned, little-endian,
+  deterministic byte stream for stable content addressing.
+- **Defense-in-depth decoding.** The decoder bounds input, checks every offset, validates
+  UTF-8, and re-checks limits before constructing objects.
+- **Constant-time verification.** Cryptographic tag and hash comparisons do not
+  short-circuit.
+- **Zeroization.** Sensitive hash and HMAC state is cleared using the `zeroize` crate.
+- **Zero/minimal dependencies.** The crypto crate has only one optional-feature dependency;
+  the handler crate has no runtime dependencies.
+- **Strict lint policy.** `#![forbid(unsafe_code)]`, denied missing-docs, rust idioms, and
+  broad Clippy groups are enforced workspace-wide.
 
 ---
 
-## Project Structure
+## Quick start
 
-```text
-libvctrl/
-├── Cargo.toml              # workspace manifest
-├── README.md               # this file (workspace overview)
-├── CONTRIBUTING.md         # contribution guidelines
-├── LICENSE                 # MIT (workspace); ISC under libvctrl_sha512/
-├── libvctrl/               # facade crate (v2.1.2)
-├── libvctrl_handler/       # contract layer (v5.0.0)
-├── libvctrl_core/          # reference implementations (v3.0.0)
-├── libvctrl_sha512/        # crypto primitives (v3.0.0, ISC)
-├── libvctrl_plumbing/      # command-level operations (v0.2.0)
-└── libvctrl_porcelain/     # high-level operations (v0.1.0)
-```
-
-Each member crate contains its own `Cargo.toml`, `src/`, `README.md`, and tests.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Rust toolchain **1.96.0** or newer (edition 2024 is required)
-- Cargo
-- Git
-
-No system libraries or external services are required.
-
-### Installation
-
-For most users, depend on the facade — it pulls the contracts, the reference implementation,
-and the crypto primitives as a single dependency:
+Add the facade to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-libvctrl = "2.1"
+libvctrl = "2.2"
 ```
 
-Or via Cargo:
-
-```bash
-cargo add libvctrl
-```
-
-To work on the workspace itself, clone the repository and build all members:
-
-```bash
-git clone https://github.com/mroczect/libvctrl.git
-cd libvctrl
-cargo build --workspace
-```
-
-### Configuration
-
-The workspace has no runtime configuration. Behavioural configuration of the cryptographic
-backend is controlled through the facade's feature flags, which are forwarded to
-`libvctrl_sha512`:
-
-- `sha384` (default) — enables SHA-384, HMAC-SHA-384, and HKDF-SHA-384.
-- `opt_size` — favours smaller binary size over speed for embedded/WebAssembly/minimal-CLI
-  targets by de-inlining the SHA-512 compression round functions.
-
-```toml
-# Default (SHA-512 + SHA-384)
-libvctrl = "2.1"
-
-# Minimal (SHA-512 only)
-libvctrl = { version = "2.1", default-features = false }
-
-# Size-optimised, full crypto
-libvctrl = { version = "2.1", features = ["opt_size"] }
-```
-
----
-
-## Usage
-
-### Quick start with the facade
+Build, encode, hash, store, and decode a blob:
 
 ```rust
+use std::io::Cursor;
 use libvctrl::{
-    Blob, Encoder, Hasher, ObjectStore,
-    BinaryEncoder, Sha512Hasher, MemoryStore, VctrlError,
+    Blob, BinaryDecoder, BinaryEncoder, Decoder, Encoder, Hasher, MemoryStore,
+    ObjectStore, Sha512Hasher, VctrlError,
 };
 
 fn main() -> Result<(), VctrlError> {
-    // 1. Build a validated blob.
+    // 1. Create a validated blob.
     let blob = Blob::new(b"hello world".to_vec())?;
 
-    // 2. Encode it into deterministic, versioned bytes.
+    // 2. Encode it into deterministic bytes.
     let mut encoded = Vec::new();
     BinaryEncoder.encode_blob(&blob, &mut encoded)?;
 
-    // 3. Hash the encoded bytes to obtain a 64-byte content address.
+    // 3. Hash the encoded bytes to get a 64-byte content address.
     let hash = Sha512Hasher.hash(&mut encoded.as_slice())?;
 
-    // 4. Store the encoded object in memory and verify it exists.
+    // 4. Store the object in memory.
     let mut store = MemoryStore::new();
     store.put(&hash, &encoded)?;
-    assert!(store.exists(&hash)?);
+
+    // 5. Retrieve and decode it back.
+    let reader = store.get(&hash)?;
+    let decoded = BinaryDecoder.decode_blob(reader)?;
+
+    assert_eq!(decoded, blob);
     Ok(())
 }
 ```
 
-### Workspace commands
+---
+
+## Using a focused crate
+
+If you only need contracts, crypto, or the reference implementation, depend on the
+individual crate instead of the facade:
+
+```toml
+[dependencies]
+libvctrl_handler = "5.2"     # contracts only
+libvctrl_core = "3.2"        # codec, builders, stores, hasher adapter
+libvctrl_sha512 = "3.2"      # raw SHA-512/HMAC/HKDF
+```
+
+The crypto crate supports feature flags for SHA-384 and size optimisation:
+
+```toml
+# Minimal SHA-512 only
+libvctrl_sha512 = { version = "3.2", default-features = false }
+
+# Size-optimised SHA-512
+libvctrl_sha512 = { version = "3.2", default-features = false, features = ["opt_size"] }
+```
+
+---
+
+## Repository layout
+
+```text
+libvctrl/
+├── Cargo.toml
+├── rust-toolchain.toml
+├── README.md
+├── libvctrl/
+├── libvctrl_handler/
+├── libvctrl_core/
+├── libvctrl_sha512/
+├── libvctrl_plumbing/
+└── libvctrl_porcelain/
+```
+
+Each crate has its own `README.md` and `Cargo.toml`.
+
+---
+
+## Testing, linting, and documentation
+
+Run the full workspace test suite:
 
 ```bash
-# Build every member
-cargo build --workspace
+cargo test --workspace --all-targets --all-features
+```
 
-# Run the entire test suite
-cargo test --workspace
+Run formatting checks:
 
-# Run clippy across all members and targets
-cargo clippy --workspace --all-targets -- -D warnings
+```bash
+cargo fmt --all -- --check
+```
 
-# Build documentation for the whole workspace
+Run Clippy with warnings denied:
+
+```bash
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+```
+
+Build documentation:
+
+```bash
 cargo doc --workspace --no-deps
+```
 
-# Run benchmarks (criterion; sha384 bench requires the sha384 feature)
-cargo bench --workspace
+Run benchmarks for crypto and handler crates:
+
+```bash
+cargo bench -p libvctrl_sha512
+cargo bench -p libvctrl_handler
 ```
 
 ---
 
-## Crates
+## Security and safety
 
-The workspace publishes six crates. Each has its own README and docs.rs page.
+The workspace enforces:
 
-| Crate                | Version | Licence | Role                                                                     | Documentation                      |
-| -------------------- | ------- | ------- | ------------------------------------------------------------------------ | ---------------------------------- |
-| `libvctrl`           | 2.1.2   | MIT     | Facade: re-exports contracts, reference impl, and crypto                 | https://docs.rs/libvctrl           |
-| `libvctrl_handler`   | 5.0.0   | MIT     | Contract layer: traits, types, limits, validation                        | https://docs.rs/libvctrl_handler   |
-| `libvctrl_core`      | 3.0.0   | MIT     | Reference implementations: codec, builders, stores, hasher adapter       | https://docs.rs/libvctrl_core      |
-| `libvctrl_sha512`    | 3.0.0   | ISC     | Zero-dependency SHA-512 / HMAC / HKDF (+ optional SHA-384)               | https://docs.rs/libvctrl_sha512    |
-| `libvctrl_plumbing`  | 0.2.0   | MIT     | Command-level VCS operations as a library (`cat_file`, `cat_file_batch`) | https://docs.rs/libvctrl_plumbing  |
-| `libvctrl_porcelain` | 0.1.0   | MIT     | High-level, user-facing VCS operations as a library (early stage)        | https://docs.rs/libvctrl_porcelain |
+- `#![forbid(unsafe_code)]` in every crate
+- denial of `unwrap_used`, `expect_used`, `panic`, and `indexing_slicing` where feasible
+- `unsafe_code = "forbid"` at the workspace level
+- zeroization of sensitive cryptographic state
+- constant-time comparison for tags and hashes
+- bounded reads and allocation limits on untrusted input
 
-### Layer roles
-
-- **`libvctrl_handler`** — the "constitution" layer. Defines _what_ a VCS object model looks
-  like: 17 backend contracts (`Encoder`, `Decoder`, `Hasher`, `ObjectStore`, `RefStore`,
-  `Transport`, `Signer`, `Verifier`, `Blame`, `ConfigStore`, etc.), 14 immutable data types
-  (`Blob`, `Tree`, `Commit`, `Tag`, `Hash`, `UserID`, ...), system limits, validation
-  functions, and the unified `VctrlError`. No implementations; `std`-only; zero dependencies.
-- **`libvctrl_core`** — the reference implementation. Realises the handler contracts with a
-  deterministic, versioned binary codec (`BinaryEncoder`/`BinaryDecoder`), a SHA-512 hasher
-  adapter (`Sha512Hasher`), fluent builders, and in-memory stores (`MemoryStore`,
-  `MemoryRefStore`). `std`-only.
-- **`libvctrl_sha512`** — the crypto engine. Pure-Rust SHA-512, HMAC-SHA512, HKDF-SHA512,
-  and optional SHA-384, with constant-time verification and zeroization. Zero external
-  dependencies; `std`-by-default but `core`-only internally. ISC-licensed.
-- **`libvctrl`** — the facade. Re-exports `libvctrl_handler`, `libvctrl_core`, and
-  `libvctrl_sha512` under one namespace, lifting the most common items to the crate root.
-  The recommended single dependency for most users.
-- **`libvctrl_plumbing`** — command-level VCS operations as a library (currently `cat_file`
-  and `cat_file_batch`). Built on `libvctrl_core`.
-- **`libvctrl_porcelain`** — high-level, user-facing VCS operations as a library. Early
-  stage with a minimal public API. A future `vctrl` CLI could be built on top, but no binary
-  exists yet.
-
----
-
-## Testing
-
-Run the entire workspace test suite (unit tests, doctests, and property-based tests via
-`proptest`):
-
-```bash
-cargo test --workspace
-```
-
-`libvctrl_sha512` additionally ships `criterion` benchmarks under `benches/`:
-
-```bash
-# Run all benchmarks
-cargo bench --workspace
-
-# The SHA-384 benchmark requires the sha384 feature (on by default)
-cargo bench --bench sha384_bench
-```
+No formal security audit has been performed. Use at your own risk in production.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. The workspace enforces a shared lint policy inherited by all
-members via `[lints] workspace = true`.
+Contributions are welcome. See `CONTRIBUTING.md` for guidelines.
 
-### Workspace lint policy
+General rules:
 
-**`rustc` lints:**
-
-- `unsafe_code` and `macro_use_extern_crate` are **`forbid`** — non-overridable, hard
-  errors. No `unsafe` code is permitted anywhere in the workspace.
-- A broad set of `rustc` lints (`missing_docs`, `dead_code`, `unused_imports`,
-  `unused_variables`, `unused_lifetimes`, `unused_macro_rules`, `unused_crate_dependencies`,
-  `unreachable_pub`, `rust_2018_idioms`, `rust_2021_compatibility`, `rust_2024_compatibility`,
-  `elided_lifetimes_in_paths`, `explicit_outlives_requirements`, `non_ascii_idents`,
-  `trivial_bounds`, `unit_bindings`, `single_use_lifetimes`, `redundant_lifetimes`,
-  `unused_qualifications`, `noop_method_call`, `unnameable_types`) are **`warn`** — they
-  surface diagnostics but do not fail the build.
-
-**`clippy` lints:**
-
-- `clippy::all` is **`warn`**.
-- `clippy::pedantic`, `clippy::nursery`, and `clippy::cargo` are **`allow`** (effectively
-  disabled).
-- A focused set of panic/unwrap-adjacent lints (`todo`, `unimplemented`, `unreachable`,
-  `unwrap_used`, `expect_used`, `panic`, `indexing_slicing`, `map_err_ignore`,
-  `wildcard_enum_match_arm`) are **`warn`**.
-- Several style/portability lints are explicitly allowed (`doc_markdown`,
-  `doc_lazy_continuation`, `needless_return`, `match_same_arms`, `uninlined_format_args`,
-  `std_instead_of_core`, `std_instead_of_alloc`, `alloc_instead_of_core`).
-
-> **Note on accuracy.** Earlier per-crate READMEs in this repository may have described
-> `missing_docs`, `rust_2018_idioms`, and the `pedantic`/`nursery` groups as "denied." That
-> was inaccurate: they are `warn` or `allow` as described above. Those per-crate sections
-> should be corrected in a separate pass. The authoritative source is the
-> `[workspace.lints]` table in the root `Cargo.toml`.
-
-### Local development
-
-```bash
-# Format check
-cargo fmt --all -- --check
-
-# Lint across the workspace (treat warnings as errors for CI)
-cargo clippy --workspace --all-targets -- -D warnings
-
-# Documentation build
-cargo doc --workspace --no-deps
-```
-
-For contribution guidelines, code style, and the full lint configuration, see
-`CONTRIBUTING.md` and this README. When contributing, preserve the layered invariants: new
-contracts and types belong in `libvctrl_handler`; new reference implementations belong in
-`libvctrl_core`; new user-facing commands belong in `libvctrl_plumbing` or
-`libvctrl_porcelain`; and no `unsafe` code may be introduced in any member.
+- Keep the contract layer free of concrete implementations.
+- Keep the crypto crate dependency-light.
+- Preserve the facade as a pure re-export layer.
+- Ensure `cargo fmt`, `cargo clippy`, and `cargo test --workspace` pass before opening a PR.
 
 ---
 
-## Licence
+## License
 
-The workspace is licensed under the **MIT** licence, except for `libvctrl_sha512`, which is
-licensed under the **ISC** licence. See each crate's `LICENSE` file for the authoritative
-text.
+The workspace is licensed under the **MIT License**, except for `libvctrl_sha512`, which
+is licensed under the **ISC License**.
+
+See the individual crate `LICENSE` files for full text.
