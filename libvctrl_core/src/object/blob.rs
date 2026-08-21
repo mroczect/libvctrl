@@ -21,3 +21,23 @@ impl BlobBuilder {
         Blob::new(self.data)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builder_empty_data_builds_ok() -> Result<(), VctrlError> {
+        let blob = BlobBuilder::new().build()?;
+        assert!(blob.data().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn builder_with_data_builds_ok() -> Result<(), VctrlError> {
+        let data = vec![1_u8, 2, 3];
+        let blob = BlobBuilder::new().with_data(data.clone()).build()?;
+        assert_eq!(blob.data(), data.as_slice());
+        Ok(())
+    }
+}
