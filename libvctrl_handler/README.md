@@ -6,7 +6,7 @@ traits, types, and validation. `libvctrl_handler` is the "constitution" layer of
 _how_ it is stored, serialised, signed, or transported. Every other crate in the workspace
 implements or consumes these contracts.
 
-- **Crate:** `libvctrl_handler` 5.0.1 (library, `std`-only, zero external dependencies)
+- **Crate:** `libvctrl_handler` 5.2.0 (library, `std`-only, zero external runtime dependencies)
 - **Language:** Rust, edition 2024 — MSRV **1.96.0**
 - **License:** MIT
 - **Repository:** https://github.com/mroczect/libvctrl
@@ -149,7 +149,7 @@ flowchart LR
 
 - **Language:** Rust (edition 2024, MSRV 1.96.0)
 - **Dependencies:** none (standard library only)
-- **Dev-dependencies:** `proptest` 1.11.0
+- **Dev-dependencies:** `criterion` 0.8 (with `cargo_bench_support` feature)
 - **Lint policy:** workspace-inherited, `#![forbid(unsafe_code)]`, denied `missing_docs`,
   `rust_2018_idioms`, and a broad set of Clippy lints (including `pedantic` and `nursery`
   groups). See the repository for the authoritative lint configuration.
@@ -167,6 +167,8 @@ flowchart LR
 ```text
 libvctrl_handler/
 ├── Cargo.toml
+├── benches/
+│   └── handler_bench.rs
 └── src/
     ├── lib.rs
     ├── constants.rs
@@ -200,7 +202,16 @@ libvctrl_handler/
     ├── types/
     │   ├── mod.rs
     │   └── core/
-    │       └── ... (data type definitions)
+    │       ├── mod.rs
+    │       ├── blob.rs
+    │       ├── commit.rs
+    │       ├── delta.rs
+    │       ├── hash.rs
+    │       ├── merge.rs
+    │       ├── reflog.rs
+    │       ├── tag.rs
+    │       ├── tree.rs
+    │       └── user_id.rs
     └── validation/
         ├── mod.rs
         ├── hash.rs
@@ -224,14 +235,14 @@ For most users, depend on the facade instead:
 
 ```toml
 [dependencies]
-libvctrl = "2.1"
+libvctrl = "2.2"
 ```
 
 To depend on `libvctrl_handler` directly (contracts only, no reference implementation):
 
 ```toml
 [dependencies]
-libvctrl_handler = "5.0"
+libvctrl_handler = "5.2"
 ```
 
 Or via Cargo:
@@ -503,13 +514,18 @@ Run the crate's test suite with Cargo:
 cargo test
 ```
 
-Property-based tests use `proptest` (a dev-dependency). Because the crate defines only
-contracts and immutable types, its tests focus on construction invariants, validation
-rejection of malformed input, and round-trip properties of `EntryKind` mode conversion.
-To run the entire workspace test suite from the repository root:
+The crate includes unit tests for constructors, validation, `EntryKind` conversions, and
+tree sorting/duplicate detection. To run the entire workspace test suite from the
+repository root:
 
 ```bash
 cargo test --workspace
+```
+
+To run the benchmark suite:
+
+```bash
+cargo bench -p libvctrl_handler
 ```
 
 To verify the strict lint policy is satisfied:
