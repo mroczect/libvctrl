@@ -20,18 +20,43 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          toolchain: 1.96.0
+          components: clippy, rustfmt
 
-      - name: Validate release.json and tags
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Validate release.json, versions, and tags
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+
           if ! jq -e '.crates | type == "array" and length > 0' release.json >/dev/null; then
             echo "::error::release.json invalid: crates must be a non-empty array"
             exit 1
           fi
 
-          while read -r name version; do
+          while IFS=' ' read -r name version; do
+            echo "Validating $name v$version"
+
+            # Crate must exist in workspace
+            if ! cargo metadata --no-deps --format-version 1 \
+              | jq -e --arg name "$name" '.packages[] | select(.name == $name)' >/dev/null; then
+              echo "::error::Crate $name not found in workspace"
+              exit 1
+            fi
+
+            # Version must match Cargo.toml
+            actual=$(cargo metadata --no-deps --format-version 1 \
+              | jq -r --arg name "$name" '.packages[] | select(.name == $name) | .version')
+
+            if [ "$actual" != "$version" ]; then
+              echo "::error::Version mismatch for $name: release.json=$version, Cargo.toml=$actual"
+              exit 1
+            fi
+
+            # Tag must exist on remote
             tag="${name}@${version}"
             echo "Checking tag $tag"
             if ! git ls-remote --tags origin "refs/tags/${tag}" | grep -q "refs/tags/${tag}"; then
@@ -40,29 +65,34 @@ jobs:
             fi
           done < <(jq -r '.crates[] | "\(.name) \(.version)"' release.json)
 
-      - name: Test and publish each crate in order
+      - name: Check workspace formatting
+        run: cargo fmt --all -- --check
+
+      - name: Test, lint, and publish each crate in order
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          while read -r name version; do
+          set -euo pipefail
+
+          while IFS=' ' read -r name version; do
             echo "=========================================="
             echo "Processing $name v$version"
             echo "=========================================="
 
-            # Build & test
+            # Test
             cargo test -p "$name" --all-targets || {
               echo "::error::Tests failed for $name"
               exit 1
             }
 
-            # Clippy with warnings denied
+            # Clippy
             cargo clippy -p "$name" --all-targets -- -D warnings || {
               echo "::error::Clippy failed for $name"
               exit 1
             }
 
             # Publish
-            cargo publish -p "$name" || {
+            cargo publish -p "$name" --locked || {
               echo "::error::Publish failed for $name"
               exit 1
             }

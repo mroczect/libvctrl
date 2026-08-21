@@ -10,6 +10,16 @@ readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[0;33m'
 readonly NC='\033[0m'
 
+# Urutan publish: dependency-first
+readonly CRATE_ORDER=(
+    "libvctrl_sha512"
+    "libvctrl_handler"
+    "libvctrl_core"
+    "libvctrl"
+    "libvctrl_plumbing"
+    "libvctrl_porcelain"
+)
+
 log() {
     local level="$1"; shift
     local msg="$*"
@@ -40,6 +50,7 @@ ensure_clean_workspace() {
     if ! git diff-index --quiet HEAD --; then
         error_exit "Uncommitted changes found. Commit or stash them first."
     fi
+
     local branch
     branch=$(git rev-parse --abbrev-ref HEAD)
     if [ "$branch" != "master" ] && [ "$branch" != "main" ]; then
@@ -47,6 +58,7 @@ ensure_clean_workspace() {
         read -r -p "Continue? (y/n) " confirm
         [ "$confirm" = "y" ] || exit 0
     fi
+
     git fetch origin
     local local_commit remote_commit
     local_commit=$(git rev-parse HEAD)
@@ -58,22 +70,10 @@ ensure_clean_workspace() {
     fi
 }
 
-# Urutan publish yang benar
-readonly CRATE_ORDER=(
-    "libvctrl_sha512"
-    "libvctrl_handler"
-    "libvctrl_core"
-    "libvctrl"
-    "libvctrl_plumbing"
-    "libvctrl_porcelain"
-)
-
 get_version() {
     local crate="$1"
-    if [ ! -d "$crate" ]; then
-        error_exit "Directory '$crate' does not exist"
-    fi
-    (cd "$crate" && cargo pkgid | cut -d'#' -f2 | cut -d: -f1)
+    cargo metadata --no-deps --format-version 1 \
+        | jq -r --arg name "$crate" '.packages[] | select(.name == $name) | .version'
 }
 
 generate_release_json() {
@@ -103,13 +103,11 @@ push_tags() {
         version=$(get_version "$crate")
         local tag="${crate}@${version}"
 
-        # Cek remote dulu
         if git ls-remote --tags origin "refs/tags/${tag}" | grep -q "refs/tags/${tag}"; then
             log WARN "Tag $tag already exists on remote, skipping push"
             continue
         fi
 
-        # Buat tag lokal jika belum ada
         if ! git rev-parse "$tag" >/dev/null 2>&1; then
             log INFO "Creating tag $tag"
             git tag -a "$tag" -m "Release $crate v$version"
@@ -120,30 +118,19 @@ push_tags() {
     done
 }
 
-main() {
-    log INFO "Release preparation started"
-    check_prerequisites
-    ensure_clean_workspace
-
-    # 1. Generate release.json
-    generate_release_json
-
-    # 2. Create new branch
+create_release_pr() {
     local branch_name
     branch_name="release/$(date +%Y%m%d%H%M%S)"
     log INFO "Creating branch $branch_name"
     git checkout -b "$branch_name"
 
-    # 3. Commit release.json
-    log INFO "Committing $RELEASE_JSON (force add)"
+    log INFO "Committing $RELEASE_JSON"
     git add -f "$RELEASE_JSON"
     git commit -m "chore(release): add $RELEASE_JSON for ordered publishing"
 
-    # 4. Push branch
     log INFO "Pushing branch $branch_name"
     git push -u origin "$branch_name"
 
-    # 5. Create PR
     log INFO "Creating pull request"
     cat > /tmp/pr_body.md <<EOF
 ## Summary
@@ -156,32 +143,45 @@ done)
 
 ## Note
 - Setelah PR ini di-merge, workflow publish akan membaca release.json dan mempublish crate sesuai urutan.
-- Pastikan tag untuk setiap crate sudah di-push sebelum merge (atau jalankan script ini dengan argumen --push-tags).
+- Pastikan tag untuk setiap crate sudah di-push sebelum merge.
 EOF
 
+    local base
+    base=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's|refs/remotes/origin/||' || echo master)
     local pr_url
     pr_url=$(gh pr create \
         --title "chore(release): add release.json for ordered publishing" \
         --body-file /tmp/pr_body.md \
-        --base "$(git rev-parse --abbrev-ref origin/HEAD | sed 's|origin/||')" \
+        --base "$base" \
         --head "$branch_name")
 
     local pr_number
     pr_number=$(basename "$pr_url")
+    log INFO "Pull request created: $pr_url"
+    log INFO "All done. Merge PR #$pr_number to trigger publishing."
+}
 
-    # 6. Interactive confirmation for tags
+main() {
+    log INFO "Release preparation started"
+    check_prerequisites
+    ensure_clean_workspace
+
+    # 1. Generate release.json
+    generate_release_json
+
+    # 2. Buat PR
+    create_release_pr
+
+    # 3. Konfirmasi push tags
     read -r -p "Do you want to push release tags now? (y/n) " confirm
     if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
         push_tags
     else
         log INFO "Tags not pushed. You can push them later with: bash scripts/prepare-release.sh --push-tags"
     fi
-
-    log INFO "Pull request created: $pr_url"
-    log INFO "All done. Merge PR #$pr_number to trigger publishing."
 }
 
-# Allow --push-tags mode
+# Mode push tags saja
 if [ "${1:-}" = "--push-tags" ]; then
     check_prerequisites
     push_tags
