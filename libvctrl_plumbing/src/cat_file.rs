@@ -1,28 +1,23 @@
+use alloc::sync::Arc;
+use core::fmt::Write as _;
+
 use libvctrl::{Decoder, EntryKind, Hash, ObjectStore, VctrlError};
-use std::fmt::Write;
 use std::io::{BufRead, Write as IoWrite};
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum CatFileMode {
     PrettyPrint,
-
     ObjectType,
-
     ObjectSize,
-
     Exists,
-
     Raw(ObjectType),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectType {
     Blob,
-
     Tree,
-
     Commit,
-
     Tag,
 }
 
@@ -36,31 +31,30 @@ pub fn cat_file<D: Decoder>(
     let hash = parse_hash(object_name)?;
 
     let mut encoded = Vec::new();
-    store
+    let _ = store
         .get(&hash)?
         .read_to_end(&mut encoded)
-        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+        .map_err(|e| VctrlError::IoError(Arc::new(e)))?;
 
     match mode {
         CatFileMode::Exists => Ok(()),
         CatFileMode::ObjectType => {
             let obj_type = decode_type(decoder, &encoded)?;
             let type_str = obj_type_to_str(obj_type);
-            writeln!(writer, "{type_str}")
-                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+            writeln!(writer, "{type_str}").map_err(|e| VctrlError::IoError(Arc::new(e)))?;
             Ok(())
         }
         CatFileMode::ObjectSize => {
             let _obj_type = decode_type(decoder, &encoded)?;
             let size = encoded.len();
-            writeln!(writer, "{size}").map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+            writeln!(writer, "{size}").map_err(|e| VctrlError::IoError(Arc::new(e)))?;
             Ok(())
         }
         CatFileMode::PrettyPrint => {
             let content = pretty_print(decoder, &encoded)?;
             writer
                 .write_all(content.as_bytes())
-                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+                .map_err(|e| VctrlError::IoError(Arc::new(e)))?;
             Ok(())
         }
         CatFileMode::Raw(expected_type) => {
@@ -74,23 +68,19 @@ pub fn cat_file<D: Decoder>(
             }
             writer
                 .write_all(&encoded)
-                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+                .map_err(|e| VctrlError::IoError(Arc::new(e)))?;
             Ok(())
         }
     }
 }
 
 #[allow(clippy::struct_excessive_bools)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BatchOptions {
     pub format: Option<String>,
-
     pub nul_terminated: bool,
-
     pub follow_symlinks: bool,
-
     pub buffer: bool,
-
     pub print_contents: bool,
 }
 
@@ -110,7 +100,7 @@ pub fn cat_file_batch<D: Decoder>(
         line.clear();
         if input
             .read_line(&mut line)
-            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?
+            .map_err(|e| VctrlError::IoError(Arc::new(e)))?
             == 0
         {
             break;
@@ -137,7 +127,7 @@ pub fn cat_file_batch<D: Decoder>(
             if !options.buffer {
                 output
                     .write_all(&out_buf)
-                    .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+                    .map_err(|e| VctrlError::IoError(Arc::new(e)))?;
                 out_buf.clear();
             }
         } else {
@@ -147,7 +137,7 @@ pub fn cat_file_batch<D: Decoder>(
             if !options.buffer {
                 output
                     .write_all(&out_buf)
-                    .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+                    .map_err(|e| VctrlError::IoError(Arc::new(e)))?;
                 out_buf.clear();
             }
         }
@@ -156,7 +146,7 @@ pub fn cat_file_batch<D: Decoder>(
     if !out_buf.is_empty() {
         output
             .write_all(&out_buf)
-            .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+            .map_err(|e| VctrlError::IoError(Arc::new(e)))?;
     }
     Ok(())
 }
@@ -170,10 +160,10 @@ fn handle_one_object<D: Decoder>(
     let hash = parse_hash(object_name)?;
 
     let mut encoded = Vec::new();
-    store
+    let _ = store
         .get(&hash)?
         .read_to_end(&mut encoded)
-        .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+        .map_err(|e| VctrlError::IoError(Arc::new(e)))?;
 
     let obj_type = decode_type(decoder, &encoded)?;
     let obj_size = encoded.len() as u64;
@@ -202,12 +192,22 @@ fn parse_hash(s: &str) -> Result<Hash, VctrlError> {
             "invalid hash length: {actual_len} (expected 128)"
         )));
     }
+
     let mut bytes = [0u8; 64];
     for (i, byte) in bytes.iter_mut().enumerate() {
-        let hex_byte = &s[i * 2..i * 2 + 2];
+        let start = i
+            .checked_mul(2)
+            .ok_or_else(|| VctrlError::Other("hash index overflow".into()))?;
+        let end = start
+            .checked_add(2)
+            .ok_or_else(|| VctrlError::Other("hash index overflow".into()))?;
+        let hex_byte = s
+            .get(start..end)
+            .ok_or_else(|| VctrlError::Other("hash slice out of bounds".into()))?;
         *byte = u8::from_str_radix(hex_byte, 16)
             .map_err(|e| VctrlError::Other(format!("invalid hex character in hash: {e}")))?;
     }
+
     Hash::from_bytes(&bytes)
 }
 
