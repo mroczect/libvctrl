@@ -72,3 +72,78 @@ impl TagBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hash_byte(byte: u8) -> Result<Hash, VctrlError> {
+        Hash::from_bytes(&[byte; 64])
+    }
+
+    fn user(name: &str, email: &str) -> Result<UserID, VctrlError> {
+        UserID::new(name.to_string(), email.to_string())
+    }
+
+    #[test]
+    fn build_missing_name_errors() -> Result<(), VctrlError> {
+        let result = TagBuilder::new()
+            .target(hash_byte(0x01)?)
+            .message("msg")
+            .build();
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn build_missing_target_errors() {
+        let result = TagBuilder::new().name("v1.0").message("msg").build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn build_valid_tag_without_tagger_or_meta() -> Result<(), VctrlError> {
+        let name = "v1.0".to_string();
+        let target = hash_byte(0x22)?;
+        let message = "release".to_string();
+
+        let tag = TagBuilder::new()
+            .name(name.clone())
+            .target(target)
+            .message(message.clone())
+            .build()?;
+
+        assert_eq!(tag.name(), name);
+        assert_eq!(tag.target(), &target);
+        assert!(tag.tagger().is_none());
+        assert_eq!(tag.message(), message);
+        Ok(())
+    }
+
+    #[test]
+    fn build_valid_tag_with_tagger_and_meta() -> Result<(), VctrlError> {
+        let name = "v2.0".to_string();
+        let target = hash_byte(0x23)?;
+        let tagger = user("Tagger", "tagger@example.com")?;
+        let message = "release".to_string();
+        let meta = CommitMeta::new(42, 0, Some("utf-8".to_string()))?;
+
+        let tag = TagBuilder::new()
+            .name(name)
+            .target(target)
+            .tagger(tagger)
+            .message(message)
+            .meta(meta)
+            .build()?;
+
+        assert_eq!(
+            tag.tagger()
+                .ok_or_else(|| VctrlError::Other("expected tagger".into()))?
+                .name(),
+            "Tagger"
+        );
+        assert_eq!(tag.meta().timestamp(), 42);
+        assert_eq!(tag.meta().encoding(), Some("utf-8"));
+        Ok(())
+    }
+}
