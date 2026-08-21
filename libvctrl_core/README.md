@@ -5,7 +5,7 @@ SHA-512 content-addressing hasher, fluent object builders, and in-memory storage
 `libvctrl_core` is the layer that turns the abstract `libvctrl_handler` traits and immutable
 types into working, production-ready components.
 
-- **Crate:** `libvctrl_core` 3.0.1 (library, `std`-only)
+- **Crate:** `libvctrl_core` 3.2.0 (library, `std`-only)
 - **Language:** Rust, edition 2024 — MSRV **1.96.0**
 - **License:** MIT
 - **Repository:** https://github.com/mroczect/libvctrl
@@ -169,8 +169,8 @@ sequenceDiagram
 
 - **Language:** Rust (edition 2024, MSRV 1.96.0)
 - **Dependencies:**
-  - `libvctrl_handler` 5.0.0 — contracts, types, constants, validation (path dependency)
-  - `libvctrl_sha512` 3.0.0 — raw SHA-512 / HMAC / HKDF engine, **with default features**
+  - `libvctrl_handler` 5.2.0 — contracts, types, constants, validation (path dependency)
+  - `libvctrl_sha512` 3.2.0 — raw SHA-512 / HMAC / HKDF engine, **with default features**
     (SHA-384 enabled)
 - **Dev-dependencies:** `proptest` 1.11.0
 - **Lint policy:** workspace-inherited, `#![forbid(unsafe_code)]`, denied missing-docs,
@@ -228,7 +228,7 @@ For most users, depend on the facade instead:
 
 ```toml
 [dependencies]
-libvctrl = "2.1"
+libvctrl = "2.2"
 ```
 
 To depend on `libvctrl_core` directly (codec/builders/stores only, without the facade's
@@ -236,7 +236,7 @@ To depend on `libvctrl_core` directly (codec/builders/stores only, without the f
 
 ```toml
 [dependencies]
-libvctrl_core = "3.0"
+libvctrl_core = "3.2"
 ```
 
 Or via Cargo:
