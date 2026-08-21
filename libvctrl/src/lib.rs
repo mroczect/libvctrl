@@ -2,23 +2,15 @@
 use proptest as _;
 
 pub use libvctrl_core as reference;
-
 pub use libvctrl_handler as handler;
-
 pub use libvctrl_sha512 as crypto;
 
 pub use handler::constants;
-
 pub use handler::enums;
-
 pub use handler::errors;
-
 pub use handler::macros;
-
 pub use handler::traits;
-
 pub use handler::types;
-
 pub use handler::validation;
 
 pub use handler::{
@@ -39,27 +31,19 @@ pub use handler::{
 };
 
 pub use reference::codec;
-
 pub use reference::object;
-
 pub use reference::store;
 
 pub use reference::codec::BinaryDecoder;
-
 pub use reference::codec::BinaryEncoder;
 
 pub use reference::hash::Sha512Hasher;
 
 pub use reference::object::BlobBuilder;
-
 pub use reference::object::CommitBuilder;
-
 pub use reference::object::TagBuilder;
-
 pub use reference::object::TreeBuilder;
-
 pub use reference::object::TreeEntryBuilder;
 
 pub use reference::store::MemoryRefStore;
-
 pub use reference::store::MemoryStore;
