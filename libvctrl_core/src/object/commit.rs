@@ -80,3 +80,106 @@ impl CommitBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hash_byte(byte: u8) -> Result<Hash, VctrlError> {
+        Hash::from_bytes(&[byte; 64])
+    }
+
+    fn user(name: &str, email: &str) -> Result<UserID, VctrlError> {
+        UserID::new(name.to_string(), email.to_string())
+    }
+
+    #[test]
+    fn build_missing_tree_errors() -> Result<(), VctrlError> {
+        let result = CommitBuilder::new()
+            .author(user("A", "a@example.com")?)
+            .committer(user("B", "b@example.com")?)
+            .message("msg")
+            .build();
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn build_missing_author_errors() -> Result<(), VctrlError> {
+        let result = CommitBuilder::new()
+            .tree(hash_byte(0x01)?)
+            .committer(user("B", "b@example.com")?)
+            .message("msg")
+            .build();
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn build_missing_committer_errors() -> Result<(), VctrlError> {
+        let result = CommitBuilder::new()
+            .tree(hash_byte(0x01)?)
+            .author(user("A", "a@example.com")?)
+            .message("msg")
+            .build();
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn build_missing_message_errors() -> Result<(), VctrlError> {
+        let result = CommitBuilder::new()
+            .tree(hash_byte(0x01)?)
+            .author(user("A", "a@example.com")?)
+            .committer(user("B", "b@example.com")?)
+            .build();
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn build_valid_commit_without_meta() -> Result<(), VctrlError> {
+        let tree = hash_byte(0x11)?;
+        let parent = hash_byte(0x12)?;
+        let author = user("Alice", "alice@example.com")?;
+        let committer = user("Bob", "bob@example.com")?;
+        let message = "hello".to_string();
+
+        let commit = CommitBuilder::new()
+            .tree(tree)
+            .parent(parent)
+            .author(author)
+            .committer(committer)
+            .message(message.clone())
+            .build()?;
+
+        assert_eq!(commit.tree(), &tree);
+        assert_eq!(commit.parents(), &[parent]);
+        assert_eq!(commit.author().name(), "Alice");
+        assert_eq!(commit.committer().name(), "Bob");
+        assert_eq!(commit.message(), message);
+        Ok(())
+    }
+
+    #[test]
+    fn build_valid_commit_with_meta() -> Result<(), VctrlError> {
+        let tree = hash_byte(0x21)?;
+        let author = user("Alice", "alice@example.com")?;
+        let committer = user("Bob", "bob@example.com")?;
+        let message = "hello".to_string();
+        let meta = CommitMeta::new(123, 0, Some("utf-8".to_string()))?;
+
+        let commit = CommitBuilder::new()
+            .tree(tree)
+            .author(author)
+            .committer(committer)
+            .message(message)
+            .meta(meta)
+            .build()?;
+
+        assert_eq!(commit.meta().timestamp(), 123);
+        assert_eq!(commit.meta().timezone_offset(), 0);
+        assert_eq!(commit.meta().encoding(), Some("utf-8"));
+        Ok(())
+    }
+}
