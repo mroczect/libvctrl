@@ -1,75 +1,17 @@
-//! # Binary Decoder
-//!
-//! This module provides a strict, bounds-checked decoder for the binary
-//! serialization format defined by the sibling encoder. It is the inverse of
-//! the encoder: every byte sequence produced by the encoder is accepted by
-//! this decoder, and every decoded object is guaranteed to satisfy the
-//! invariants of the corresponding `libvctrl_handler` types.
-//!
-//! ## Design rationale
-//!
-//! Decoding untrusted input is one of the most dangerous operations in a
-//! version control system. A naive implementation might trust length prefixes
-//! and parse out of bounds. This decoder therefore follows a "defense in
-//! depth" strategy:
-//!
-//! - The stream is first bounded by a conservative maximum size.
-//! - Every offset is checked before slicing.
-//! - Every string is validated as UTF-8.
-//! - System limits are re-checked after numeric conversion.
-//!
-//! ## How it works
-//!
-//! Each `decode_*` method first calls [`read_bounded`] to slurp the input into
-//! a bounded `Vec<u8>`, then calls [`check_version`] to strip and validate the
-//! version byte, and finally parses the remaining bytes with explicit offset
-//! checks. No slice indexing is performed without a preceding bounds check.
+use alloc::str;
+use alloc::sync::Arc;
 
 use libvctrl_handler::{
     Blob, Commit, CommitMeta, Decoder, EntryKind, HASH_LENGTH, Hash, MAX_BLOB_SIZE,
     MAX_MESSAGE_LENGTH, MAX_TREE_ENTRIES, Tag, Tree, TreeEntry, UserID, VctrlError,
 };
-use std::str;
 
-/// The binary format version this decoder accepts.
 const EXPECTED_VERSION: u8 = 3;
 
-/// Decodes the binary format for Git objects.
-///
-/// `BinaryDecoder` is a zero-sized type that implements [`Decoder`]. It accepts
-/// any [`std::io::Read`] source and verifies the version byte, length prefixes,
-/// and all system limits before constructing the object.
-///
-/// # Why this struct exists
-///
-/// The encoder/decoder split separates serialization concerns. `BinaryDecoder`
-/// ensures that reading data from external sources is as safe as constructing
-/// objects directly through the handler types.
-///
-/// # How it works
-///
-/// Each `decode_*` method first calls [`read_bounded`] to slurp the input into
-/// a bounded `Vec<u8>`, then calls [`check_version`] to strip the version byte,
-/// and finally parses the remaining bytes with explicit offset checks.
-///
-/// # Examples
-///
-/// ```
-/// use libvctrl_handler::Decoder;
-/// use libvctrl_core::codec::BinaryDecoder;
-///
-/// let decoder = BinaryDecoder;
-/// // Decoding methods require an encoded byte stream; see the individual
-/// // `decode_blob`, `decode_tree`, `decode_commit`, and `decode_tag` examples.
-/// ```
+#[derive(Debug, Copy, Clone)]
 pub struct BinaryDecoder;
 
 impl BinaryDecoder {
-    /// Strips and validates the version byte.
-    ///
-    /// The first byte of every encoded object must equal [`EXPECTED_VERSION`].
-    /// Returns the remaining bytes if valid, otherwise a
-    /// [`VctrlError::CorruptedData`].
     fn check_version(data: &[u8]) -> Result<&[u8], VctrlError> {
         let version = data
             .first()
@@ -85,12 +27,6 @@ impl BinaryDecoder {
             .ok_or_else(|| VctrlError::CorruptedData("missing payload after version".into()))
     }
 
-    /// Reads the reader into memory while enforcing a hard size bound.
-    ///
-    /// This helper prevents denial-of-service attacks by refusing to allocate
-    /// more than `max_size` bytes. It uses a fixed 4 KiB buffer to avoid
-    /// reallocation on each byte and returns [`VctrlError::IoError`] if the
-    /// underlying reader fails.
     fn read_bounded<R: std::io::Read>(
         reader: &mut R,
         max_size: usize,
@@ -100,7 +36,7 @@ impl BinaryDecoder {
         loop {
             let n = reader
                 .read(&mut chunk)
-                .map_err(|e| VctrlError::IoError(std::sync::Arc::new(e)))?;
+                .map_err(|e| VctrlError::IoError(Arc::new(e)))?;
             if n == 0 {
                 break;
             }
@@ -114,14 +50,12 @@ impl BinaryDecoder {
         Ok(buf)
     }
 
-    /// Returns a single byte at `pos`, or a structured error.
     fn require_byte(data: &[u8], pos: usize, what: &str) -> Result<u8, VctrlError> {
         data.get(pos)
             .copied()
             .ok_or_else(|| VctrlError::CorruptedData(format!("missing {what}")))
     }
 
-    /// Returns a slice `data[start..start+len]`, with overflow and bounds checks.
     fn require_slice<'a>(
         data: &'a [u8],
         start: usize,
@@ -137,35 +71,6 @@ impl BinaryDecoder {
 }
 
 impl Decoder for BinaryDecoder {
-    /// Decodes a binary blob.
-    ///
-    /// # Format
-    ///
-    /// The encoded blob starts with a version byte (currently `3`), followed by
-    /// an 8-byte little-endian length prefix and exactly that many data bytes.
-    /// The declared byte length is re-checked against [`MAX_BLOB_SIZE`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`VctrlError::CorruptedData`] if the version is wrong, the length
-    /// prefix is truncated, the blob exceeds the limit, or the declared length
-    /// does not match the remaining bytes. Returns [`VctrlError::IoError`] if the
-    /// reader fails.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::io::Cursor;
-    /// # use libvctrl_handler::{Blob, Decoder, Encoder};
-    /// # use libvctrl_core::codec::{BinaryDecoder, BinaryEncoder};
-    /// let original = Blob::new(b"hello world".to_vec()).unwrap();
-    ///
-    /// let mut encoded = Vec::new();
-    /// BinaryEncoder.encode_blob(&original, &mut encoded).unwrap();
-    ///
-    /// let decoded = BinaryDecoder.decode_blob(Cursor::new(encoded.as_slice())).unwrap();
-    /// assert_eq!(decoded, original);
-    /// ```
     fn decode_blob<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Blob, VctrlError> {
         let max_size = usize::try_from(MAX_BLOB_SIZE).unwrap_or(usize::MAX) + 16;
         let data = Self::read_bounded(&mut reader, max_size)?;
@@ -193,38 +98,6 @@ impl Decoder for BinaryDecoder {
         Blob::new(payload.to_vec())
     }
 
-    /// Decodes a binary tree.
-    ///
-    /// # Format
-    ///
-    /// After the version byte, a 4-byte little-endian count is followed by that
-    /// many entries. Each entry starts with a one-byte name length, a UTF-8 name,
-    /// a one-byte kind tag, and a 64-byte hash.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`VctrlError::CorruptedData`] if any prefix is truncated, the entry
-    /// count exceeds [`MAX_TREE_ENTRIES`], the name is not valid UTF-8, the kind
-    /// byte is unknown, the hash is invalid, or the final parsed position does not
-    /// equal the total byte length. Also returns validation errors from
-    /// [`Tree::new`] and [`TreeEntry::new`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::io::Cursor;
-    /// # use libvctrl_handler::{Decoder, Encoder, EntryKind, Hash, Tree, TreeEntry};
-    /// # use libvctrl_core::codec::{BinaryDecoder, BinaryEncoder};
-    /// let hash = Hash::from_bytes(&[0u8; 64]).unwrap();
-    /// let entry = TreeEntry::new("a.txt".to_owned(), EntryKind::Blob, hash).unwrap();
-    /// let original = Tree::new(vec![entry]).unwrap();
-    ///
-    /// let mut encoded = Vec::new();
-    /// BinaryEncoder.encode_tree(&original, &mut encoded).unwrap();
-    ///
-    /// let decoded = BinaryDecoder.decode_tree(Cursor::new(encoded.as_slice())).unwrap();
-    /// assert_eq!(decoded, original);
-    /// ```
     fn decode_tree<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Tree, VctrlError> {
         let max_size = usize::try_from(MAX_TREE_ENTRIES).unwrap_or(usize::MAX) * 321 + 5;
         let data = Self::read_bounded(&mut reader, max_size)?;
@@ -284,57 +157,15 @@ impl Decoder for BinaryDecoder {
         Tree::new(entries)
     }
 
-    /// Decodes a binary commit.
-    ///
-    /// # Format
-    ///
-    /// The commit layout is fixed: tree hash, u16 parent count, parent hashes,
-    /// author name/email with u8 length prefixes, committer name/email, u32
-    /// message length, message bytes, i64 timestamp, i16 timezone offset, and an
-    /// optional encoding string. All integer fields are little-endian.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`VctrlError::CorruptedData`] for structural issues and
-    /// [`VctrlError::SerializationError`] if the message exceeds
-    /// [`MAX_MESSAGE_LENGTH`]. Also returns validation errors from
-    /// [`Commit::with_meta`] and [`UserID::new`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::io::Cursor;
-    /// # use libvctrl_handler::{Commit, Decoder, Encoder, Hash, UserID};
-    /// # use libvctrl_core::codec::{BinaryDecoder, BinaryEncoder};
-    /// let tree = Hash::from_bytes(&[1u8; 64]).unwrap();
-    /// let author = UserID::new("Alice".to_owned(), "alice@example.com".to_owned()).unwrap();
-    /// let committer = UserID::new("Bob".to_owned(), "bob@example.com".to_owned()).unwrap();
-    /// let original = Commit::new(
-    ///     tree,
-    ///     vec![],
-    ///     author,
-    ///     committer,
-    ///     "Initial commit".to_owned(),
-    /// )
-    /// .unwrap();
-    ///
-    /// let mut encoded = Vec::new();
-    /// BinaryEncoder.encode_commit(&original, &mut encoded).unwrap();
-    ///
-    /// let decoded = BinaryDecoder.decode_commit(Cursor::new(encoded.as_slice())).unwrap();
-    /// assert_eq!(decoded, original);
-    /// ```
     #[allow(clippy::too_many_lines)]
     fn decode_commit<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Commit, VctrlError> {
         let max_size = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) + 1024;
         let data = Self::read_bounded(&mut reader, max_size)?;
         let data = Self::check_version(&data)?;
 
-        // Tree hash
         let tree_hash = Self::require_slice(data, 0, HASH_LENGTH, "commit tree hash")?;
         let tree = Hash::from_bytes(tree_hash)?;
 
-        // Parent count and parents
         let parent_count_bytes = Self::require_slice(data, HASH_LENGTH, 2, "commit parent count")?;
         let parent_count = u16::from_le_bytes(
             parent_count_bytes
@@ -350,7 +181,6 @@ impl Decoder for BinaryDecoder {
             pos += HASH_LENGTH;
         }
 
-        // Author name
         let author_name_len = Self::require_byte(data, pos, "author name length")? as usize;
         pos += 1;
         let author_name_bytes = Self::require_slice(data, pos, author_name_len, "author name")?;
@@ -359,7 +189,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += author_name_len;
 
-        // Author email
         let author_email_len = Self::require_byte(data, pos, "author email length")? as usize;
         pos += 1;
         let author_email_bytes = Self::require_slice(data, pos, author_email_len, "author email")?;
@@ -370,7 +199,6 @@ impl Decoder for BinaryDecoder {
 
         let author = UserID::new(author_name, author_email)?;
 
-        // Committer name
         let committer_name_len = Self::require_byte(data, pos, "committer name length")? as usize;
         pos += 1;
         let committer_name_bytes =
@@ -382,7 +210,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += committer_name_len;
 
-        // Committer email
         let committer_email_len = Self::require_byte(data, pos, "committer email length")? as usize;
         pos += 1;
         let committer_email_bytes =
@@ -396,7 +223,6 @@ impl Decoder for BinaryDecoder {
 
         let committer = UserID::new(committer_name, committer_email)?;
 
-        // Message
         let msg_len_bytes = Self::require_slice(data, pos, 4, "commit message length")?;
         let msg_len = u32::from_le_bytes(
             msg_len_bytes
@@ -417,7 +243,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += msg_len;
 
-        // Timestamp and timezone
         let timestamp_bytes = Self::require_slice(data, pos, 8, "commit timestamp")?;
         let timestamp = i64::from_le_bytes(
             timestamp_bytes
@@ -434,7 +259,6 @@ impl Decoder for BinaryDecoder {
         );
         pos += 2;
 
-        // Optional encoding
         let encoding_len = Self::require_byte(data, pos, "commit encoding length")? as usize;
         pos += 1;
         let encoding = if encoding_len > 0 {
@@ -456,50 +280,12 @@ impl Decoder for BinaryDecoder {
         Commit::with_meta(tree, parents, author, committer, message, meta)
     }
 
-    /// Decodes a binary tag.
-    ///
-    /// # Format
-    ///
-    /// Tag starts with a one-byte name length and name, a 64-byte target hash, a
-    /// tagger presence byte, optional tagger name/email, u32 message length,
-    /// message, timestamp, timezone offset, and optional encoding.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`VctrlError::CorruptedData`] for structural issues and
-    /// [`VctrlError::SerializationError`] if the message exceeds
-    /// [`MAX_MESSAGE_LENGTH`]. Also returns validation errors from
-    /// [`Tag::with_meta`] and [`UserID::new`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::io::Cursor;
-    /// # use libvctrl_handler::{Decoder, Encoder, Hash, Tag, UserID};
-    /// # use libvctrl_core::codec::{BinaryDecoder, BinaryEncoder};
-    /// let target = Hash::from_bytes(&[2u8; 64]).unwrap();
-    /// let tagger = UserID::new("Tagger".to_owned(), "tagger@example.com".to_owned()).unwrap();
-    /// let original = Tag::new(
-    ///     "v1.0.0".to_owned(),
-    ///     target,
-    ///     Some(tagger),
-    ///     "Release".to_owned(),
-    /// )
-    /// .unwrap();
-    ///
-    /// let mut encoded = Vec::new();
-    /// BinaryEncoder.encode_tag(&original, &mut encoded).unwrap();
-    ///
-    /// let decoded = BinaryDecoder.decode_tag(Cursor::new(encoded.as_slice())).unwrap();
-    /// assert_eq!(decoded, original);
-    /// ```
     #[allow(clippy::too_many_lines)]
     fn decode_tag<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Tag, VctrlError> {
         let max_size = usize::try_from(MAX_MESSAGE_LENGTH).unwrap_or(usize::MAX) + 1024;
         let data = Self::read_bounded(&mut reader, max_size)?;
         let data = Self::check_version(&data)?;
 
-        // Tag name
         let name_len = Self::require_byte(data, 0, "tag name length")? as usize;
         let name_bytes = Self::require_slice(data, 1, name_len, "tag name")?;
         let name = str::from_utf8(name_bytes)
@@ -507,12 +293,10 @@ impl Decoder for BinaryDecoder {
             .to_string();
         let mut pos = 1 + name_len;
 
-        // Target hash
         let target_bytes = Self::require_slice(data, pos, HASH_LENGTH, "tag target hash")?;
         let target = Hash::from_bytes(target_bytes)?;
         pos += HASH_LENGTH;
 
-        // Tagger presence
         let has_tagger = match Self::require_byte(data, pos, "tagger presence byte")? {
             0 => false,
             1 => true,
@@ -524,7 +308,6 @@ impl Decoder for BinaryDecoder {
         };
         pos += 1;
 
-        // Optional tagger
         let tagger = if has_tagger {
             let tagger_name_len = Self::require_byte(data, pos, "tagger name length")? as usize;
             pos += 1;
@@ -552,7 +335,6 @@ impl Decoder for BinaryDecoder {
             None
         };
 
-        // Message
         let msg_len_bytes = Self::require_slice(data, pos, 4, "tag message length")?;
         let msg_len = u32::from_le_bytes(
             msg_len_bytes
@@ -573,7 +355,6 @@ impl Decoder for BinaryDecoder {
             .to_string();
         pos += msg_len;
 
-        // Timestamp and timezone
         let timestamp_bytes = Self::require_slice(data, pos, 8, "tag timestamp")?;
         let timestamp = i64::from_le_bytes(
             timestamp_bytes
@@ -590,7 +371,6 @@ impl Decoder for BinaryDecoder {
         );
         pos += 2;
 
-        // Optional encoding
         let encoding_len = Self::require_byte(data, pos, "tag encoding length")? as usize;
         pos += 1;
         let encoding = if encoding_len > 0 {
@@ -610,5 +390,276 @@ impl Decoder for BinaryDecoder {
 
         let meta = CommitMeta::new(timestamp, timezone_offset, encoding)?;
         Tag::with_meta(name, target, tagger, message, meta)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec::BinaryEncoder;
+    use libvctrl_handler::{Encoder, TreeEntry};
+    use std::io::Cursor;
+
+    fn hash_byte(byte: u8) -> Result<Hash, VctrlError> {
+        Hash::from_bytes(&[byte; 64])
+    }
+
+    fn user(name: &str, email: &str) -> Result<UserID, VctrlError> {
+        UserID::new(name.to_string(), email.to_string())
+    }
+
+    fn meta(ts: i64, tz: i16) -> Result<CommitMeta, VctrlError> {
+        CommitMeta::new(ts, tz, None)
+    }
+
+    #[test]
+    fn check_version_valid() -> Result<(), VctrlError> {
+        let data = [3_u8, 42];
+        let rest = BinaryDecoder::check_version(&data)?;
+        assert_eq!(rest, &[42]);
+        Ok(())
+    }
+
+    #[test]
+    fn check_version_missing_byte() {
+        assert!(BinaryDecoder::check_version(&[]).is_err());
+    }
+
+    #[test]
+    fn check_version_unsupported() -> Result<(), VctrlError> {
+        let result = BinaryDecoder::check_version(&[4_u8]);
+        assert!(result.is_err());
+        match result {
+            Err(VctrlError::CorruptedData(msg)) => {
+                assert!(msg.contains("unsupported version"));
+            }
+            _ => return Err(VctrlError::Other("expected CorruptedData".into())),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn read_bounded_within_limit() -> Result<(), VctrlError> {
+        let mut reader = Cursor::new(vec![1_u8, 2, 3]);
+        let data = BinaryDecoder::read_bounded(&mut reader, 10)?;
+        assert_eq!(data, vec![1, 2, 3]);
+        Ok(())
+    }
+
+    #[test]
+    fn read_bounded_exceeds_limit() {
+        let mut reader = Cursor::new(vec![1_u8, 2, 3, 4]);
+        assert!(BinaryDecoder::read_bounded(&mut reader, 2).is_err());
+    }
+
+    #[test]
+    fn require_byte_valid() -> Result<(), VctrlError> {
+        let value = BinaryDecoder::require_byte(&[10, 20], 1, "second byte")?;
+        assert_eq!(value, 20);
+        Ok(())
+    }
+
+    #[test]
+    fn require_byte_missing() {
+        assert!(BinaryDecoder::require_byte(&[10], 1, "second byte").is_err());
+    }
+
+    #[test]
+    fn require_slice_valid() -> Result<(), VctrlError> {
+        let data = [1, 2, 3, 4];
+        let slice = BinaryDecoder::require_slice(&data, 1, 2, "middle")?;
+        assert_eq!(slice, &[2, 3]);
+        Ok(())
+    }
+
+    #[test]
+    fn require_slice_overflow() {
+        let data = [1, 2, 3];
+        assert!(BinaryDecoder::require_slice(&data, usize::MAX, 2, "overflow").is_err());
+    }
+
+    #[test]
+    fn decode_blob_valid_roundtrip() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+        let payload = vec![1_u8, 2, 3, 4];
+
+        let blob = Blob::new(payload.clone())?;
+        let mut buf = Vec::new();
+        encoder.encode_blob(&blob, &mut buf)?;
+        let decoded = codec.decode_blob(Cursor::new(buf))?;
+        assert_eq!(decoded.data(), payload.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn decode_blob_invalid_version() {
+        let codec = BinaryDecoder;
+        let data = [4_u8, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert!(codec.decode_blob(Cursor::new(data)).is_err());
+    }
+
+    #[test]
+    fn decode_blob_length_mismatch() {
+        let codec = BinaryDecoder;
+        let mut data = Vec::new();
+        data.push(3_u8);
+        data.extend_from_slice(&5_u64.to_le_bytes());
+        data.push(1_u8);
+        assert!(codec.decode_blob(Cursor::new(data)).is_err());
+    }
+
+    #[test]
+    fn decode_tree_valid_roundtrip() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+
+        let hash = hash_byte(0x22)?;
+        let entry = TreeEntry::new("a.txt".to_string(), EntryKind::Blob, hash)?;
+        let tree = Tree::new(vec![entry])?;
+
+        let mut buf = Vec::new();
+        encoder.encode_tree(&tree, &mut buf)?;
+        let decoded = codec.decode_tree(Cursor::new(buf))?;
+
+        let entries = decoded.entries();
+        assert_eq!(entries.len(), 1);
+        let first = entries
+            .first()
+            .ok_or_else(|| VctrlError::Other("expected one entry".into()))?;
+        assert_eq!(first.name(), "a.txt");
+        assert_eq!(first.kind(), EntryKind::Blob);
+        assert_eq!(*first.hash(), hash);
+        Ok(())
+    }
+
+    #[test]
+    fn decode_tree_unknown_kind() -> Result<(), VctrlError> {
+        let codec = BinaryDecoder;
+        let mut data = Vec::new();
+        data.push(3_u8);
+        data.extend_from_slice(&1_u32.to_le_bytes());
+        data.push(1_u8);
+        data.push(b'a');
+        data.push(9_u8);
+        data.extend_from_slice(hash_byte(0x33)?.as_bytes());
+
+        let result = codec.decode_tree(Cursor::new(data));
+        assert!(result.is_err());
+        match result {
+            Err(VctrlError::CorruptedData(msg)) => {
+                assert!(msg.contains("unknown entry kind"));
+            }
+            _ => return Err(VctrlError::Other("expected CorruptedData".into())),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn decode_commit_valid_roundtrip() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+
+        let tree = hash_byte(0x01)?;
+        let parent = hash_byte(0x02)?;
+        let author = user("Alice", "alice@example.com")?;
+        let committer = user("Bob", "bob@example.com")?;
+        let message = "initial commit".to_string();
+        let meta = meta(1_600_000_000, 0)?;
+
+        let commit =
+            Commit::with_meta(tree, vec![parent], author, committer, message.clone(), meta)?;
+
+        let mut buf = Vec::new();
+        encoder.encode_commit(&commit, &mut buf)?;
+        let decoded = codec.decode_commit(Cursor::new(buf))?;
+
+        assert_eq!(decoded.tree(), &tree);
+        let parents = decoded.parents();
+        assert_eq!(parents.len(), 1);
+        assert_eq!(parents.first(), Some(&parent));
+        assert_eq!(decoded.author().name(), "Alice");
+        assert_eq!(decoded.committer().email(), "bob@example.com");
+        assert_eq!(decoded.message(), message);
+        assert_eq!(decoded.meta().timestamp(), 1_600_000_000);
+        assert_eq!(decoded.meta().timezone_offset(), 0);
+        assert!(decoded.meta().encoding().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn decode_commit_trailing_bytes() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+
+        let tree = hash_byte(0x01)?;
+        let author = user("Alice", "alice@example.com")?;
+        let committer = user("Bob", "bob@example.com")?;
+        let message = "initial commit".to_string();
+        let meta = meta(1_600_000_000, 0)?;
+
+        let commit = Commit::with_meta(tree, vec![], author, committer, message, meta)?;
+        let mut buf = Vec::new();
+        encoder.encode_commit(&commit, &mut buf)?;
+        buf.push(0_u8);
+
+        assert!(codec.decode_commit(Cursor::new(buf)).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn decode_tag_valid_roundtrip() -> Result<(), VctrlError> {
+        let encoder = BinaryEncoder;
+        let codec = BinaryDecoder;
+
+        let target = hash_byte(0x33)?;
+        let tagger = user("Tagger", "tagger@example.com")?;
+        let message = "v1.0".to_string();
+        let meta = meta(1_600_000_000, 0)?;
+
+        let tag = Tag::with_meta(
+            "v1.0".to_string(),
+            target,
+            Some(tagger),
+            message.clone(),
+            meta,
+        )?;
+
+        let mut buf = Vec::new();
+        encoder.encode_tag(&tag, &mut buf)?;
+        let decoded = codec.decode_tag(Cursor::new(buf))?;
+
+        assert_eq!(decoded.name(), "v1.0");
+        assert_eq!(decoded.target(), &target);
+        let decoded_tagger = decoded
+            .tagger()
+            .ok_or_else(|| VctrlError::Other("expected tagger".into()))?;
+        assert_eq!(decoded_tagger.name(), "Tagger");
+        assert_eq!(decoded.message(), message);
+        assert_eq!(decoded.meta().timestamp(), 1_600_000_000);
+        assert_eq!(decoded.meta().timezone_offset(), 0);
+        assert!(decoded.meta().encoding().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn decode_tag_invalid_tagger_presence() -> Result<(), VctrlError> {
+        let codec = BinaryDecoder;
+        let mut data = Vec::new();
+        data.push(3_u8);
+        data.push(1_u8);
+        data.push(b'v');
+        data.extend_from_slice(hash_byte(0x33)?.as_bytes());
+        data.push(2_u8);
+
+        let result = codec.decode_tag(Cursor::new(data));
+        assert!(result.is_err());
+        match result {
+            Err(VctrlError::CorruptedData(msg)) => {
+                assert!(msg.contains("invalid tagger presence"));
+            }
+            _ => return Err(VctrlError::Other("expected CorruptedData".into())),
+        }
+        Ok(())
     }
 }

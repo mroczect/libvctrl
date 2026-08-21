@@ -1,99 +1,14 @@
-//! SHA-512 hasher implementation for content addressing.
-//!
-//! # Why this module exists
-//!
-//! The [`libvctrl_handler`] crate defines the [`Hasher`](libvctrl_handler::Hasher)
-//! trait as the abstraction for content-addressable object hashing. This module
-//! provides a concrete implementation using the SHA-512 algorithm from the
-//! [`libvctrl_sha512`] crate. It bridges the raw SHA-512 digest computation to
-//! the handler's [`Hash`] type, ensuring that all hashes produced by this
-//! crate are compatible with the rest of the VCS ecosystem.
-//!
-//! # How it works
-//!
-//! The [`Sha512Hasher`] is a zero-sized struct. It holds no state because
-//! hashing is stateless across invocations. The [`hash`](Sha512Hasher::hash)
-//! method reads from a generic [`Read`](std::io::Read) stream in fixed-size
-//! chunks, feeds each chunk into the underlying [`Sha512Hash`] engine, and
-//! finalizes the digest into a 64-byte [`Hash`]. The result length always
-//! matches [`HASH_LENGTH`](libvctrl_handler::HASH_LENGTH), so conversion
-//! cannot fail.
-//!
-//! # Examples
-//!
-//! Hash a byte slice:
-//!
-//! ```
-//! use libvctrl_core::hash::Sha512Hasher;
-//! use libvctrl_handler::Hasher;
-//!
-//! let hasher = Sha512Hasher;
-//! let hash = hasher.hash(b"hello world".as_ref()).unwrap();
-//! assert_eq!(hash.as_bytes().len(), 64);
-//! ```
+use alloc::sync::Arc;
+use std::io;
 
 use libvctrl_handler::{Hash, Hasher, VctrlError};
 use libvctrl_sha512::Hash as Sha512Hash;
 
-/// A hasher that uses the SHA-512 algorithm.
-///
-/// # Design rationale
-///
-/// This is a zero-sized struct (ZST) because the SHA-512 algorithm does not
-/// require any persistent state between calls. Each call to
-/// [`hash`](Sha512Hasher::hash) creates a fresh [`Sha512Hash`] engine,
-/// processes the input, and drops it. This makes the hasher trivially
-/// [`Clone`], [`Default`], and [`Debug`], and allows it to be passed by value
-/// without overhead.
-///
-/// The struct name follows the convention of naming the concrete implementation
-/// after the algorithm it uses, making it obvious to users what cryptographic
-/// function will be applied.
-///
-/// # Examples
-///
-/// Create a hasher instance:
-///
-/// ```
-/// # use libvctrl_core::hash::Sha512Hasher;
-/// let hasher = Sha512Hasher::default();
-/// // The hasher is stateless and can be reused for multiple inputs.
-/// ```
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Sha512Hasher;
 
 impl Hasher for Sha512Hasher {
-    /// Hashes the contents of a reader using SHA-512.
-    ///
-    /// # How it works
-    ///
-    /// The method reads from `reader` in 4096-byte chunks to avoid loading
-    /// large objects entirely into memory. For each chunk, it calls
-    /// [`update`](Sha512Hash::update) on a fresh [`Sha512Hash`] engine. Once
-    /// EOF is reached (read returns 0), the engine is finalized and the raw
-    /// 64-byte digest is converted into a [`Hash`] via
-    /// [`Hash::from_bytes`]. Because SHA-512 always produces 64 bytes, the
-    /// conversion cannot fail and the `?` operator is safe to use.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`VctrlError::IoError`] if an I/O error occurs while reading
-    /// from the underlying reader. Hash computation itself is infallible.
-    ///
-    /// # Examples
-    ///
-    /// Hash data from a [`Cursor`](std::io::Cursor):
-    ///
-    /// ```
-    /// # use libvctrl_core::hash::Sha512Hasher;
-    /// # use libvctrl_handler::Hasher;
-    /// # use std::io::Cursor;
-    /// let hasher = Sha512Hasher;
-    /// let data = b"streaming data";
-    /// let hash = hasher.hash(Cursor::new(data)).unwrap();
-    /// assert_eq!(hash.as_bytes().len(), 64);
-    /// ```
-    fn hash<R: std::io::Read + Send>(&self, mut reader: R) -> Result<Hash, VctrlError> {
+    fn hash<R: io::Read + Send>(&self, mut reader: R) -> Result<Hash, VctrlError> {
         let mut hasher = Sha512Hash::new();
         let mut buffer = [0u8; 4096];
         loop {
@@ -102,8 +17,8 @@ impl Hasher for Sha512Hasher {
                 break;
             }
             let chunk = buffer.get(..n).ok_or_else(|| {
-                VctrlError::IoError(std::sync::Arc::new(std::io::Error::new(
-                    std::io::ErrorKind::UnexpectedEof,
+                VctrlError::IoError(Arc::new(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
                     "read returned invalid length",
                 )))
             })?;
@@ -111,5 +26,51 @@ impl Hasher for Sha512Hasher {
         }
         let digest = hasher.finalize();
         Hash::from_bytes(&digest)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn hash_empty_input() -> Result<(), VctrlError> {
+        let hash = Sha512Hasher.hash(Cursor::new(Vec::<u8>::new()))?;
+        assert_eq!(
+            hash.as_bytes(),
+            &[
+                0xcf, 0x83, 0xe1, 0x35, 0x7e, 0xef, 0xb8, 0xbd, 0xf1, 0x54, 0x28, 0x50, 0xd6, 0x6d,
+                0x80, 0x07, 0xd6, 0x20, 0xe4, 0x05, 0x0b, 0x57, 0x15, 0xdc, 0x83, 0xf4, 0xa9, 0x21,
+                0xd3, 0x6c, 0xe9, 0xce, 0x47, 0xd0, 0xd1, 0x3c, 0x5d, 0x85, 0xf2, 0xb0, 0xff, 0x83,
+                0x18, 0xd2, 0x87, 0x7e, 0xec, 0x2f, 0x63, 0xb9, 0x31, 0xbd, 0x47, 0x41, 0x7a, 0x81,
+                0xa5, 0x38, 0x32, 0x7a, 0xf9, 0x27, 0xda, 0x3e
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn hash_abc() -> Result<(), VctrlError> {
+        let hash = Sha512Hasher.hash(Cursor::new(b"abc"))?;
+        assert_eq!(
+            hash.as_bytes(),
+            &[
+                0xdd, 0xaf, 0x35, 0xa1, 0x93, 0x61, 0x7a, 0xba, 0xcc, 0x41, 0x73, 0x49, 0xae, 0x20,
+                0x41, 0x31, 0x12, 0xe6, 0xfa, 0x4e, 0x89, 0xa9, 0x7e, 0xa2, 0x0a, 0x9e, 0xee, 0xe6,
+                0x4b, 0x55, 0xd3, 0x9a, 0x21, 0x92, 0x99, 0x2a, 0x27, 0x4f, 0xc1, 0xa8, 0x36, 0xba,
+                0x3c, 0x23, 0xa3, 0xfe, 0xeb, 0xbd, 0x45, 0x4d, 0x44, 0x23, 0x64, 0x3c, 0xe8, 0x0e,
+                0x2a, 0x9a, 0xc9, 0x4f, 0xa5, 0x4c, 0xa4, 0x9f
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn hash_multiple_chunks() -> Result<(), VctrlError> {
+        let data = vec![0xAB; 8192];
+        let hash = Sha512Hasher.hash(Cursor::new(data))?;
+        assert_eq!(hash.as_bytes().len(), 64);
+        Ok(())
     }
 }

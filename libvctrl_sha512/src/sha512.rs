@@ -1,128 +1,53 @@
 #![allow(clippy::inline_always)]
-//! Pure Rust implementation of the SHA-512 cryptographic hash function.
-//!
-//! # Why this module exists
-//!
-//! This module provides a zero-dependency, `no_std`-compatible implementation
-//! of SHA-512 as specified in FIPS 180-4. It is the foundational primitive
-//! used by higher-level constructs such as HMAC and HKDF within this crate.
-//!
-//! The implementation emphasizes:
-//! - **Incremental hashing** through the [`Hash`] state machine, allowing
-//!   large inputs to be processed in chunks without loading everything into
-//!   memory.
-//! - **Constant-time verification** for comparing digests, mitigating timing
-//!   side-channel attacks.
-//! - **Zeroization** of sensitive state after use, preventing residual data
-//!   from lingering in memory.
-//!
-//! # How it works
-//!
-//! SHA-512 follows the Merkle–Damgård construction with a 1024-bit block size
-//! and a 512-bit output. The internal state consists of eight 64-bit working
-//! variables (`a` through `h`) initialized with the first 64 bits of the
-//! fractional parts of the square roots of the first eight prime numbers.
-//!
-//! For each 128-byte block, the message schedule expands 16 initial words into
-//! 80 round words using bitwise rotations and modular additions. The
-//! compression function then updates the working variables using the standard
-//! SHA-512 logical functions (`Ch`, `Maj`, `Σ0`, `Σ1`, `σ0`, `σ1`) and
-//! per-round constants derived from the cube roots of the first 80 primes.
-//!
-//! Padding appends a single `0x80` byte, zeros, and a 128-bit big-endian length
-//! before finalization. The final digest is the concatenation of the eight
-//! 64-bit state words in big-endian order.
-//!
-//! # Examples
-//!
-//! Compute the SHA-512 digest of `"abc"`:
-//!
-//! ```
-//! use libvctrl_sha512::Hash;
-//!
-//! let digest = Hash::hash(b"abc");
-//! let expected: [u8; 64] = [
-//!     0xdd, 0xaf, 0x35, 0xa1, 0x93, 0x61, 0x7a, 0xba,
-//!     0xcc, 0x41, 0x73, 0x49, 0xae, 0x20, 0x41, 0x31,
-//!     0x12, 0xe6, 0xfa, 0x4e, 0x89, 0xa9, 0x7e, 0xa2,
-//!     0x0a, 0x9e, 0xee, 0xe6, 0x4b, 0x55, 0xd3, 0x9a,
-//!     0x21, 0x92, 0x99, 0x2a, 0x27, 0x4f, 0xc1, 0xa8,
-//!     0x36, 0xba, 0x3c, 0x23, 0xa3, 0xfe, 0xeb, 0xbd,
-//!     0x45, 0x4d, 0x44, 0x23, 0x64, 0x3c, 0xe8, 0x0e,
-//!     0x2a, 0x9a, 0xc9, 0x4f, 0xa5, 0x4c, 0xa4, 0x9f,
-//! ];
-//! assert_eq!(digest, expected);
-//! ```
+#![allow(clippy::indexing_slicing)]
+#![allow(clippy::arithmetic_side_effects)]
 
 use crate::utils::{load_be, store_be, verify};
 
-/// Internal message schedule for the SHA-512 compression function.
-///
-/// This struct holds the 16 64-bit words of the current block. It provides
-/// the logical functions and message expansion routine required by FIPS 180-4.
 struct W([u64; 16]);
 
-/// Internal state for SHA-512, consisting of eight 64-bit working variables.
-///
-/// The state is copied before processing each block so that the previous state
-/// can be added after the compression function completes, per the Merkle–
-/// Damgård construction.
 #[derive(Copy, Clone)]
 pub(crate) struct State(pub(crate) [u64; 8]);
 
 impl W {
-    /// Loads a 128-byte block into 16 big-endian 64-bit words.
     fn new(input: &[u8]) -> Self {
-        let mut words = [0u64; 16];
-        for (i, e) in words.iter_mut().enumerate() {
-            *e = load_be(input, i * 8);
+        let mut words = [0_u64; 16];
+        for (index, word) in words.iter_mut().enumerate() {
+            *word = load_be(input, index * 8);
         }
         Self(words)
     }
 
-    /// The `Ch(x, y, z)` logical function: `(x & y) ^ (!x & z)`.
     #[inline(always)]
     const fn ch(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (!x & z)
     }
 
-    /// The `Maj(x, y, z)` logical function: `(x & y) ^ (x & z) ^ (y & z)`.
     #[inline(always)]
     const fn maj(x: u64, y: u64, z: u64) -> u64 {
         (x & y) ^ (x & z) ^ (y & z)
     }
 
-    /// The `Σ0(x)` function: right rotations of 28, 34, and 39 bits XORed.
     #[inline(always)]
     const fn big_sigma0(x: u64) -> u64 {
         x.rotate_right(28) ^ x.rotate_right(34) ^ x.rotate_right(39)
     }
 
-    /// The `Σ1(x)` function: right rotations of 14, 18, and 41 bits XORed.
     #[inline(always)]
     const fn big_sigma1(x: u64) -> u64 {
         x.rotate_right(14) ^ x.rotate_right(18) ^ x.rotate_right(41)
     }
 
-    /// The `σ0(x)` function: right rotations of 1 and 8 bits XORed with a
-    /// logical right shift of 7 bits.
     #[inline(always)]
     const fn small_sigma0(x: u64) -> u64 {
         x.rotate_right(1) ^ x.rotate_right(8) ^ (x >> 7)
     }
 
-    /// The `σ1(x)` function: right rotations of 19 and 61 bits XORed with a
-    /// logical right shift of 6 bits.
     #[inline(always)]
     const fn small_sigma1(x: u64) -> u64 {
         x.rotate_right(19) ^ x.rotate_right(61) ^ (x >> 6)
     }
 
-    /// Computes one word of the message schedule.
-    ///
-    /// The new word at index `dest` is derived from the existing words at
-    /// indices `src_b`, `src_c`, and `src_d` according to the SHA-512 message
-    /// expansion recurrence.
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     #[allow(clippy::many_single_char_names, clippy::missing_const_for_fn)]
@@ -134,10 +59,6 @@ impl W {
             .wrapping_add(Self::small_sigma0(words[src_d]));
     }
 
-    /// Expands the first 16 words into the full 80-word message schedule.
-    ///
-    /// The expansion is performed in-place, overwriting the initial words with
-    /// the newly computed schedule entries.
     #[inline]
     fn expand(&mut self) {
         self.m(0, 14, 9, 1);
@@ -158,10 +79,6 @@ impl W {
         self.m(15, 13, 8, 0);
     }
 
-    /// The SHA-512 compression function.
-    ///
-    /// This method applies the round function `f` for round index `i` using the
-    /// round constant `k`. It updates the eight working variables in-place.
     #[cfg_attr(feature = "opt_size", inline(never))]
     #[cfg_attr(not(feature = "opt_size"), inline(always))]
     #[allow(clippy::missing_const_for_fn)]
@@ -186,11 +103,6 @@ impl W {
             ));
     }
 
-    /// Applies 16 rounds of the compression function using one group of round
-    /// constants.
-    ///
-    /// The `s` parameter selects which group of 16 constants (out of five) to
-    /// use. This design improves code reuse while maintaining performance.
     #[allow(clippy::unreadable_literal)]
     fn g(&self, state: &mut State, s: usize) {
         const ROUND_CONSTANTS: [u64; 80] = [
@@ -296,10 +208,6 @@ impl W {
 }
 
 impl State {
-    /// Creates a new state initialized with the SHA-512 initial hash values.
-    ///
-    /// The initial values are the first 64 bits of the fractional parts of the
-    /// square roots of the first eight primes.
     pub(crate) fn new() -> Self {
         const IV: [u8; 64] = [
             0x6a, 0x09, 0xe6, 0x67, 0xf3, 0xbc, 0xc9, 0x08, 0xbb, 0x67, 0xae, 0x85, 0x84, 0xca,
@@ -308,58 +216,50 @@ impl State {
             0x68, 0x8c, 0x2b, 0x3e, 0x6c, 0x1f, 0x1f, 0x83, 0xd9, 0xab, 0xfb, 0x41, 0xbd, 0x6b,
             0x5b, 0xe0, 0xcd, 0x19, 0x13, 0x7e, 0x21, 0x79,
         ];
-        let mut t = [0u64; 8];
-        for (i, e) in t.iter_mut().enumerate() {
-            *e = load_be(&IV, i * 8);
+        let mut state = [0_u64; 8];
+        for (index, word) in state.iter_mut().enumerate() {
+            *word = load_be(&IV, index * 8);
         }
-        Self(t)
+        Self(state)
     }
 
-    /// Adds another state to this one using wrapping addition.
-    ///
-    /// This is used after the compression function to incorporate the previous
-    /// hash value, per the Merkle–Damgård construction.
     #[inline(always)]
     #[allow(clippy::missing_const_for_fn)]
-    pub(crate) fn add(&mut self, x: &Self) {
-        let sx = &mut self.0;
-        let ex = &x.0;
-        sx[0] = sx[0].wrapping_add(ex[0]);
-        sx[1] = sx[1].wrapping_add(ex[1]);
-        sx[2] = sx[2].wrapping_add(ex[2]);
-        sx[3] = sx[3].wrapping_add(ex[3]);
-        sx[4] = sx[4].wrapping_add(ex[4]);
-        sx[5] = sx[5].wrapping_add(ex[5]);
-        sx[6] = sx[6].wrapping_add(ex[6]);
-        sx[7] = sx[7].wrapping_add(ex[7]);
+    pub(crate) fn add(&mut self, other: &Self) {
+        let self_state = &mut self.0;
+        let other_state = &other.0;
+        self_state[0] = self_state[0].wrapping_add(other_state[0]);
+        self_state[1] = self_state[1].wrapping_add(other_state[1]);
+        self_state[2] = self_state[2].wrapping_add(other_state[2]);
+        self_state[3] = self_state[3].wrapping_add(other_state[3]);
+        self_state[4] = self_state[4].wrapping_add(other_state[4]);
+        self_state[5] = self_state[5].wrapping_add(other_state[5]);
+        self_state[6] = self_state[6].wrapping_add(other_state[6]);
+        self_state[7] = self_state[7].wrapping_add(other_state[7]);
     }
 
-    /// Writes the state as 64 bytes in big-endian order.
     pub(crate) fn store(&self, out: &mut [u8]) {
-        for (i, &e) in self.0.iter().enumerate() {
-            store_be(out, i * 8, e);
+        for (index, &word) in self.0.iter().enumerate() {
+            store_be(out, index * 8, word);
         }
     }
 
-    /// Processes as many 128-byte blocks as possible from the input.
-    ///
-    /// Returns the number of bytes remaining that do not form a complete block.
     pub(crate) fn blocks(&mut self, mut input: &[u8]) -> usize {
-        let mut t = *self;
+        let mut temp = *self;
         let mut inlen = input.len();
         while inlen >= 128 {
             let mut w = W::new(input);
-            w.g(&mut t, 0);
+            w.g(&mut temp, 0);
             w.expand();
-            w.g(&mut t, 1);
+            w.g(&mut temp, 1);
             w.expand();
-            w.g(&mut t, 2);
+            w.g(&mut temp, 2);
             w.expand();
-            w.g(&mut t, 3);
+            w.g(&mut temp, 3);
             w.expand();
-            w.g(&mut t, 4);
-            t.add(self);
-            self.0 = t.0;
+            w.g(&mut temp, 4);
+            temp.add(self);
+            self.0 = temp.0;
             input = &input[128..];
             inlen -= 128;
         }
@@ -367,244 +267,189 @@ impl State {
     }
 }
 
-/// SHA-512 hasher that supports incremental updates and finalization.
-///
-/// # Design rationale
-///
-/// The struct maintains internal state (`state`), a buffer for incomplete
-/// blocks (`w`), the number of buffered bytes (`r`), and the total message
-/// length in bytes (`len`). This design allows callers to feed data in
-/// arbitrary chunk sizes without requiring the entire message to be present in
-/// memory at once.
-///
-/// The struct is [`Clone`], enabling state duplication for HMAC and HKDF
-/// implementations that need to compute multiple hashes from a common
-/// intermediate state.
-///
-/// # Examples
-///
-/// Incrementally hash a message in two parts:
-///
-/// ```
-/// use libvctrl_sha512::Hash;
-///
-/// let mut hasher = Hash::new();
-/// hasher.update(b"hello ");
-/// hasher.update(b"world");
-/// let digest = hasher.finalize();
-/// assert_eq!(digest, Hash::hash(b"hello world"));
-/// ```
 #[derive(Clone)]
 pub struct Hash {
-    /// Current eight 64-bit working variables.
     pub(crate) state: State,
-
-    /// Buffer for incomplete blocks. Only the first `r` bytes are valid.
     pub(crate) w: [u8; 128],
-
-    /// Number of bytes currently buffered in `w`.
     pub(crate) r: usize,
-
-    /// Total length of input processed so far, in bytes.
     pub(crate) len: u128,
 }
 
+impl core::fmt::Debug for Hash {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("Hash")
+    }
+}
+
+impl zeroize::Zeroize for Hash {
+    fn zeroize(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.state.0);
+        zeroize::Zeroize::zeroize(&mut self.w);
+        zeroize::Zeroize::zeroize(&mut self.r);
+        zeroize::Zeroize::zeroize(&mut self.len);
+    }
+}
+
+impl Drop for Hash {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(self);
+    }
+}
+
 impl Hash {
-    /// Creates a new SHA-512 hasher with the standard initial state.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let hasher = Hash::new();
-    /// // The hasher is empty and ready to accept data.
-    /// ```
     #[must_use]
     pub fn new() -> Self {
         Self {
             state: State::new(),
             r: 0,
-            w: [0u8; 128],
+            w: [0_u8; 128],
             len: 0,
         }
     }
 
-    /// Internal method to feed data into the hasher without consuming self.
-    ///
-    /// This is used by both [`update`](Hash::update) and the HMAC/HKDF
-    /// implementations.
     pub(crate) fn update_inner<T: AsRef<[u8]>>(&mut self, input: T) {
         let input = input.as_ref();
-        let mut n = input.len();
-        self.len += n as u128;
-        let av = 128 - self.r;
-        let tc = core::cmp::min(n, av);
-        self.w[self.r..self.r + tc].copy_from_slice(&input[0..tc]);
-        self.r += tc;
-        n -= tc;
-        let pos = tc;
+        let mut remaining = input.len();
+        self.len += remaining as u128;
+        let available = 128 - self.r;
+        let take = core::cmp::min(remaining, available);
+        self.w[self.r..self.r + take].copy_from_slice(&input[0..take]);
+        self.r += take;
+        remaining -= take;
+        let pos = take;
         if self.r == 128 {
-            self.state.blocks(&self.w);
+            let _ = self.state.blocks(&self.w);
             self.r = 0;
         }
-        if self.r == 0 && n > 0 {
-            let rb = self.state.blocks(&input[pos..]);
-            if rb > 0 {
-                self.w[..rb].copy_from_slice(&input[pos + n - rb..]);
-                self.r = rb;
+        if self.r == 0 && remaining > 0 {
+            let leftover = self.state.blocks(&input[pos..]);
+            if leftover > 0 {
+                self.w[..leftover].copy_from_slice(&input[pos + remaining - leftover..]);
+                self.r = leftover;
             }
         }
     }
 
-    /// Feeds data into the hasher.
-    ///
-    /// This method may be called any number of times before
-    /// [`finalize`](Hash::finalize). The input is buffered until a full
-    /// 128-byte block is available, at which point the block is processed.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let mut hasher = Hash::new();
-    /// hasher.update(b"a");
-    /// hasher.update(b"b");
-    /// hasher.update(b"c");
-    /// assert_eq!(hasher.finalize(), Hash::hash(b"abc"));
-    /// ```
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T) {
         self.update_inner(input);
     }
 
-    /// Finalizes the hash computation and returns the 64-byte digest.
-    ///
-    /// # How it works
-    ///
-    /// The method consumes the hasher. It applies the standard SHA-512 padding:
-    /// appends a `0x80` byte, pads with zeros until the length is 112 bytes
-    /// (mod 128), and appends the original message length as a 128-bit
-    /// big-endian integer. The padded data is then processed, and the final
-    /// state is serialized as the digest.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let digest = Hash::hash(b"abc");
-    /// assert_eq!(digest.len(), 64);
-    /// ```
     #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn finalize(mut self) -> [u8; 64] {
-        let mut padded = [0u8; 256];
+        let mut padded = zeroize::Zeroizing::new([0_u8; 256]);
         padded[..self.r].copy_from_slice(&self.w[..self.r]);
         padded[self.r] = 0x80;
         let r = if self.r < 112 { 128 } else { 256 };
         let total_bits: u128 = self.len * 8;
         let high = (total_bits >> 64) as u64;
-        #[allow(clippy::cast_possible_truncation)]
         let low = total_bits as u64;
-        store_be(&mut padded, r - 16, high);
-        store_be(&mut padded, r - 8, low);
+        store_be(&mut *padded, r - 16, high);
+        store_be(&mut *padded, r - 8, low);
 
-        self.state.blocks(&padded[..r]);
-        let mut out = [0u8; 64];
+        let _ = self.state.blocks(&padded[..r]);
+        let mut out = [0_u8; 64];
         self.state.store(&mut out);
         out
     }
 
-    /// One-shot SHA-512 hash of the given input.
-    ///
-    /// This convenience method creates a new [`Hash`], feeds the entire input,
-    /// and finalizes it. It is equivalent to:
-    ///
-    /// ```no_compile
-    /// let mut h = Hash::new();
-    /// h.update(input);
-    /// h.finalize()
-    /// ```
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let digest = Hash::hash(b"");
-    /// let expected: [u8; 64] = [
-    ///     0xcf, 0x83, 0xe1, 0x35, 0x7e, 0xef, 0xb8, 0xbd,
-    ///     0xf1, 0x54, 0x28, 0x50, 0xd6, 0x6d, 0x80, 0x07,
-    ///     0xd6, 0x20, 0xe4, 0x05, 0x0b, 0x57, 0x15, 0xdc,
-    ///     0x83, 0xf4, 0xa9, 0x21, 0xd3, 0x6c, 0xe9, 0xce,
-    ///     0x47, 0xd0, 0xd1, 0x3c, 0x5d, 0x85, 0xf2, 0xb0,
-    ///     0xff, 0x83, 0x18, 0xd2, 0x87, 0x7e, 0xec, 0x2f,
-    ///     0x63, 0xb9, 0x31, 0xbd, 0x47, 0x41, 0x7a, 0x81,
-    ///     0xa5, 0x38, 0x32, 0x7a, 0xf9, 0x27, 0xda, 0x3e,
-    /// ];
-    /// assert_eq!(digest, expected);
-    /// ```
     pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 64] {
-        let mut h = Self::new();
-        h.update(input);
-        h.finalize()
+        let mut hasher = Self::new();
+        hasher.update(input);
+        hasher.finalize()
     }
 
-    /// Verifies that the hash of this instance matches the expected digest.
-    ///
-    /// # How it works
-    ///
-    /// Finalizes the current state and compares the resulting digest with
-    /// `expected` using a constant-time comparison algorithm. This prevents
-    /// timing attacks when verifying authentication tags or integrity checks.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let mut hasher = Hash::new();
-    /// hasher.update(b"abc");
-    /// let expected = Hash::hash(b"abc");
-    /// assert!(hasher.verify(&expected));
-    /// ```
     #[must_use]
     pub fn verify(self, expected: &[u8; 64]) -> bool {
         let out = self.finalize();
         verify(&out, expected)
     }
 
-    /// Zeroizes the internal state, buffer, and length counter.
-    ///
-    /// This method overwrites all sensitive internal data with zeros and
-    /// inserts a compiler fence to prevent the optimizer from eliminating the
-    /// writes. It is useful for security-sensitive applications that must
-    /// ensure no residual hash state remains in memory after use.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use libvctrl_sha512::Hash;
-    ///
-    /// let mut hasher = Hash::new();
-    /// hasher.update(b"secret");
-    /// hasher.zeroize();
-    /// // The hasher is now in a clean state and can be reused if desired.
-    /// ```
     pub fn zeroize(&mut self) {
-        self.state.0.fill(0);
-        self.w.fill(0);
-        self.r = 0;
-        self.len = 0;
-        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+        zeroize::Zeroize::zeroize(self);
     }
 }
 
 impl Default for Hash {
-    /// Returns a new SHA-512 hasher with the default initial state.
-    ///
-    /// Equivalent to [`Hash::new`].
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hash_empty_vector() {
+        let expected: [u8; 64] = [
+            0xcf, 0x83, 0xe1, 0x35, 0x7e, 0xef, 0xb8, 0xbd, 0xf1, 0x54, 0x28, 0x50, 0xd6, 0x6d,
+            0x80, 0x07, 0xd6, 0x20, 0xe4, 0x05, 0x0b, 0x57, 0x15, 0xdc, 0x83, 0xf4, 0xa9, 0x21,
+            0xd3, 0x6c, 0xe9, 0xce, 0x47, 0xd0, 0xd1, 0x3c, 0x5d, 0x85, 0xf2, 0xb0, 0xff, 0x83,
+            0x18, 0xd2, 0x87, 0x7e, 0xec, 0x2f, 0x63, 0xb9, 0x31, 0xbd, 0x47, 0x41, 0x7a, 0x81,
+            0xa5, 0x38, 0x32, 0x7a, 0xf9, 0x27, 0xda, 0x3e,
+        ];
+        assert_eq!(Hash::hash(b""), expected);
+    }
+
+    #[test]
+    fn test_hash_abc_vector() {
+        let expected: [u8; 64] = [
+            0xdd, 0xaf, 0x35, 0xa1, 0x93, 0x61, 0x7a, 0xba, 0xcc, 0x41, 0x73, 0x49, 0xae, 0x20,
+            0x41, 0x31, 0x12, 0xe6, 0xfa, 0x4e, 0x89, 0xa9, 0x7e, 0xa2, 0x0a, 0x9e, 0xee, 0xe6,
+            0x4b, 0x55, 0xd3, 0x9a, 0x21, 0x92, 0x99, 0x2a, 0x27, 0x4f, 0xc1, 0xa8, 0x36, 0xba,
+            0x3c, 0x23, 0xa3, 0xfe, 0xeb, 0xbd, 0x45, 0x4d, 0x44, 0x23, 0x64, 0x3c, 0xe8, 0x0e,
+            0x2a, 0x9a, 0xc9, 0x4f, 0xa5, 0x4c, 0xa4, 0x9f,
+        ];
+        assert_eq!(Hash::hash(b"abc"), expected);
+    }
+
+    #[test]
+    fn test_update_multiple_calls_equals_one_shot() {
+        let mut hasher = Hash::new();
+        hasher.update(b"abc");
+        hasher.update(b"def");
+        let multi = hasher.finalize();
+        let single = Hash::hash(b"abcdef");
+        assert_eq!(multi, single);
+    }
+
+    #[test]
+    fn test_verify_correct_and_incorrect() {
+        let expected = Hash::hash(b"abc");
+
+        let mut hasher = Hash::new();
+        hasher.update(b"abc");
+        assert!(hasher.verify(&expected));
+
+        let mut hasher = Hash::new();
+        hasher.update(b"abd");
+        assert!(!hasher.verify(&expected));
+    }
+
+    #[test]
+    fn test_w_new_loads_big_endian_words() {
+        let input = [
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+            0x17, 0x18,
+        ];
+        let w = W::new(&input);
+        assert_eq!(w.0[0], 0x0102_0304_0506_0708);
+        assert_eq!(w.0[1], 0x1112_1314_1516_1718);
+        assert_eq!(w.0[2], 0);
+    }
+
+    #[test]
+    fn test_w_ch_maj_bitwise_helpers() {
+        assert_eq!(W::ch(0b1100, 0b1010, 0b0110), 0b1010);
+        assert_eq!(W::maj(0b1100, 0b1010, 0b0110), 0b1110);
+    }
+
+    #[test]
+    fn test_state_add_merges_state_words() {
+        let mut state = State([1, 2, 3, 4, 5, 6, 7, 8]);
+        let other = State([10, 20, 30, 40, 50, 60, 70, 80]);
+        state.add(&other);
+        assert_eq!(state.0, [11, 22, 33, 44, 55, 66, 77, 88]);
     }
 }

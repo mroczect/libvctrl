@@ -1,29 +1,32 @@
 SHELL = /bin/bash
 .SHELLFLAGS = -euo pipefail -c
 
-CARGO   = cargo
-MEMBERS = libvctrl_handler libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl libvctrl_sha512
+CARGO          = cargo
+MEMBERS        = libvctrl_handler libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl libvctrl_sha512
+PUBLISH_ORDER  = libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl_handler libvctrl libvctrl_sha512
 
-# Default package jika ingin menjalankan CI untuk satu package
-PKG ?= libvctrl_handler
+PKG           ?= libvctrl_handler
 
-# Flag tambahan untuk Clippy (kosong = santai)
-CLIPPY_FLAGS ?=
+CLIPPY_FLAGS  ?= -- -D warnings
+
+.DEFAULT_GOAL := help
+
+.PHONY: help
+help:
+	@echo "Usage: make <target> [PKG=<package>] [CLIPPY_FLAGS=<flags>]"
+	@echo ""
+	@echo "Targets:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
+	@echo ""
+	@echo "Contoh:"
+	@echo "  make ci
+	@echo "  make clippy CLIPPY_FLAGS=''
+	@echo "  make test-pkg PKG=libvctrl_core"
 
 .PHONY: all
 all: build
 
-.PHONY: help
-help:
-	@echo "Usage: make <target> [PKG=<package>]"
-	@echo ""
-	@echo "Targets:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
-
-# ---------------------------------------------------------------------------
-# Global
-# ---------------------------------------------------------------------------
 .PHONY: build
 build:
 	$(CARGO) build --workspace
@@ -36,9 +39,16 @@ release:
 check:
 	$(CARGO) check --workspace
 
+.PHONY: check-all
+check-all:
+	$(CARGO) check --workspace --all-targets --all-features
+
 .PHONY: test
 test:
 	$(CARGO) test --workspace
+
+.PHONY: test-all
+test-all: test
 
 .PHONY: test-verbose
 test-verbose:
@@ -60,16 +70,25 @@ fmt:
 fmt-check:
 	$(CARGO) fmt --all -- --check
 
-# Clippy santai (tidak -D warnings)
 .PHONY: clippy
 clippy:
-	$(CARGO) clippy --all-targets --all-features $(CLIPPY_FLAGS)
+	$(CARGO) clippy --workspace --all-targets --all-features $(CLIPPY_FLAGS)
+
+.PHONY: clippy-all
+clippy-all: clippy
+
+.PHONY: clippy-strict
+clippy-strict:
+	$(CARGO) clippy --workspace --all-targets --all-features -- -D warnings
 
 .PHONY: lint
 lint: fmt clippy
 
 .PHONY: ci
 ci: fmt-check clippy test-verbose
+
+.PHONY: ci-fast
+ci-fast: fmt-check clippy test
 
 .PHONY: clean
 clean:
@@ -87,6 +106,11 @@ doc-open: doc
 bench:
 	$(CARGO) bench --workspace
 
+.PHONY: coverage
+coverage:
+	$(CARGO) llvm-cov --workspace --html
+	@echo "Coverage report: target/llvm-cov/html/index.html"
+
 .PHONY: update
 update:
 	$(CARGO) update
@@ -100,35 +124,21 @@ audit:
 	fi
 
 .PHONY: publish-check
-publish-check: check-readmes
+publish-check:
 	@for crate in $(MEMBERS); do \
-		echo "Packaging $$crate"; \
-		$(CARGO) package -p "$$crate" --no-verify || exit 1; \
+		echo "🔍 Memeriksa packaging $$crate"; \
+		$(CARGO) package -p "$$crate" || exit 1; \
 	done
-	@echo "All crates are ready for publish."
+	@echo "✅ Semua crate siap publish."
 
 .PHONY: publish-all
-publish-all: check-readmes
-	@echo "Publishing libvctrl_handler ..."
-	$(CARGO) publish -p libvctrl_handler
-	@sleep 5
-	@echo "Publishing libvctrl_core ..."
-	$(CARGO) publish -p libvctrl_core
-	@sleep 5
-	@echo "Publishing libvctrl_plumbing ..."
-	$(CARGO) publish -p libvctrl_plumbing
-	@sleep 5
-	@echo "Publishing libvctrl_porcelain ..."
-	$(CARGO) publish -p libvctrl_porcelain
-	@sleep 5
-	@echo "Publishing libvctrl (root) ..."
-	$(CARGO) publish -p libvctrl
-	@echo "All crates published successfully."
-
-.PHONY: coverage
-coverage:
-	$(CARGO) llvm-cov --workspace --html
-	@echo "Coverage report: target/llvm-cov/html/index.html"
+publish-all:
+	@for crate in $(PUBLISH_ORDER); do \
+		echo "📦 Publishing $$crate ..."; \
+		$(CARGO) publish -p $$crate || exit 1; \
+		sleep 5; \
+	done
+	@echo "✅ Semua crate berhasil dipublish."
 
 .PHONY: version
 version:
@@ -161,7 +171,7 @@ snap:
 
 .PHONY: run
 run:
-	$(CARGO) run
+	$(CARGO) run -p $(PKG)
 
 .PHONY: install
 install:
@@ -174,9 +184,6 @@ uninstall:
 .PHONY: rebuild
 rebuild: release install
 
-# ---------------------------------------------------------------------------
-# Package-specific targets (pkg=<name>)
-# ---------------------------------------------------------------------------
 .PHONY: build-pkg
 build-pkg:
 	$(CARGO) build -p $(PKG)
@@ -205,20 +212,19 @@ fmt-pkg:
 fmt-check-pkg:
 	$(CARGO) fmt -p $(PKG) -- --check
 
-# Clippy per package (santai)
 .PHONY: clippy-pkg
 clippy-pkg:
 	$(CARGO) clippy -p $(PKG) --all-targets --all-features $(CLIPPY_FLAGS)
 
-# Alias backward-compatible
-.PHONY: clippy-pkg-unwarn
-clippy-pkg-unwarn: clippy-pkg
+.PHONY: clippy-pkg-strict
+clippy-pkg-strict:
+	$(CARGO) clippy -p $(PKG) --all-targets --all-features -- -D warnings
 
 .PHONY: ci-pkg
 ci-pkg: fmt-check-pkg clippy-pkg test-verbose-pkg
 
-.PHONY: ci-pkg-unwarn
-ci-pkg-unwarn: ci-pkg
+.PHONY: ci-pkg-strict
+ci-pkg-strict: fmt-check-pkg clippy-pkg-strict test-verbose-pkg
 
 .PHONY: doc-pkg
 doc-pkg:
@@ -232,9 +238,6 @@ watch-test-pkg:
 watch-build-pkg:
 	$(CARGO) watch -x 'check -p $(PKG)'
 
-# ---------------------------------------------------------------------------
-# Convenience aliases for common packages
-# ---------------------------------------------------------------------------
 .PHONY: handler
 handler: PKG=libvctrl_handler
 handler: ci-pkg
@@ -258,8 +261,3 @@ root-pkg: ci-pkg
 .PHONY: sha512
 sha512: PKG=libvctrl_sha512
 sha512: ci-pkg
-
-# Target khusus kalau mau lebih ketat
-.PHONY: clippy-strict
-clippy-strict:
-	$(CARGO) clippy --all-targets --all-features -- -D warnings

@@ -1,8 +1,9 @@
 #![allow(missing_docs)]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
+use criterion as _;
 
-use core::error::Error as StdError;
+use core::error::Error as _;
 use libvctrl_handler::*;
 
 fn make_hash(byte: u8) -> Hash {

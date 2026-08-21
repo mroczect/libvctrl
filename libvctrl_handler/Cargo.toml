@@ -1,6 +1,6 @@
 [package]
 name = "libvctrl_handler"
-version = "5.0.1"
+version = "5.2.0"
 edition = "2024"
 description = "Fundamental contracts for building a version control system – no implementations, only traits and types"
 license = "MIT"
@@ -14,3 +14,10 @@ categories = ["development-tools", "data-structures"]
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "handler_bench"
+harness = false

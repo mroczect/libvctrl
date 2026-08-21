@@ -1,16 +1,15 @@
 //! Integration tests for the cat-file plumbing command.
 
-use libvctrl::{BinaryDecoder, BinaryEncoder};
+use std::io::Cursor;
+
 use libvctrl::{
-    Blob, Commit, Encoder, EntryKind, Hash, Hasher, ObjectStore, Tag, Tree, TreeEntry, UserID,
-    VctrlError,
+    BinaryDecoder, BinaryEncoder, Blob, Commit, Encoder, EntryKind, Hash, Hasher, MemoryStore,
+    ObjectStore, Sha512Hasher, Tag, Tree, TreeEntry, UserID, VctrlError,
 };
-use libvctrl::{MemoryStore, Sha512Hasher};
 use libvctrl_core as _;
 use libvctrl_plumbing::cat_file::{
     BatchOptions, CatFileMode, ObjectType, cat_file, cat_file_batch,
 };
-use std::io::Cursor;
 
 // Helper: build a minimal repository with one object of each type
 struct TestRepo {
@@ -185,7 +184,7 @@ fn object_size() -> Result<(), VctrlError> {
     let size: usize = utf8_string(out)?
         .trim()
         .parse::<usize>()
-        .map_err(|e: std::num::ParseIntError| VctrlError::Other(e.to_string()))?;
+        .map_err(|e: core::num::ParseIntError| VctrlError::Other(e.to_string()))?;
     assert!(size > 0);
     Ok(())
 }

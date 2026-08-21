@@ -263,7 +263,7 @@ checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
 name = "libvctrl"
-version = "2.1.2"
+version = "2.2.0"
 dependencies = [
  "libvctrl_core",
  "libvctrl_handler",
@@ -273,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "libvctrl_core"
-version = "3.0.0"
+version = "3.2.0"
 dependencies = [
  "libvctrl_handler",
  "libvctrl_sha512",
@@ -282,11 +282,14 @@ dependencies = [
 
 [[package]]
 name = "libvctrl_handler"
-version = "5.0.0"
+version = "5.2.0"
+dependencies = [
+ "criterion",
+]
 
 [[package]]
 name = "libvctrl_plumbing"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "libvctrl",
  "libvctrl_core",
@@ -298,9 +301,10 @@ version = "0.1.0"
 
 [[package]]
 name = "libvctrl_sha512"
-version = "3.0.0"
+version = "3.2.0"
 dependencies = [
  "criterion",
+ "zeroize",
 ]
 
 [[package]]
@@ -716,6 +720,12 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "zeroize"
+version = "1.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
 
 [[package]]
 name = "zmij"
