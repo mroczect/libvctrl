@@ -15,12 +15,11 @@ description = "libvctrl backend backed by monumentum storage engine"
 
 [dependencies]
 libvctrl_handler = { path = "../libvctrl_handler" }
-monumentum_handler = { path = "../../monumentum/monumentum_handler" }
-monumentum_core = { path = "../../monumentum/monumentum_core" }
+monumentum_handler = { git = "https://github.com/mroczect/monumentum", branch = "master" }
+monumentum_core = { git = "https://github.com/mroczect/monumentum", branch = "master" }
 
 [dev-dependencies]
 libvctrl = { path = "../libvctrl" }
-monumentum_core = { path = "../../monumentum/monumentum_core" }
 
 [lints]
 workspace = true
