@@ -12,6 +12,8 @@ pub use handler::macros;
 pub use handler::traits;
 pub use handler::types;
 pub use handler::validation;
+pub mod repository;
+pub use repository::{FileToCommit, Repository};
 
 pub use handler::{
     HASH_LENGTH, MAX_BLOB_SIZE, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, MAX_PARENT_COUNT,
