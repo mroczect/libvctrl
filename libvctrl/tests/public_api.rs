@@ -119,14 +119,12 @@ fn codec_roundtrip_through_public_api() -> Result<(), VctrlError> {
     let encoder = BinaryEncoder;
     let decoder = BinaryDecoder;
 
-    // Blob
     let blob = Blob::new(b"roundtrip".to_vec())?;
     let mut buf = Vec::new();
     encoder.encode_blob(&blob, &mut buf)?;
     let decoded_blob = decoder.decode_blob(std::io::Cursor::new(buf))?;
     assert_eq!(decoded_blob.data(), blob.data());
 
-    // Tree
     let hash = make_hash(0x33)?;
     let entry = TreeEntry::new("a.txt".to_string(), EntryKind::Blob, hash)?;
     let tree = Tree::new(vec![entry])?;
@@ -135,7 +133,6 @@ fn codec_roundtrip_through_public_api() -> Result<(), VctrlError> {
     let decoded_tree = decoder.decode_tree(std::io::Cursor::new(buf))?;
     assert_eq!(decoded_tree.entries().len(), 1);
 
-    // Commit
     let author = make_user("Alice", "alice@example.com")?;
     let committer = make_user("Bob", "bob@example.com")?;
     let meta = CommitMeta::new(1_600_000_000, 0, None)?;
@@ -152,7 +149,6 @@ fn codec_roundtrip_through_public_api() -> Result<(), VctrlError> {
     let decoded_commit = decoder.decode_commit(std::io::Cursor::new(buf))?;
     assert_eq!(decoded_commit.message(), "commit");
 
-    // Tag
     let tagger = make_user("Tagger", "tagger@example.com")?;
     let tag = Tag::with_meta(
         "v1.0".to_string(),
