@@ -1,3 +1,5 @@
+use crate::Decoder;
+use crate::ObjectStore;
 use crate::errors::VctrlError;
 
 pub trait Index: Send + Sync {
@@ -16,5 +18,11 @@ pub trait Index: Send + Sync {
     }
     fn entries(&self) -> Result<Vec<Self::Entry>, VctrlError>;
     fn write_tree(&self) -> Result<Self::TreeId, VctrlError>;
-    fn read_tree(&mut self, tree: &Self::TreeId) -> Result<(), VctrlError>;
+
+    fn read_tree<D: Decoder>(
+        &mut self,
+        store: &dyn ObjectStore,
+        decoder: &D,
+        tree: &Self::TreeId,
+    ) -> Result<(), VctrlError>;
 }
