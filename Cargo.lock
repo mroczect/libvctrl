@@ -342,6 +342,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "monumentum_core"
 version = "0.1.0"
+source = "git+https://github.com/mroczect/monumentum?branch=master#3f0c7afce370841de8d3702b835ea82600423fcc"
 dependencies = [
  "fs2",
  "monumentum_handler",
@@ -350,6 +351,7 @@ dependencies = [
 [[package]]
 name = "monumentum_handler"
 version = "0.1.0"
+source = "git+https://github.com/mroczect/monumentum?branch=master#3f0c7afce370841de8d3702b835ea82600423fcc"
 
 [[package]]
 name = "num-traits"
