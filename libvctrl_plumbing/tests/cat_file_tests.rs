@@ -1,5 +1,3 @@
-//! Integration tests for the cat-file plumbing command.
-
 use std::io::Cursor;
 
 use libvctrl::{
@@ -11,7 +9,6 @@ use libvctrl_plumbing::cat_file::{
     BatchOptions, CatFileMode, ObjectType, cat_file, cat_file_batch,
 };
 
-// Helper: build a minimal repository with one object of each type
 struct TestRepo {
     store: MemoryStore,
     decoder: BinaryDecoder,
@@ -29,14 +26,12 @@ impl TestRepo {
 
         let user = UserID::new("Alice".into(), "alice@example.com".into())?;
 
-        // Blob
         let blob = Blob::new(b"hello, world\n".to_vec())?;
         let mut enc_blob = Vec::new();
         encoder.encode_blob(&blob, &mut enc_blob)?;
         let blob_hash = hasher.hash(enc_blob.as_slice())?;
         store.put(&blob_hash, &enc_blob)?;
 
-        // Tree with one entry pointing to the blob
         let entry = TreeEntry::new("file.txt".into(), EntryKind::Blob, blob_hash)?;
         let tree = Tree::new(vec![entry])?;
         let mut enc_tree = Vec::new();
@@ -44,7 +39,6 @@ impl TestRepo {
         let tree_hash = hasher.hash(enc_tree.as_slice())?;
         store.put(&tree_hash, &enc_tree)?;
 
-        // Commit
         let commit = Commit::new(
             tree_hash,
             vec![],
@@ -57,7 +51,6 @@ impl TestRepo {
         let commit_hash = hasher.hash(enc_commit.as_slice())?;
         store.put(&commit_hash, &enc_commit)?;
 
-        // Tag pointing to the commit
         let tag = Tag::new("v1.0".into(), commit_hash, Some(user), "Release\n".into())?;
         let mut enc_tag = Vec::new();
         encoder.encode_tag(&tag, &mut enc_tag)?;

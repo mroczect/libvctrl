@@ -9,3 +9,4 @@ issue*
 /dist
 release*
 !release.json
+a.sh

@@ -66,7 +66,7 @@ fn bench_validate_refs(c: &mut Criterion) {
 }
 
 fn bench_hash_parse(c: &mut Criterion) {
-    let hex_str = "ab".repeat(HASH_LENGTH); // 64 byte hex = 128 char
+    let hex_str = "ab".repeat(HASH_LENGTH);
     let _ = c.bench_function("hash/from_hex_string", |b| {
         b.iter(|| {
             let _ = black_box(Hash::from_str(&hex_str));
@@ -75,7 +75,7 @@ fn bench_hash_parse(c: &mut Criterion) {
 }
 
 fn bench_blob_new(c: &mut Criterion) {
-    let data = vec![0x42_u8; 1024 * 1024]; // 1 MiB
+    let data = vec![0x42_u8; 1024 * 1024];
     let _ = c.bench_function("blob/new_1MiB", |b| {
         b.iter_batched(
             || data.clone(),

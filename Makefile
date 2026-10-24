@@ -158,11 +158,11 @@ snap:
 	@for crate in $(MEMBERS); do \
 		if [ -d "$$crate" ]; then \
 			echo "Snapping $$crate/src"; \
-			snapcat "$$crate/src" -f markdown -o "dev/$$crate.src.snapcat.md" || true; \
+			snapcat "$$crate/src" --format markdown > "dev/$$crate.src.snapcat.md" || true; \
 		fi; \
 		if [ -d "$$crate/tests" ]; then \
 			echo "Snapping $$crate/tests"; \
-			snapcat "$$crate/tests" -f markdown -o "dev/$$crate.tests.snapcat.md" || true; \
+			snapcat "$$crate/tests" --format markdown > "dev/$$crate.tests.snapcat.md" || true; \
 		fi; \
 	done
 	@echo "Merging all snapshots into dev/root.md"

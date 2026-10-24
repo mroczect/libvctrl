@@ -1,5 +1,5 @@
 use criterion as _;
-use libvctrl_handler::{Index, VctrlError};
+use libvctrl_handler::{Decoder, Index, ObjectStore, VctrlError};
 mod common;
 
 #[derive(Debug)]
@@ -15,36 +15,34 @@ impl Index for MockIndex {
     fn add(&mut self, _entry: Self::Entry) -> Result<(), VctrlError> {
         Ok(())
     }
-
     fn remove(&mut self, _path: &Self::Path) -> Result<(), VctrlError> {
         Ok(())
     }
-
     fn clear(&mut self) -> Result<(), VctrlError> {
         Ok(())
     }
-
     fn get(&self, _path: &Self::Path) -> Result<Option<Self::Entry>, VctrlError> {
         Ok(None)
     }
-
     fn contains(&self, _path: &Self::Path) -> Result<bool, VctrlError> {
         Ok(false)
     }
-
     fn len(&self) -> Result<usize, VctrlError> {
         Ok(self.len)
     }
-
     fn entries(&self) -> Result<Vec<Self::Entry>, VctrlError> {
         Ok(Vec::new())
     }
-
     fn write_tree(&self) -> Result<Self::TreeId, VctrlError> {
         Ok(())
     }
 
-    fn read_tree(&mut self, _tree: &Self::TreeId) -> Result<(), VctrlError> {
+    fn read_tree<D: Decoder>(
+        &mut self,
+        _store: &dyn ObjectStore,
+        _decoder: &D,
+        _tree: &Self::TreeId,
+    ) -> Result<(), VctrlError> {
         Ok(())
     }
 }
