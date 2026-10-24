@@ -1,4 +1,4 @@
-use alloc::vec::IntoIter;
+use alloc::vec::Vec;
 use std::collections::HashMap;
 
 use libvctrl_handler::{Hash, RefStore, VctrlError};
@@ -18,8 +18,6 @@ impl MemoryRefStore {
 }
 
 impl RefStore for MemoryRefStore {
-    type RefsIterator = IntoIter<Result<String, VctrlError>>;
-
     fn set_ref(&mut self, name: &str, hash: &Hash) -> Result<(), VctrlError> {
         libvctrl_handler::validate_ref_name(name)?;
         let _ = self.refs.insert(name.to_string(), *hash);
@@ -38,10 +36,10 @@ impl RefStore for MemoryRefStore {
         Ok(())
     }
 
-    fn list_refs(&self) -> Result<Self::RefsIterator, VctrlError> {
+    fn list_refs(&self) -> Result<Vec<String>, VctrlError> {
         let mut names: Vec<String> = self.refs.keys().cloned().collect();
         names.sort();
-        Ok(names.into_iter().map(Ok).collect::<Vec<_>>().into_iter())
+        Ok(names)
     }
 }
 
@@ -57,10 +55,8 @@ mod tests {
     fn set_and_get_ref_roundtrip() -> Result<(), VctrlError> {
         let mut store = MemoryRefStore::new();
         let hash = hash_byte(0xAB)?;
-
         store.set_ref("refs/heads/main", &hash)?;
-        let got = store.get_ref("refs/heads/main")?;
-        assert_eq!(got, hash);
+        assert_eq!(store.get_ref("refs/heads/main")?, hash);
         Ok(())
     }
 
@@ -97,7 +93,7 @@ mod tests {
         store.set_ref("refs/heads/b", &h1)?;
         store.set_ref("refs/heads/a", &h2)?;
 
-        let names: Vec<String> = store.list_refs()?.collect::<Result<_, _>>()?;
+        let names = store.list_refs()?;
         assert_eq!(
             names,
             vec!["refs/heads/a".to_string(), "refs/heads/b".to_string()]
