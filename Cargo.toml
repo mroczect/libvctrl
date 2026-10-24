@@ -2,7 +2,7 @@
 members = [
   "libvctrl",
   "libvctrl_core",
-  "libvctrl_handler",
+  "libvctrl_handler", "libvctrl_monumentum",
   "libvctrl_plumbing",
   "libvctrl_porcelain",
   "libvctrl_sha512"
