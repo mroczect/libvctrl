@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-###############################################################################
-# Release preparation script
-# Runs tests & clippy, then creates and pushes a git tag to trigger CI.
-###############################################################################
 
 readonly LOG_FILE="release_$(date +%Y%m%d_%H%M%S).log"
 
