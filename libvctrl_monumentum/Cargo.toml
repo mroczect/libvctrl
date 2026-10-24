@@ -1,0 +1,25 @@
+[package]
+name = "libvctrl_monumentum"
+version = "0.1.0"
+authors.workspace = true
+categories.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+description = "libvctrl backend backed by monumentum storage engine"
+
+[dependencies]
+libvctrl_handler = { path = "../libvctrl_handler" }
+monumentum_handler = { git = "https://github.com/mroczect/monumentum", branch = "master" }
+monumentum_core = { git = "https://github.com/mroczect/monumentum", branch = "master" }
+
+[dev-dependencies]
+libvctrl = { path = "../libvctrl" }
+
+[lints]
+workspace = true

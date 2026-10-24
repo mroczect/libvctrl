@@ -202,7 +202,7 @@ fn memory_ref_store_works() -> Result<(), VctrlError> {
     store.set_ref("refs/heads/main", &hash)?;
     assert_eq!(store.get_ref("refs/heads/main")?, hash);
 
-    let refs: Vec<String> = store.list_refs()?.collect::<Result<_, _>>()?;
+    let refs = store.list_refs()?;
     assert_eq!(refs, vec!["refs/heads/main".to_string()]);
 
     store.delete_ref("refs/heads/main")?;

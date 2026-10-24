@@ -207,6 +207,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -263,7 +273,7 @@ checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
 name = "libvctrl"
-version = "2.2.0"
+version = "2.2.1"
 dependencies = [
  "libvctrl_core",
  "libvctrl_handler",
@@ -273,7 +283,7 @@ dependencies = [
 
 [[package]]
 name = "libvctrl_core"
-version = "3.2.0"
+version = "3.2.1"
 dependencies = [
  "libvctrl_handler",
  "libvctrl_sha512",
@@ -282,9 +292,19 @@ dependencies = [
 
 [[package]]
 name = "libvctrl_handler"
-version = "5.2.0"
+version = "5.2.1"
 dependencies = [
  "criterion",
+]
+
+[[package]]
+name = "libvctrl_monumentum"
+version = "0.1.0"
+dependencies = [
+ "libvctrl",
+ "libvctrl_handler",
+ "monumentum_core",
+ "monumentum_handler",
 ]
 
 [[package]]
@@ -318,6 +338,20 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "monumentum_core"
+version = "0.1.0"
+source = "git+https://github.com/mroczect/monumentum?branch=master#3f0c7afce370841de8d3702b835ea82600423fcc"
+dependencies = [
+ "fs2",
+ "monumentum_handler",
+]
+
+[[package]]
+name = "monumentum_handler"
+version = "0.1.0"
+source = "git+https://github.com/mroczect/monumentum?branch=master#3f0c7afce370841de8d3702b835ea82600423fcc"
 
 [[package]]
 name = "num-traits"

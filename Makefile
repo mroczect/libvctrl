@@ -2,8 +2,8 @@ SHELL = /bin/bash
 .SHELLFLAGS = -euo pipefail -c
 
 CARGO          = cargo
-MEMBERS        = libvctrl_handler libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl libvctrl_sha512
-PUBLISH_ORDER  = libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl_handler libvctrl libvctrl_sha512
+MEMBERS        = libvctrl_handler libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl libvctrl_sha512 libvctrl_monumentum
+PUBLISH_ORDER  = libvctrl_core libvctrl_plumbing libvctrl_porcelain libvctrl_handler libvctrl libvctrl_sha512 libvctrl_monumentum
 
 PKG           ?= libvctrl_handler
 

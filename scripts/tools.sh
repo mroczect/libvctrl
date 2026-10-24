@@ -5,11 +5,11 @@ WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CRATES=(
 	"libvctrl"
 	"libvctrl_core"
-	"libvctrl_docs"
 	"libvctrl_handler"
 	"libvctrl_plumbing"
 	"libvctrl_porcelain"
 	"libvctrl_sha512"
+	"libvctrl_monumentum"
 )
 DRY_RUN=false
 
