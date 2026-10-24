@@ -47,10 +47,9 @@ fn memory_ref_store_roundtrip_and_list() -> Result<(), VctrlError> {
 
     store.set_ref("refs/heads/main", &h1)?;
     store.set_ref("refs/heads/dev", &h2)?;
-
     assert_eq!(store.get_ref("refs/heads/main")?, h1);
 
-    let names: Vec<String> = store.list_refs()?.collect::<Result<_, _>>()?;
+    let names = store.list_refs()?;
     assert_eq!(
         names,
         vec!["refs/heads/dev".to_string(), "refs/heads/main".to_string()]
@@ -58,7 +57,6 @@ fn memory_ref_store_roundtrip_and_list() -> Result<(), VctrlError> {
 
     store.delete_ref("refs/heads/dev")?;
     assert!(store.get_ref("refs/heads/dev").is_err());
-
     Ok(())
 }
 
